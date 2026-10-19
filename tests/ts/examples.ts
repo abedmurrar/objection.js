@@ -1,3 +1,4 @@
+import { Equal } from './_utils/expect';
 import Ajv from 'ajv';
 import { Knex, knex } from 'knex';
 import * as objection from '../../';
@@ -171,9 +172,7 @@ function takesModelSubclass<M extends objection.Model>(m: M) {}
 function takesModel(m: objection.Model) {}
 function takesModelClass(m: objection.ModelClass<any>) {}
 
-// Borrowed from https://github.com/TypeStrong/ts-expect/blob/39f04b5/src/index.ts
-type TypeEqual<T, U> =
-  Exclude<T, U> extends never ? (Exclude<U, T> extends never ? true : false) : false;
+type TypeEqual<T, U> = Equal<T, U>;
 const expectsTrue = <T extends true>() => 1;
 
 const takesPerson = (person: Person) => {
