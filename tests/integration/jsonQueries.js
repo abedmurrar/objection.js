@@ -1451,5 +1451,105 @@ module.exports = (session) => {
         });
       });
     });
+
+    describe('special characters in field expression keys', () => {
+      const keys = [
+        "x') or 1=1 --",
+        "x'}'; drop table ModelJson; --",
+        'a?b',
+        '??',
+        '\\?',
+        'a\\b',
+        'a"b',
+        'a,b',
+        '{}',
+        'a b',
+        'NULL',
+        'a\nb',
+      ];
+
+      // Keys with a double quote need to be written using single quotes.
+      const keyExpr = (key) => (key.includes('"') ? `['${key}']` : `["${key}"]`);
+
+      beforeEach(async () => {
+        await BoundModel.query().delete();
+        await BoundModel.query().insert([
+          {
+            id: 1,
+            name: 'has keys',
+            jsonObject: Object.fromEntries(keys.map((key, i) => [key, { n: i }])),
+          },
+          { id: 2, name: 'other', jsonObject: { other: { n: -1 } } },
+        ]);
+      });
+
+      keys.forEach((key, i) => {
+        describe(JSON.stringify(key), () => {
+          const expr = `jsonObject:${keyExpr(key)}`;
+
+          it('select(ref)', async () => {
+            const rows = await BoundModel.query()
+              .select(ref(expr).as('value'), ref(`${expr}.n`).castInt().as('n'))
+              .orderBy('id');
+
+            expect(rows).to.eql([
+              { value: { n: i }, n: i },
+              { value: null, n: null },
+            ]);
+          });
+
+          it('where(ref)', async () => {
+            expectIdsEqual(await BoundModel.query().where(ref(`${expr}.n`).castInt(), i), [1]);
+            expectIdsEqual(await BoundModel.query().whereNotNull(ref(expr)), [1]);
+          });
+
+          it('whereJson* methods', async () => {
+            expectIdsEqual(await BoundModel.query().whereJsonIsObject(expr), [1]);
+            expectIdsEqual(await BoundModel.query().whereJsonNotObject(expr), [2]);
+            expectIdsEqual(await BoundModel.query().whereJsonSupersetOf(expr, { n: i }), [1]);
+            expectIdsEqual(await BoundModel.query().whereJsonSubsetOf(expr, { n: i, x: 1 }), [1]);
+            expectIdsEqual(await BoundModel.query().where(ref(`${expr}.n`), '=', i), [1]);
+          });
+
+          it('whereJsonHasAny and whereJsonHasAll with the key as a value', async () => {
+            expectIdsEqual(await BoundModel.query().whereJsonHasAny('jsonObject', key), [1]);
+            expectIdsEqual(await BoundModel.query().whereJsonHasAll('jsonObject', [key, 'a?b']), [
+              1,
+            ]);
+          });
+
+          it('patch', async () => {
+            const numUpdated = await BoundModel.query()
+              .patch({ [`${expr}.n`]: 100 })
+              .where('id', 1);
+
+            expect(numUpdated).to.equal(1);
+
+            const [row1, row2] = await BoundModel.query().orderBy('id');
+            expect(row1.jsonObject[key]).to.eql({ n: 100 });
+
+            keys
+              .filter((other) => other !== key)
+              .forEach((other) => {
+                expect(row1.jsonObject[other]).to.eql({ n: keys.indexOf(other) });
+              });
+
+            expect(row2.jsonObject).to.eql({ other: { n: -1 } });
+          });
+        });
+      });
+
+      it('works with standard_conforming_strings = off', async () => {
+        await session.knex.transaction(async (trx) => {
+          await trx.raw('SET LOCAL standard_conforming_strings = off');
+
+          const rows = await BoundModel.query(trx)
+            .select(ref(`jsonObject:${keyExpr('a\\b')}.n`).as('n'))
+            .where(ref(`jsonObject:${keyExpr("x') or 1=1 --")}.n`).castInt(), 0);
+
+          expect(rows).to.eql([{ n: keys.indexOf('a\\b') }]);
+        });
+      });
+    });
   });
 };

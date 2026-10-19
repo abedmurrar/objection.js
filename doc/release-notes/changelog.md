@@ -1,5 +1,19 @@
 # Changelog
 
+## 4.0.0 (unreleased)
+
+### Security
+
+- Escape the keys of JSON field expressions. Keys containing `'` allowed SQL injection through `ref('col:key')`, `patch({ 'col:key': value })`, `onConflict().merge()` and the `whereJson*` methods, and keys containing `?` corrupted the bindings. Keys with `,`, `{`, `}`, `"`, whitespace or `NULL` now refer to the actual key instead of being split [#2077](https://github.com/Vincit/objection.js/issues/2077)
+
+### Breaking changes
+
+- JSON field expressions (`'col:key'`) and the `whereJson*` methods throw on databases other than postgres instead of generating invalid SQL. On MySQL the generated `#>` started a comment, silently dropping the rest of the `where` clause.
+
+### What's new
+
+- Fix infinite recursion in `andWhereJsonNotSupersetOf()`
+
 ## 3.1.5
 
 ### What's new
