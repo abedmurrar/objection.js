@@ -46,6 +46,20 @@ This method takes one argument (the owner(s) of the relation) and it can have an
 - A model instance.
 - An array of model instances.
 
+The query is rejected (and `toKnexQuery()` throws) without running any hooks or SQL if:
+
+- `for()` is used on a query that wasn't created using `relatedQuery`. Before this was checked, `Person.query().for(1).delete()` deleted every row.
+- A write method (`insert`, `update`, `patch`, `delete`, `relate`, `unrelate`, `increment`, `decrement`) is called on a `relatedQuery` without calling `for()` first, or `for()` is called after the write method.
+
+```js
+// OK
+await Person.relatedQuery('pets').for(1).delete();
+
+// Rejected
+await Person.relatedQuery('pets').delete().for(1);
+await Person.query().for(1).delete();
+```
+
 ## context()
 
 ```js

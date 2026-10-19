@@ -1023,8 +1023,8 @@ describe('QueryBuilder', () => {
       update: TestModel.query().update(),
       patch: TestModel.query().patch(),
       delete: TestModel.query().delete(),
-      relate: TestModel.relatedQuery('someRel').relate(1),
-      unrelate: TestModel.relatedQuery('someRel').unrelate(),
+      relate: TestModel.relatedQuery('someRel').for(1).relate(1),
+      unrelate: TestModel.relatedQuery('someRel').for(1).unrelate(),
     };
 
     // Check all types of operations, call all available checks for reach of them,
