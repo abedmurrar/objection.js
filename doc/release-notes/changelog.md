@@ -8,6 +8,7 @@
 
 ### Breaking changes
 
+- `orWhere` (and raw `where` clauses) can no longer escape the conditions objection adds itself. `$relatedQuery('pets').where(a).orWhere(b).delete()` used to produce `owner and a or b` (or `a or b and owner` for writes) and touch the rows of other owners. The same applied to relation `filter`/`modify`, `joinTableModify`, `relate()`, `unrelate()`, `$query()`, `deleteById()`, `patchAndFetchById()`, `updateAndFetchById()` and static `relatedQuery()` subqueries. These clauses are now wrapped in parentheses. Queries without such clauses generate the same SQL as before. A `findById()` you call yourself is not grouped, so `findById(1).orWhere(...)` still means "id = 1 or ...". [#2191](https://github.com/Vincit/objection.js/issues/2191), [#1909](https://github.com/Vincit/objection.js/issues/1909)
 - `for()` can only be used with queries created using the static `relatedQuery()`. Before, `Person.query().for(1).delete()` ignored `for()` and deleted every row. Write methods of `relatedQuery()` reject if `for()` is not called before them; before, `delete().for(1)` silently did nothing and `insert().for(1)` inserted rows with `null` foreign keys [#2185](https://github.com/Vincit/objection.js/issues/2185)
 - JSON field expressions (`'col:key'`) and the `whereJson*` methods throw on databases other than postgres instead of generating invalid SQL. On MySQL the generated `#>` started a comment, silently dropping the rest of the `where` clause.
 
