@@ -165,3 +165,15 @@ class ForgotStaticQueryBuilder extends Model {
 
 // @ts-expect-error
 ForgotStaticQueryBuilder.query().active();
+
+// Modifiers typed for a subtype of the model (like a row type with computed
+// columns) can be used too.
+interface PersonWithPetCount extends Person {
+  petCount: number;
+}
+
+function withPetCount(query: QueryBuilder<PersonWithPetCount>) {
+  query.select(Person.relatedQuery('pets').count().as('petCount'));
+}
+
+Person.query().modify(withPetCount);

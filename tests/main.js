@@ -61,4 +61,13 @@ describe('main module', () => {
     expect(objection.NotNullViolationError).to.equal(require('db-errors').NotNullViolationError);
     expect(objection.DataError).to.equal(require('db-errors').DataError);
   });
+
+  it('defineRelations should return the relation mappings as is', () => {
+    const { defineRelations } = require('../');
+    const thunk = () => ({});
+    const mappings = {};
+
+    expect(defineRelations(thunk)).to.equal(thunk);
+    expect(defineRelations(mappings)).to.equal(mappings);
+  });
 });

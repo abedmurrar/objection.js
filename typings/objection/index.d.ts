@@ -27,6 +27,13 @@ declare namespace Objection {
 
   const compose: ComposeFunction;
   const mixin: MixinFunction;
+  const defineRelations: DefineRelationsFunction;
+
+  const BelongsToOneRelation: RelationType<'one'>;
+  const HasOneRelation: RelationType<'one'>;
+  const HasManyRelation: RelationType<'many'>;
+  const ManyToManyRelation: RelationType<'many'>;
+  const HasOneThroughRelation: RelationType<'one'>;
 
   const snakeCaseMappers: SnakeCaseMappersFactory;
   const knexSnakeCaseMappers: KnexSnakeCaseMappersFactory;
@@ -250,9 +257,9 @@ declare namespace Objection {
    */
   type ModelProps<T extends Model> = Exclude<
     {
-      [K in keyof T]?: Defined<T[K]> extends Model
+      [K in keyof T]?: NonNullable<T[K]> extends Model
         ? never
-        : Defined<T[K]> extends Array<infer I>
+        : NonNullable<T[K]> extends Array<infer I>
           ? I extends Model
             ? never
             : K
@@ -268,9 +275,9 @@ declare namespace Objection {
    */
   type ModelRelations<T extends Model> = Defined<
     {
-      [K in keyof T]?: Defined<T[K]> extends Model
+      [K in keyof T]?: NonNullable<T[K]> extends Model
         ? K
-        : Defined<T[K]> extends Array<infer I>
+        : NonNullable<T[K]> extends Array<infer I>
           ? I extends Model
             ? K
             : never
@@ -283,7 +290,8 @@ declare namespace Objection {
    * correct kind if the property is a model or a model array.
    */
   type RelatedQueryBuilder<T> = T extends Model
-    ? SingleQueryBuilder<QueryBuilderType<T>>
+    ? // A to-one relation query returns `undefined` if there is no related model.
+      MaybeSingleQueryBuilder<QueryBuilderType<T>>
     : T extends Array<infer I>
       ? I extends Model
         ? QueryBuilderType<I>
@@ -357,11 +365,19 @@ declare namespace Objection {
     item: unknown;
   }
 
+  type QueryBuilderItemState<T> = { item: T };
+
   /**
    * The state of a query builder whose result type `R` was given explicitly,
    * as in `QueryBuilder<Person, Person | undefined>`.
    */
-  type DefaultQueryBuilderState<out M, out R> = { item: ResultItemOf<R, M> };
+  // This is a conditional type so that it resolves to `QueryBuilderItemState`,
+  // whose instances only differ by the item type. This makes for example
+  // `DefaultQueryBuilderState<M, M[]>` and `DefaultQueryBuilderState<M, M | undefined>`
+  // the same type.
+  type DefaultQueryBuilderState<M, R> = [R] extends [never]
+    ? QueryBuilderItemState<never>
+    : QueryBuilderItemState<ResultItemOf<R, M>>;
 
   /**
    * Returns the query builder type `QB` (including custom query builder
@@ -958,7 +974,11 @@ declare namespace Objection {
         ? unknown
         : QB['ModelType'] extends PM
           ? unknown
-          : { '~error': 'The modifier is for a different model than the query' }
+          : // Modifiers for a subtype of the model, like a row type with
+            // computed columns, are allowed too.
+            PM extends QB['ModelType']
+            ? unknown
+            : { '~error': 'The modifier is for a different model than the query' }
       : unknown
     : unknown;
 
@@ -1022,11 +1042,24 @@ declare namespace Objection {
     // The query builder types for each result kind. These are members (instead
     // of type aliases) so that comparing a custom query builder to its base
     // class doesn't need to expand them.
-    '~many': RebindQueryBuilder<this, M, S['item'][], S>;
-    '~maybe': RebindQueryBuilder<this, M, S['item'] | undefined, S>;
-    '~one': RebindQueryBuilder<this, M, S['item'], S>;
-    '~count': RebindQueryBuilder<this, M, number, S>;
-    '~page': RebindQueryBuilder<this, M, Page<S['item']>, S>;
+    // The members use `this` instead of the type parameters, so that they are
+    // the same when TypeScript compares two query builder types.
+    '~state': S;
+    '~many': RebindQueryBuilder<this, this['ModelType'], this['~state']['item'][], this['~state']>;
+    '~maybe': RebindQueryBuilder<
+      this,
+      this['ModelType'],
+      this['~state']['item'] | undefined,
+      this['~state']
+    >;
+    '~one': RebindQueryBuilder<this, this['ModelType'], this['~state']['item'], this['~state']>;
+    '~count': RebindQueryBuilder<this, this['ModelType'], number, this['~state']>;
+    '~page': RebindQueryBuilder<
+      this,
+      this['ModelType'],
+      Page<this['~state']['item']>,
+      this['~state']
+    >;
 
     select: SelectMethod<this>;
     columns: SelectMethod<this>;
@@ -1220,19 +1253,21 @@ declare namespace Objection {
     ): RebindQueryBuilder<this, MC, ReplaceResultItem<R, MC>, { item: MC }>;
     castTo<T>(): RebindQueryBuilder<this, M, T, { item: ResultItemOf<T, M> }>;
 
-    update(update: PartialModelObject<M>): this['~count'];
-    update(): this['~count'];
     // For generic code (like custom query builder methods) where the model type
     // isn't known: `this.update<{ deletedAt: Date }>({ deletedAt: new Date() })`.
+    // These overloads come first so that the errors of the other overloads are
+    // the ones that are reported.
     update<T extends object = never>(update: NoInfer<T>): this['~count'];
+    update(update: PartialModelObject<M>): this['~count'];
+    update(): this['~count'];
     updateAndFetch(update: PartialModelObject<M>): this['~one'];
     updateAndFetchById(id: MaybeCompositeId, update: PartialModelObject<M>): this['~one'];
 
-    patch(update: PartialModelObject<M>): this['~count'];
-    patch(): this['~count'];
     // For generic code (like custom query builder methods) where the model type
     // isn't known: `this.patch<{ deletedAt: Date }>({ deletedAt: new Date() })`.
     patch<T extends object = never>(update: NoInfer<T>): this['~count'];
+    patch(update: PartialModelObject<M>): this['~count'];
+    patch(): this['~count'];
     patchAndFetch(update: PartialModelObject<M>): this['~one'];
     patchAndFetchById(id: MaybeCompositeId, update: PartialModelObject<M>): this['~one'];
 
@@ -1240,12 +1275,13 @@ declare namespace Objection {
     delete(): this['~count'];
     deleteById(id: MaybeCompositeId): this['~count'];
 
-    insert(insert: PartialModelObject<M>): this['~one'];
-    insert(insert: PartialModelObject<M>[]): this['~many'];
-    insert(): this['~one'];
     // For generic code where the model type isn't known.
     insert<T extends object = never>(insert: NoInfer<T>): this['~one'];
     insert<T extends object = never>(insert: NoInfer<T>[]): this['~many'];
+    insert(insert: PartialModelObject<M>[]): this['~many'];
+    insert(): this['~one'];
+    // The error of the last overload is reported, so this one is last.
+    insert(insert: PartialModelObject<M>): this['~one'];
 
     onConflict(column?: ColumnRef | ColumnRef[] | true): this;
     ignore(): this;
@@ -1404,7 +1440,7 @@ declare namespace Objection {
     context: QueryContext,
   ) => Promise<void> | void;
   type StringOrReferenceBuilder = string | ReferenceBuilder;
-  type RelationMappingColumnRef = StringOrReferenceBuilder | StringOrReferenceBuilder[];
+  type RelationMappingColumnRef = StringOrReferenceBuilder | readonly StringOrReferenceBuilder[];
 
   export interface RelationMapping<M extends Model> {
     relation: RelationType;
@@ -1424,14 +1460,185 @@ declare namespace Objection {
   export interface RelationThrough<M extends Model> {
     from: RelationMappingColumnRef;
     to: RelationMappingColumnRef;
-    extra?: string | string[] | Record<string, string>;
+    extra?: string | readonly string[] | Readonly<Record<string, string>>;
     modelClass?: ModelClassSpecifier;
     modify?: Modifier<QueryBuilderType<M>>;
     filter?: Modifier<QueryBuilderType<M>>;
     beforeInsert?: RelationMappingHook<M>;
   }
 
-  export interface RelationType extends Constructor<Relation> {}
+  type RelationCardinality = 'one' | 'many';
+
+  export interface RelationType<C extends RelationCardinality = RelationCardinality>
+    extends Constructor<Relation> {
+    // Type-only: whether the relation is to one model or to many models.
+    '~cardinality'?: C;
+  }
+
+  /**
+   * The relation mappings of model class `MC`, as written in its static
+   * `relationMappings` property (an object or a function that returns one).
+   * `{}` when they can't be inferred, for example when the property has the
+   * type annotation `RelationMappings` or `RelationMappingsThunk`.
+   */
+  export type RelationMappingsOf<MC> = MC extends { relationMappings: infer R }
+    ? InferredRelationMappings<R extends (...args: any[]) => infer O ? O : R>
+    : {};
+
+  type InferredRelationMappings<T> =
+    IsAnyType<T> extends true ? {} : string extends keyof T ? {} : T;
+
+  // The model class of a relation mapping's `modelClass`: a class, or a
+  // function that returns one. `never` for module paths, whose class can't
+  // be known.
+  type RelatedModelClassOf<C> =
+    IsAnyType<C> extends true
+      ? never
+      : C extends abstract new (...args: any[]) => Model
+        ? C
+        : C extends () => infer K
+          ? K extends abstract new (...args: any[]) => Model
+            ? K
+            : never
+          : never;
+
+  type RelatedModelOf<C> = [RelatedModelClassOf<C>] extends [never]
+    ? Model
+    : ModelInstance<RelatedModelClassOf<C>>;
+
+  // `join.through.extra` as an object of `{ property: column }`.
+  type RelationExtraColumns<E> = E extends string
+    ? { [K in E]: K }
+    : E extends readonly (infer N extends string)[]
+      ? { [K in N]: K }
+      : E extends Readonly<Record<string, string>>
+        ? E
+        : {};
+
+  type RelationExtraProps<Mapping> = Mapping extends {
+    join: { through: infer Through };
+  }
+    ? Through extends { extra: infer E }
+      ? RelationExtraColumns<E> extends infer Columns
+        ? string extends keyof Columns
+          ? // The names of the columns are not known, for example when they
+            // were inferred as `string[]`. Use `defineRelations` to keep them.
+            {}
+          : {
+              -readonly [P in keyof Columns]: Through extends { modelClass: infer C }
+                ? Columns[P] extends keyof RelatedModelOf<C>
+                  ? RelatedModelOf<C>[Columns[P]]
+                  : unknown
+                : unknown;
+            }
+        : {}
+      : {}
+    : {};
+
+  type WithRelationExtraProps<M, Extra> = {} extends Extra ? M : M & Extra;
+
+  /**
+   * The type of the relation property of a relation mapping.
+   */
+  export type RelationPropertyType<Mapping> = Mapping extends {
+    relation: infer Type;
+    modelClass: infer C;
+  }
+    ? WithRelationExtraProps<RelatedModelOf<C>, RelationExtraProps<Mapping>> extends infer Related
+      ? Type extends { '~cardinality'?: infer Cardinality }
+        ? [NonNullable<Cardinality>] extends ['many']
+          ? Related[]
+          : [NonNullable<Cardinality>] extends ['one']
+            ? Related | null
+            : Related | Related[] | null
+        : Related | Related[] | null
+      : never
+    : never;
+
+  /**
+   * The relation properties of model class `MC`, inferred from its
+   * `relationMappings`. Use it to add the relation properties to the model's
+   * instances without declaring each of them:
+   *
+   * ```ts
+   * class Person extends Model {
+   *   static relationMappings = () => ({ pets: { ... } });
+   * }
+   *
+   * interface Person extends RelationsOf<typeof Person> {}
+   * ```
+   */
+  export type RelationsOf<MC> = {
+    [K in keyof RelationMappingsOf<MC>]?: RelationPropertyType<RelationMappingsOf<MC>[K]>;
+  };
+
+  type InferredRelationProps<MC, I> = {
+    [K in Exclude<keyof RelationMappingsOf<MC>, keyof I>]?: RelationPropertyType<
+      RelationMappingsOf<MC>[K]
+    >;
+  };
+
+  /**
+   * The instance type of model class `MC`, including the relation properties
+   * inferred from its `relationMappings` that the class doesn't declare.
+   */
+  export type ModelInstance<MC> = MC extends abstract new (...args: any[]) => infer I
+    ? [Exclude<keyof RelationMappingsOf<MC>, keyof I>] extends [never]
+      ? I
+      : I & InferredRelationProps<MC, I>
+    : never;
+
+  /**
+   * The names of the relations of model class `MC` inferred from its
+   * `relationMappings`.
+   */
+  type RelationNamesOf<MC> = keyof RelationMappingsOf<MC> & string;
+
+  // The query builder of a relation for the static `relatedQuery()`.
+  type RelationQueryBuilder<Mapping> = Mapping extends { modelClass: infer C }
+    ? [RelatedModelClassOf<C>] extends [never]
+      ? QueryBuilder<Model>
+      : ModelClassQueryBuilder<
+          RelatedModelClassOf<C>,
+          Extract<
+            WithRelationExtraProps<
+              ModelInstance<RelatedModelClassOf<C>>,
+              RelationExtraProps<Mapping>
+            >,
+            Model
+          >
+        >
+    : QueryBuilder<Model>;
+
+  // Shown in the error message when a relation name isn't known.
+  type UnknownRelationName = {
+    '~error': 'Unknown relation. Pass the related model type explicitly for relation names that can not be checked: relatedQuery<Pet>(name)';
+  };
+
+  type RelationMappingsDefinition = { readonly [relationName: string]: RelationMapping<any> };
+
+  export interface DefineRelationsFunction {
+    /**
+     * Returns the relation mappings as is. Use it to define `relationMappings`
+     * so that the types of the relations can be inferred exactly:
+     *
+     * ```ts
+     * static relationMappings = defineRelations(() => ({
+     *   movies: {
+     *     relation: Model.ManyToManyRelation,
+     *     modelClass: Movie,
+     *     join: {
+     *       from: 'persons.id',
+     *       through: { from: 'persons_movies.personId', to: 'persons_movies.movieId', extra: ['role'] },
+     *       to: 'movies.id',
+     *     },
+     *   },
+     * }));
+     * ```
+     */
+    <const T extends RelationMappingsDefinition>(relationMappings: () => T): () => T;
+    <const T extends RelationMappingsDefinition>(relationMappings: T): T;
+  }
 
   export interface Relation {
     name: string;
@@ -1637,11 +1844,11 @@ declare namespace Objection {
     ref: ReferenceFunction;
     fn: FunctionFunction;
 
-    BelongsToOneRelation: RelationType;
-    HasOneRelation: RelationType;
-    HasManyRelation: RelationType;
-    ManyToManyRelation: RelationType;
-    HasOneThroughRelation: RelationType;
+    BelongsToOneRelation: RelationType<'one'>;
+    HasOneRelation: RelationType<'one'>;
+    HasManyRelation: RelationType<'many'>;
+    ManyToManyRelation: RelationType<'many'>;
+    HasOneThroughRelation: RelationType<'one'>;
 
     defaultGraphOptions?: GraphOptions;
 
@@ -1652,8 +1859,10 @@ declare namespace Objection {
       trxOrKnex?: TransactionOrKnex,
     ): ArrayRelatedQueryBuilder<M[K]>;
 
-    relatedQuery<RM extends Model>(
-      relationName: string,
+    // For relation names that can't be checked. The model type of the
+    // relation must be given explicitly: `relatedQuery<Pet>(relationName)`.
+    relatedQuery<RM extends Model = never>(
+      relationName: [RM] extends [never] ? UnknownRelationName : string,
       trxOrKnex?: TransactionOrKnex,
     ): QueryBuilderType<RM>;
 
@@ -1749,18 +1958,24 @@ declare namespace Objection {
     static ref: ReferenceFunction;
     static fn: FunctionFunction;
 
-    static BelongsToOneRelation: RelationType;
-    static HasOneRelation: RelationType;
-    static HasManyRelation: RelationType;
-    static ManyToManyRelation: RelationType;
-    static HasOneThroughRelation: RelationType;
+    static BelongsToOneRelation: RelationType<'one'>;
+    static HasOneRelation: RelationType<'one'>;
+    static HasManyRelation: RelationType<'many'>;
+    static ManyToManyRelation: RelationType<'many'>;
+    static HasOneThroughRelation: RelationType<'one'>;
 
     static defaultGraphOptions?: GraphOptions;
 
     static query<MC extends Constructor<Model>>(
       this: MC,
       trxOrKnex?: TransactionOrKnex,
-    ): ModelClassQueryBuilder<MC, InstanceType<MC>>;
+    ): ModelClassQueryBuilder<MC, Extract<ModelInstance<MC>, Model>>;
+
+    static relatedQuery<MC extends Constructor<Model>, K extends RelationNamesOf<MC>>(
+      this: MC,
+      relationName: K,
+      trxOrKnex?: TransactionOrKnex,
+    ): RelationQueryBuilder<RelationMappingsOf<MC>[K]>;
 
     static relatedQuery<M extends Model, K extends keyof M>(
       this: ConstructorType<M>,
@@ -1768,12 +1983,23 @@ declare namespace Objection {
       trxOrKnex?: TransactionOrKnex,
     ): ArrayRelatedQueryBuilder<M[K]>;
 
-    static relatedQuery<RM extends Model>(
-      relationName: string,
+    // For relation names that can't be checked. The model type of the
+    // relation must be given explicitly: `relatedQuery<Pet>(relationName)`.
+    static relatedQuery<RM extends Model = never>(
+      relationName: [RM] extends [never] ? UnknownRelationName : string,
       trxOrKnex?: TransactionOrKnex,
     ): QueryBuilderType<RM>;
 
+    static fromJson<MC extends Constructor<Model>>(
+      this: MC,
+      json: object,
+      opt?: ModelOptions,
+    ): ModelInstance<MC>;
     static fromJson<M extends Model>(this: Constructor<M>, json: object, opt?: ModelOptions): M;
+    static fromDatabaseJson<MC extends Constructor<Model>>(
+      this: MC,
+      json: object,
+    ): ModelInstance<MC>;
     static fromDatabaseJson<M extends Model>(this: Constructor<M>, json: object): M;
 
     static columnNameToPropertyName(columnName: string): string;
@@ -1845,8 +2071,10 @@ declare namespace Objection {
       trxOrKnex?: TransactionOrKnex,
     ): RelatedQueryBuilder<this[K]>;
 
-    $relatedQuery<RM extends Model>(
-      relationName: string,
+    // For relation names that can't be checked. The model type of the
+    // relation must be given explicitly: `$relatedQuery<Pet>(relationName)`.
+    $relatedQuery<RM extends Model = never>(
+      relationName: [RM] extends [never] ? UnknownRelationName : string,
       trxOrKnex?: TransactionOrKnex,
     ): QueryBuilderType<RM>;
 
@@ -1907,7 +2135,7 @@ declare namespace Objection {
     $knex(): Knex;
     $transaction(): Knex;
 
-    QueryBuilderType: QueryBuilder<this>;
+    QueryBuilderType: QueryBuilder<this, this[], QueryBuilderItemState<this>>;
   }
 
   /**

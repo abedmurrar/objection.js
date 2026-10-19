@@ -41,9 +41,9 @@ class Animal extends Model {
       modelClass: Person,
       join: {
         from: 'animals.ownerId',
-        to: 'persons.id'
-      }
-    }
+        to: 'persons.id',
+      },
+    },
   };
 }
 ```
@@ -60,9 +60,9 @@ class Person extends Model {
       modelClass: Animal,
       join: {
         from: 'persons.id',
-        to: 'animals.ownerId'
-      }
-    }
+        to: 'animals.ownerId',
+      },
+    },
   };
 }
 ```
@@ -79,9 +79,9 @@ class Person extends Model {
       modelClass: Animal,
       join: {
         from: 'persons.id',
-        to: 'animals.ownerId'
-      }
-    }
+        to: 'animals.ownerId',
+      },
+    },
   };
 }
 ```
@@ -101,11 +101,11 @@ class Person extends Model {
         through: {
           // persons_movies is the join table.
           from: 'persons_movies.personId',
-          to: 'persons_movies.movieId'
+          to: 'persons_movies.movieId',
         },
-        to: 'movies.id'
-      }
-    }
+        to: 'movies.id',
+      },
+    },
   };
 }
 ```
@@ -125,13 +125,76 @@ class Person extends Model {
         through: {
           // persons_movies is the join table.
           from: 'persons_movies.personId',
-          to: 'persons_movies.movieId'
+          to: 'persons_movies.movieId',
         },
-        to: 'movies.id'
-      }
-    }
+        to: 'movies.id',
+      },
+    },
   };
 }
+```
+
+## TypeScript
+
+The types of the relations are inferred from `relationMappings`. You don't need to declare the relation properties in the model:
+
+```ts
+import { Model, defineRelations } from 'objection';
+
+class Person extends Model {
+  static tableName = 'persons';
+
+  id!: number;
+  firstName!: string;
+
+  // Don't annotate the type (like `: RelationMappingsThunk`): that throws away
+  // the information the types are inferred from.
+  static relationMappings = defineRelations(() => ({
+    pets: {
+      relation: Model.HasManyRelation,
+      modelClass: Animal,
+      join: { from: 'persons.id', to: 'animals.ownerId' },
+    },
+    mom: {
+      relation: Model.BelongsToOneRelation,
+      modelClass: Person,
+      join: { from: 'persons.momId', to: 'persons.id' },
+    },
+    movies: {
+      relation: Model.ManyToManyRelation,
+      modelClass: () => Movie,
+      join: {
+        from: 'persons.id',
+        through: {
+          modelClass: PersonMovie,
+          from: 'persons_movies.personId',
+          to: 'persons_movies.movieId',
+          extra: ['role'],
+        },
+        to: 'movies.id',
+      },
+    },
+  }));
+}
+
+const person = await Person.query().findById(1).throwIfNotFound();
+
+person.pets; // Animal[] | undefined
+person.mom; // Person | null | undefined
+person.movies; // (Movie & { role: PersonMovie['role'] })[] | undefined
+
+await Person.relatedQuery('pets').for(1); // Animal[]
+```
+
+- To-many relations (`HasManyRelation`, `ManyToManyRelation`) are arrays. To-one relations (`BelongsToOneRelation`, `HasOneRelation`, `HasOneThroughRelation`) are `Model | null`, because objection sets them to `null` when there is no related model.
+- `modelClass` can be a class or a function that returns one. Module paths (strings) and untyped values (like the result of `require()`) can't be inferred, so those relations are typed as `Model`.
+- `defineRelations` is optional, it returns the mappings as is. Without it the names of `extra` columns are inferred as `string[]` and the extra columns are left out of the types. The types of the extra columns come from `through.modelClass`, or are `unknown` without one.
+- Relation properties that are declared in the class are used as is.
+
+The relation properties are added to the models objection creates (the results of queries, `fromJson()`, ...). To also get them for `new Person()` and for `this` in the model's methods, add this line after the class:
+
+```ts
+interface Person extends RelationsOf<typeof Person> {}
 ```
 
 ## Require loops (non ECMAScript modules only)
@@ -141,11 +204,11 @@ Require loops (circular dependencies, circular requires) are a very common probl
 If you are using [ECMAScript modules](https://nodejs.org/api/esm.html), circular imports are not a problem. You can just do:
 
 ```js
-import Animal from "./Animal.js";
+import Animal from './Animal.js';
 
 class Person extends Model {
   static get tableName() {
-    return "persons";
+    return 'persons';
   }
 
   static get relationMappings() {
@@ -154,8 +217,8 @@ class Person extends Model {
         relation: Model.HasManyRelation,
         modelClass: Animal,
         join: {
-          from: "persons.id",
-          to: "animals.ownerId",
+          from: 'persons.id',
+          to: 'animals.ownerId',
         },
       },
     };
@@ -188,8 +251,8 @@ class Person extends Model {
         modelClass: Animal,
         join: {
           from: 'persons.id',
-          to: 'animals.ownerId'
-        }
+          to: 'animals.ownerId',
+        },
       },
 
       movies: {
@@ -206,10 +269,10 @@ class Person extends Model {
           through: {
             // persons_movies is the join table.
             from: 'persons_movies.personId',
-            to: 'persons_movies.movieId'
+            to: 'persons_movies.movieId',
           },
-          to: 'movies.id'
-        }
+          to: 'movies.id',
+        },
       },
 
       movies: {
@@ -224,13 +287,12 @@ class Person extends Model {
           from: 'persons.id',
           through: {
             from: 'persons_movies.personId',
-            to: 'persons_movies.movieId'
+            to: 'persons_movies.movieId',
           },
-          to: 'movies.id'
-        }
-      }
+          to: 'movies.id',
+        },
+      },
     };
   }
 }
 ```
-

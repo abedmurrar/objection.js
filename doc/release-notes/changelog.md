@@ -19,6 +19,10 @@
 - Types: `runAfter()` and `castTo<T>()` set the result type, which is used by `first()`, `throwIfNotFound()` and the other methods that change the result kind
 - Types: `modify()` checks the arguments passed to modifier functions and accepts modifiers written for any result kind. `AnyQueryBuilder<M>` is a query builder for model `M` of any result kind
 - Types: Model classes can be used as the base class of mixins
+- Types: The types of relations are inferred from `relationMappings`, so relation properties don't need to be declared in the model. To-one relations are `Model | null`, to-many relations arrays, and many-to-many relations include their `extra` columns. `defineRelations()` preserves the exact mapping types, and `interface Person extends RelationsOf<typeof Person> {}` adds the relations to the instance type. See the [relations guide](/guide/relations.html#typescript)
+- Types: `relatedQuery()` and `$relatedQuery()` only accept known relation names. For names that can't be checked, pass the related model type: `relatedQuery<Pet>(name)`
+- Types: `$relatedQuery()` of a to-one relation can resolve to `undefined`
+- Types: Relation properties typed `Model | null` are recognized as relations by `ModelRelations` and `ModelProps`
 - Fix infinite recursion in `andWhereJsonNotSupersetOf()`
 
 ## 3.1.5
@@ -50,7 +54,7 @@
 - Patch Validator: Prevent recursion on inner properties [#2520](https://github.com/Vincit/objection.js/pull/2520)
 
 ## 3.1.2
-  
+
 ### What's new
 
 - Patch Validator: Prevent recursion on inner properties [#2520](https://github.com/Vincit/objection.js/pull/2520)

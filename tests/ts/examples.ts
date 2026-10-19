@@ -206,7 +206,7 @@ async () => {
   takesPeople(await Person.query().where('lastName', lastName));
   takesPeople(await Person.query().where({ lastName }));
   const person = await Person.query().findById(123);
-  expectsTrue<TypeEqual<Person | undefined, typeof person>>();
+  expectsTrue<TypeEqual<objection.ModelInstance<typeof Person> | undefined, typeof person>>();
   takesMaybePerson(person);
   takesMaybePerson(await Person.query().findById('uid'));
 };
@@ -218,7 +218,7 @@ async () => {
   takesMaybePerson(await Person.query().where('lastName', '>', lastName).first());
 
   const person = await Person.query().where({ lastName }).first();
-  expectsTrue<TypeEqual<Person | undefined, typeof person>>();
+  expectsTrue<TypeEqual<objection.ModelInstance<typeof Person> | undefined, typeof person>>();
   takesMaybePerson(person);
 
   takesMaybePerson(await Person.query().findOne(raw('raw SQL constraint')));
@@ -226,7 +226,7 @@ async () => {
   takesMaybePerson(await Person.query().findOne('lastName', '>', lastName));
 
   const person2 = await Person.query().findOne({ lastName });
-  expectsTrue<TypeEqual<Person | undefined, typeof person2>>();
+  expectsTrue<TypeEqual<objection.ModelInstance<typeof Person> | undefined, typeof person2>>();
   takesMaybePerson(person2);
 };
 
@@ -315,7 +315,8 @@ class Movie extends objection.Model {
   // prettier-ignore
   director!: Person;
 
-  fetchDirector(): PromiseLike<Person> {
+  // To-one relation queries return `undefined` if there's no related model.
+  fetchDirector(): PromiseLike<Person | undefined> {
     return this.$relatedQuery('director');
   }
 
@@ -359,7 +360,8 @@ function takesMovie(m: Movie) {
 async () => {
   // Another example of strongly-typed $relatedQuery without a cast:
   takesPeople(await new Movie().$relatedQuery('actors'));
-  takesPerson(await new Movie().$relatedQuery('director'));
+  takesMaybePerson(await new Movie().$relatedQuery('director'));
+  takesPerson(await new Movie().$relatedQuery('director').throwIfNotFound());
 
   takesMaybePerson(await new Movie().$relatedQuery('actors').first());
   takesMaybePerson(await new Movie().$relatedQuery('director').where('age', '>', 32));

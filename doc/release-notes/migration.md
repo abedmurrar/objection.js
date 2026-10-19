@@ -44,12 +44,26 @@ The return value of the `runAfter()` callback replaces the result of the query, 
 
 ```ts
 // string[]
-const names = await Person.query().runAfter((people) => people.map((it) => it.firstName));
+const names = await Person.query().runAfter((people) =>
+  people.map((it) => it.firstName),
+);
 ```
 
 ## typescript: `castTo<T>()` sets the type of the result
 
 `castTo<T>()` sets the result type to `T`, and the methods that change the result kind are based on it. For example `castTo<Row[]>().first()` is `Row | undefined`. Before, `castTo<Row>()` after `first()` silently dropped `undefined`.
+
+## typescript: Relations are inferred from `relationMappings`
+
+Relation properties no longer need to be declared in models, see the [relations guide](/guide/relations.html#typescript). To use it, remove the type annotation of `relationMappings` (`: RelationMappings` or `: RelationMappingsThunk`) and the relation property declarations, or wrap the mappings in `defineRelations()`. Declared relation properties keep working as before.
+
+Relation names passed to `relatedQuery()` and `$relatedQuery()` are now checked. If a relation can't be inferred or declared, pass the related model type explicitly: `relatedQuery<Pet>('pets')`.
+
+`$relatedQuery()` for a to-one relation now resolves to `Model | undefined`, since that's what it returns when there is no related model. Add `throwIfNotFound()` if you expect one.
+
+## typescript: Generic functions that pass callbacks to `ModelClass<M>.query()`
+
+With `strictFunctionTypes` disabled (as with `strict: false`), passing a `CallbackVoid<QueryBuilder<M>>` to `onBuild()` of a `ModelClass<M>.query()` query in generic code no longer compiles. Type the callback with the model's query builder type instead: `CallbackVoid<QueryBuilderType<M>>`.
 
 ## typescript: Modifiers
 
@@ -89,27 +103,27 @@ down the type back to `SomeModel`.
 Before:
 
 ```ts
-const person = await Person.query().findById(id)
-console.log(person.id)
+const person = await Person.query().findById(id);
+console.log(person.id);
 ```
 
 After:
 
 ```ts
-const person = await Person.query().findById(id)
+const person = await Person.query().findById(id);
 
 if (!person) {
-  throw new Error('Person not found')
+  throw new Error('Person not found');
 }
 
-console.log(person.id)
+console.log(person.id);
 ```
 
 Or
 
 ```ts
-const person = await Person.query().findById(id).throwIfNotFound()
-console.log(person.id)
+const person = await Person.query().findById(id).throwIfNotFound();
+console.log(person.id);
 ```
 
 ## typescript: `QueryBuilder` now inherits `PromiseLike` instead of `Promise`
