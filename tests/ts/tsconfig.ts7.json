@@ -1,0 +1,16 @@
+{
+  // TypeScript 7 removed `moduleResolution: node`. Run with
+  // `npm run test:typings:ts7`.
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "target": "es2022",
+    "strict": true,
+    "noImplicitAny": true,
+    "noImplicitReturns": true,
+    "noEmit": true,
+    "experimentalDecorators": true,
+    "types": ["node"]
+  },
+  "include": ["./**/*.ts"]
+}

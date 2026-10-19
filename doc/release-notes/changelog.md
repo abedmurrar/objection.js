@@ -14,6 +14,11 @@
 
 ### What's new
 
+- Types: Custom query builders only need to declare `'~rebind'` and keep their type through every method, including `throwIfNotFound()`, `castTo()` and `runAfter()`. See the [migration guide](/release-notes/migration.html)
+- Types: The type of `query()` comes from the static `QueryBuilder` property
+- Types: `runAfter()` and `castTo<T>()` set the result type, which is used by `first()`, `throwIfNotFound()` and the other methods that change the result kind
+- Types: `modify()` checks the arguments passed to modifier functions and accepts modifiers written for any result kind. `AnyQueryBuilder<M>` is a query builder for model `M` of any result kind
+- Types: Model classes can be used as the base class of mixins
 - Fix infinite recursion in `andWhereJsonNotSupersetOf()`
 
 ## 3.1.5

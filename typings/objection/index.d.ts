@@ -154,7 +154,14 @@ declare namespace Objection {
   }
 
   type Identity<T> = (value: T) => T;
-  type AnyQueryBuilder = QueryBuilder<any, any>;
+  /**
+   * A query builder of any result kind for models of type `M`.
+   *
+   * Use this as the parameter type of modifiers and other functions that take
+   * query builders so that they accept queries of every kind (`find`,
+   * `first()`, `findById()`, `patch()`, ...).
+   */
+  type AnyQueryBuilder<M extends Model = any> = QueryBuilder<M, any, any>;
   type AnyModelConstructor = ModelConstructor<Model>;
   type ModifierFunction<QB extends AnyQueryBuilder> = (qb: QB, ...args: any[]) => void;
   type Modifier<QB extends AnyQueryBuilder = AnyQueryBuilder> =
@@ -311,30 +318,125 @@ declare namespace Objection {
    */
   type ResultType<T extends { ResultType: any }> = T['ResultType'];
 
+  type IsAnyType<T> = 0 extends 1 & T ? true : false;
+
+  /**
+   * The type of the items of a query result `R`. For example `Person` for
+   * `Person[]`, `Person | undefined` and `Page<Person>`. For results without
+   * items (`number`), returns `M`.
+   */
+  type ResultItemOf<R, M = unknown> =
+    IsAnyType<R> extends true
+      ? any
+      : [R] extends [number]
+        ? M
+        : [R] extends [readonly (infer I)[]]
+          ? I
+          : [R] extends [Page<infer I>]
+            ? I
+            : Exclude<R, undefined>;
+
+  type IsSingleResult<R> =
+    IsAnyType<R> extends true
+      ? false
+      : [R] extends [number]
+        ? false
+        : [R] extends [readonly any[]]
+          ? false
+          : [R] extends [Page<any>]
+            ? false
+            : true;
+
+  /**
+   * The type-level state of a query builder. It's kept when the result kind
+   * changes (for example when `first()` or `patch()` is called).
+   */
+  interface QueryBuilderState {
+    // The type of the result items, for example `Person` when the result is
+    // `Person[]`, `Person | undefined` or `Page<Person>`.
+    item: unknown;
+  }
+
+  /**
+   * The state of a query builder whose result type `R` was given explicitly,
+   * as in `QueryBuilder<Person, Person | undefined>`.
+   */
+  type DefaultQueryBuilderState<out M, out R> = { item: ResultItemOf<R, M> };
+
+  /**
+   * Returns the query builder type `QB` (including custom query builder
+   * subclasses) for model `M`, result `R` and state `S`.
+   */
+  type RebindQueryBuilder<
+    QB extends AnyQueryBuilder,
+    M extends Model,
+    R,
+    S extends QueryBuilderState = QB['~S'],
+  > = (QB['~rebind'] & { '~args': [M, R, S] })['~rebind'];
+
   /**
    * Gets the single item query builder type for a query builder.
    */
-  type SingleQueryBuilder<T extends { SingleQueryBuilderType: any }> = T['SingleQueryBuilderType'];
+  type SingleQueryBuilder<QB extends AnyQueryBuilder> = QB['~one'];
 
   /**
    * Gets the single or undefined item query builder type for a query builder.
    */
-  type MaybeSingleQueryBuilder<QB extends AnyQueryBuilder> = QB['MaybeSingleQueryBuilderType'];
+  type MaybeSingleQueryBuilder<QB extends AnyQueryBuilder> = QB['~maybe'];
 
   /**
    * Gets the multi-item query builder type for a query builder.
    */
-  type ArrayQueryBuilder<T extends { ArrayQueryBuilderType: any }> = T['ArrayQueryBuilderType'];
+  type ArrayQueryBuilder<QB extends AnyQueryBuilder> = QB['~many'];
 
   /**
    * Gets the number query builder type for a query builder.
    */
-  type NumberQueryBuilder<T extends { NumberQueryBuilderType: any }> = T['NumberQueryBuilderType'];
+  type NumberQueryBuilder<QB extends AnyQueryBuilder> = QB['~count'];
 
   /**
    * Gets the page query builder type for a query builder.
    */
-  type PageQueryBuilder<T extends { PageQueryBuilderType: any }> = T['PageQueryBuilderType'];
+  type PageQueryBuilder<QB extends AnyQueryBuilder> = QB['~page'];
+
+  // `runAfter` replaces the result with whatever the callback returns, also
+  // when it returns nothing.
+  type RunAfterResult<T> = [Awaited<T>] extends [void] ? undefined : Awaited<T>;
+
+  // Replaces the item type of result `R` with `I`, keeping the result kind.
+  type ReplaceResultItem<R, I> =
+    IsAnyType<R> extends true
+      ? any
+      : [R] extends [number]
+        ? number
+        : [R] extends [readonly any[]]
+          ? I[]
+          : [R] extends [Page<any>]
+            ? Page<I>
+            : undefined extends R
+              ? I | undefined
+              : I;
+
+  /**
+   * The query builder type of the static `query()` method of model class `MC`.
+   * This is based on the static `QueryBuilder` property, which decides the
+   * query builder class at runtime.
+   */
+  type ModelClassQueryBuilder<MC, M extends Model> = MC extends {
+    QueryBuilder: { prototype: infer QB };
+  }
+    ? keyof QueryBuilderType<M> extends keyof QB
+      ? // The static `QueryBuilder` creates query builders of the declared
+        // `QueryBuilderType` (only the keys are compared, which is much faster).
+        QueryBuilderType<M>
+      : // `QueryBuilderType` was declared, but the static `QueryBuilder` creates
+        // some other query builders. Trust the class that is used at runtime.
+        InitialQueryBuilder<QB, M>
+    : QueryBuilderType<M>;
+
+  type InitialQueryBuilder<QB, M extends Model> = QB extends { '~rebind': any }
+    ? (QB['~rebind'] & { '~args': [M, M[], { item: M }] })['~rebind']
+    : QB;
 
   interface ForClassMethod {
     <M extends Model>(modelClass: ModelConstructor<M>): QueryBuilderType<M>;
@@ -655,7 +757,7 @@ declare namespace Objection {
   interface FirstMethod {
     <QB extends AnyQueryBuilder>(
       this: QB,
-    ): QB extends ArrayQueryBuilder<QB> ? MaybeSingleQueryBuilder<QB> : QB;
+    ): [ResultType<QB>] extends [readonly any[]] ? MaybeSingleQueryBuilder<QB> : QB;
   }
 
   type ForIdValue = MaybeCompositeId | AnyQueryBuilder;
@@ -708,7 +810,7 @@ declare namespace Objection {
     <QB extends AnyQueryBuilder>(
       this: QB,
       column: string | Raw | (string | Raw)[],
-    ): QB extends NumberQueryBuilder<QB> ? ArrayQueryBuilder<QB> : QB;
+    ): [ResultType<QB>] extends [number] ? ArrayQueryBuilder<QB> : QB;
   }
 
   interface TimeoutOptions {
@@ -719,9 +821,9 @@ declare namespace Objection {
     (ms: number, options?: TimeoutOptions): QB;
   }
 
-  export interface Page<M extends Model> {
+  export interface Page<T> {
     total: number;
-    results: M[];
+    results: T[];
   }
 
   interface RunBeforeCallback<QB extends AnyQueryBuilder> {
@@ -732,12 +834,20 @@ declare namespace Objection {
     (cb: RunBeforeCallback<QB>): QB;
   }
 
-  interface RunAfterCallback<QB extends AnyQueryBuilder> {
-    (this: QB, result: ResultType<QB>, query: QB): any;
+  interface RunAfterCallback<QB extends AnyQueryBuilder, T = unknown> {
+    (this: QB, result: ResultType<QB>, query: QB): T;
   }
 
   interface RunAfterMethod<QB extends AnyQueryBuilder> {
-    (cb: RunAfterCallback<QB>): QB;
+    // The callback's return value replaces the result of the query.
+    <T>(
+      cb: RunAfterCallback<QB, T>,
+    ): RebindQueryBuilder<
+      QB,
+      ModelType<QB>,
+      RunAfterResult<T>,
+      { item: ResultItemOf<RunAfterResult<T>, ModelType<QB>> }
+    >;
   }
 
   interface OnBuildMethod<QB extends AnyQueryBuilder> {
@@ -834,8 +944,34 @@ declare namespace Objection {
     (): QB;
   }
 
+  type ModifierArgs<F> = F extends (qb: any, ...args: infer A) => any ? A : unknown[];
+
+  // A modifier function written for models of type `PM` can be used with any
+  // query builder for models of type `PM` regardless of the result kind. Only
+  // the model type of the query builder parameter is checked.
+  type CheckModifierModel<QB extends AnyQueryBuilder, F> = F extends (
+    qb: infer P,
+    ...args: any[]
+  ) => any
+    ? P extends { ModelType: infer PM }
+      ? IsAnyType<P> extends true
+        ? unknown
+        : QB['ModelType'] extends PM
+          ? unknown
+          : { '~error': 'The modifier is for a different model than the query' }
+      : unknown
+    : unknown;
+
   interface ModifyMethod<QB extends AnyQueryBuilder> {
-    (modifier: Modifier<QB> | Modifier<QB>[], ...args: any[]): QB;
+    (modifier: (qb: QB) => unknown): QB;
+    <F extends (qb: any, ...args: any[]) => unknown>(
+      modifier: F & CheckModifierModel<QB, F>,
+      ...args: ModifierArgs<F>
+    ): QB;
+    (
+      modifier: Exclude<Modifier<QB>, ModifierFunction<any>> | Modifier<QB>[],
+      ...args: unknown[]
+    ): QB;
   }
 
   interface ModifiersMethod<QB extends AnyQueryBuilder> {
@@ -853,8 +989,44 @@ declare namespace Objection {
     ): Promise<R | FR>;
   }
 
-  export class QueryBuilder<M extends Model, R = M[]> implements CatchablePromiseLike<R> {
+  export class QueryBuilder<
+    M extends Model,
+    R = M[],
+    S extends QueryBuilderState = DefaultQueryBuilderState<M, R>,
+  > implements CatchablePromiseLike<R>
+  {
     static forClass: ForClassMethod;
+
+    /**
+     * Type-only members used to compute the type of the query builder after
+     * methods that change the result type, like `first()` or `patch()`.
+     *
+     * A custom query builder subclass only needs to redeclare `'~rebind'`:
+     *
+     * ```ts
+     * class MyQueryBuilder<
+     *   M extends Model,
+     *   R = M[],
+     *   S extends QueryBuilderState = DefaultQueryBuilderState<M, R>,
+     * > extends QueryBuilder<M, R, S> {
+     *   declare '~rebind': MyQueryBuilder<this['~M'], this['~R'], this['~S']>;
+     * }
+     * ```
+     */
+    '~args': unknown;
+    '~M': this['~args'] extends [any, any, any] ? this['~args'][0] : any;
+    '~R': this['~args'] extends [any, any, any] ? this['~args'][1] : any;
+    '~S': this['~args'] extends [any, any, any] ? this['~args'][2] : any;
+    '~rebind': QueryBuilder<this['~M'], this['~R'], this['~S']>;
+
+    // The query builder types for each result kind. These are members (instead
+    // of type aliases) so that comparing a custom query builder to its base
+    // class doesn't need to expand them.
+    '~many': RebindQueryBuilder<this, M, S['item'][], S>;
+    '~maybe': RebindQueryBuilder<this, M, S['item'] | undefined, S>;
+    '~one': RebindQueryBuilder<this, M, S['item'], S>;
+    '~count': RebindQueryBuilder<this, M, number, S>;
+    '~page': RebindQueryBuilder<this, M, Page<S['item']>, S>;
 
     select: SelectMethod<this>;
     columns: SelectMethod<this>;
@@ -1030,7 +1202,7 @@ declare namespace Objection {
     avgDistinct: AggregateMethod<this>;
     increment: IncrementDecrementMethod<this>;
     decrement: IncrementDecrementMethod<this>;
-    first: FirstMethod;
+    first(): IsAnyType<R> extends true ? any : [R] extends [readonly any[]] ? this['~maybe'] : this;
 
     orderBy: OrderByMethod<this>;
     orderByRaw: OrderByRawMethod<this>;
@@ -1038,51 +1210,56 @@ declare namespace Objection {
     groupBy: GroupByMethod<this>;
     groupByRaw: RawInterface<this>;
 
-    findById(id: MaybeCompositeId): MaybeSingleQueryBuilder<this>;
+    findById(id: MaybeCompositeId): this['~maybe'];
     findByIds(ids: MaybeCompositeId[]): this;
-    findOne: WhereMethod<MaybeSingleQueryBuilder<this>>;
+    findOne: WhereMethod<this['~maybe']>;
 
     execute(): Promise<R>;
-    castTo<MC extends Model>(modelClass: ModelConstructor<MC>): QueryBuilderType<MC>;
-    castTo<R>(): QueryBuilder<M, R>;
+    castTo<MC extends Model>(
+      modelClass: ModelConstructor<MC>,
+    ): RebindQueryBuilder<this, MC, ReplaceResultItem<R, MC>, { item: MC }>;
+    castTo<T>(): RebindQueryBuilder<this, M, T, { item: ResultItemOf<T, M> }>;
 
-    update(update: PartialModelObject<M>): NumberQueryBuilder<this>;
-    update(): NumberQueryBuilder<this>;
-    updateAndFetch(update: PartialModelObject<M>): SingleQueryBuilder<this>;
-    updateAndFetchById(
-      id: MaybeCompositeId,
-      update: PartialModelObject<M>,
-    ): SingleQueryBuilder<this>;
+    update(update: PartialModelObject<M>): this['~count'];
+    update(): this['~count'];
+    // For generic code (like custom query builder methods) where the model type
+    // isn't known: `this.update<{ deletedAt: Date }>({ deletedAt: new Date() })`.
+    update<T extends object = never>(update: NoInfer<T>): this['~count'];
+    updateAndFetch(update: PartialModelObject<M>): this['~one'];
+    updateAndFetchById(id: MaybeCompositeId, update: PartialModelObject<M>): this['~one'];
 
-    patch(update: PartialModelObject<M>): NumberQueryBuilder<this>;
-    patch(): NumberQueryBuilder<this>;
-    patchAndFetch(update: PartialModelObject<M>): SingleQueryBuilder<this>;
-    patchAndFetchById(
-      id: MaybeCompositeId,
-      update: PartialModelObject<M>,
-    ): SingleQueryBuilder<this>;
+    patch(update: PartialModelObject<M>): this['~count'];
+    patch(): this['~count'];
+    // For generic code (like custom query builder methods) where the model type
+    // isn't known: `this.patch<{ deletedAt: Date }>({ deletedAt: new Date() })`.
+    patch<T extends object = never>(update: NoInfer<T>): this['~count'];
+    patchAndFetch(update: PartialModelObject<M>): this['~one'];
+    patchAndFetchById(id: MaybeCompositeId, update: PartialModelObject<M>): this['~one'];
 
-    del(): NumberQueryBuilder<this>;
-    delete(): NumberQueryBuilder<this>;
-    deleteById(id: MaybeCompositeId): NumberQueryBuilder<this>;
+    del(): this['~count'];
+    delete(): this['~count'];
+    deleteById(id: MaybeCompositeId): this['~count'];
 
-    insert(insert: PartialModelObject<M>): SingleQueryBuilder<this>;
-    insert(insert: PartialModelObject<M>[]): ArrayQueryBuilder<this>;
-    insert(): SingleQueryBuilder<this>;
+    insert(insert: PartialModelObject<M>): this['~one'];
+    insert(insert: PartialModelObject<M>[]): this['~many'];
+    insert(): this['~one'];
+    // For generic code where the model type isn't known.
+    insert<T extends object = never>(insert: NoInfer<T>): this['~one'];
+    insert<T extends object = never>(insert: NoInfer<T>[]): this['~many'];
 
     onConflict(column?: ColumnRef | ColumnRef[] | true): this;
     ignore(): this;
     merge(merge?: PartialModelObject<M> | string[]): this;
 
-    insertAndFetch(insert: PartialModelObject<M>): SingleQueryBuilder<this>;
-    insertAndFetch(insert: PartialModelObject<M>[]): ArrayQueryBuilder<this>;
-    insertAndFetch(): SingleQueryBuilder<this>;
+    insertAndFetch(insert: PartialModelObject<M>): this['~one'];
+    insertAndFetch(insert: PartialModelObject<M>[]): this['~many'];
+    insertAndFetch(): this['~one'];
 
     relate(
       ids: MaybeCompositeId | MaybeCompositeId[] | PartialModelObject<M> | PartialModelObject<M>[],
-    ): NumberQueryBuilder<this>;
+    ): this['~count'];
 
-    unrelate(): NumberQueryBuilder<this>;
+    unrelate(): this['~count'];
     for(ids: ForIdValue | ForIdValue[]): this;
 
     withGraphFetched(expr: RelationExpression<M>, options?: GraphOptions): this;
@@ -1091,11 +1268,11 @@ declare namespace Objection {
     truncate(): Promise<void>;
     allowGraph: AllowGraphMethod<this>;
 
-    throwIfNotFound: (
-      arg?: any,
-    ) => R extends Model | undefined ? SingleQueryBuilder<QueryBuilder<M, M>> : this;
+    throwIfNotFound(arg?: any): IsSingleResult<R> extends true ? this['~one'] : this;
 
-    returning: ReturningMethod;
+    returning(
+      column: string | Raw | (string | Raw)[],
+    ): IsAnyType<R> extends true ? any : [R] extends [number] ? this['~many'] : this;
     forUpdate: IdentityMethod<this>;
     forShare: IdentityMethod<this>;
     forNoKeyUpdate: IdentityMethod<this>;
@@ -1121,9 +1298,9 @@ declare namespace Objection {
     knex(knex?: Knex): Knex;
     clone(): this;
 
-    page(page: number, pageSize: number): PageQueryBuilder<this>;
-    range(): PageQueryBuilder<this>;
-    range(start: number, end: number): PageQueryBuilder<this>;
+    page(page: number, pageSize: number): this['~page'];
+    range(): this['~page'];
+    range(start: number, end: number): this['~page'];
     offset(offset: number): this;
     limit(limit: number): this;
     resultSize(): Promise<number>;
@@ -1174,12 +1351,6 @@ declare namespace Objection {
 
     ModelType: M;
     ResultType: R;
-
-    ArrayQueryBuilderType: QueryBuilder<M, M[]>;
-    SingleQueryBuilderType: QueryBuilder<M, M>;
-    MaybeSingleQueryBuilderType: QueryBuilder<M, M | undefined>;
-    NumberQueryBuilderType: QueryBuilder<M, number>;
-    PageQueryBuilderType: QueryBuilder<M, Page<M>>;
 
     then<R1 = R, R2 = never>(
       onfulfilled?: ((value: R) => R1 | PromiseLike<R1>) | undefined | null,
@@ -1426,15 +1597,18 @@ declare namespace Objection {
   interface PrototypeType<T> extends Function {
     prototype: T;
   }
-  
+
   interface ConstructorFunctionType<T = any> extends PrototypeType<T> {
     new (...args: any[]): T;
   }
-  
+
   // for internal use on generic static this deduction, copied from https://github.com/microsoft/TypeScript/issues/5863#issuecomment-1483978415
-  type ConstructorType<T = unknown, Static extends Record<string, any> = PrototypeType<T>> = (ConstructorFunctionType<T> | PrototypeType<T>) & {
+  type ConstructorType<T = unknown, Static extends Record<string, any> = PrototypeType<T>> = (
+    | ConstructorFunctionType<T>
+    | PrototypeType<T>
+  ) & {
     [Key in keyof Static]: Static[Key];
-  };  
+  };
 
   export interface ModelConstructor<M extends Model> extends Constructor<M> {}
 
@@ -1548,6 +1722,9 @@ declare namespace Objection {
   }
 
   export class Model {
+    // This allows model classes to be used as the base class of mixins.
+    constructor(...args: any[]);
+
     static QueryBuilder: typeof QueryBuilder;
 
     static tableName: string;
@@ -1580,10 +1757,10 @@ declare namespace Objection {
 
     static defaultGraphOptions?: GraphOptions;
 
-    static query<M extends Model>(
-      this: Constructor<M>,
+    static query<MC extends Constructor<Model>>(
+      this: MC,
       trxOrKnex?: TransactionOrKnex,
-    ): QueryBuilderType<M>;
+    ): ModelClassQueryBuilder<MC, InstanceType<MC>>;
 
     static relatedQuery<M extends Model, K extends keyof M>(
       this: ConstructorType<M>,
@@ -1730,7 +1907,7 @@ declare namespace Objection {
     $knex(): Knex;
     $transaction(): Knex;
 
-    QueryBuilderType: QueryBuilder<this, this[]>;
+    QueryBuilderType: QueryBuilder<this>;
   }
 
   /**

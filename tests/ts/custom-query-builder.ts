@@ -1,11 +1,17 @@
-import { Model, QueryBuilder, Page, TransactionOrKnex } from '../../';
+import {
+  Model,
+  QueryBuilder,
+  TransactionOrKnex,
+  QueryBuilderState,
+  DefaultQueryBuilderState,
+} from '../../';
 
-class CustomQueryBuilder<M extends Model, R = M[]> extends QueryBuilder<M, R> {
-  ArrayQueryBuilderType!: CustomQueryBuilder<M, M[]>;
-  SingleQueryBuilderType!: CustomQueryBuilder<M, M>;
-  MaybeSingleQueryBuilderType!: CustomQueryBuilder<M, M | undefined>;
-  NumberQueryBuilderType!: CustomQueryBuilder<M, number>;
-  PageQueryBuilderType!: CustomQueryBuilder<M, Page<M>>;
+class CustomQueryBuilder<
+  M extends Model,
+  R = M[],
+  S extends QueryBuilderState = DefaultQueryBuilderState<M, R>,
+> extends QueryBuilder<M, R, S> {
+  declare '~rebind': CustomQueryBuilder<this['~M'], this['~R'], this['~S']>;
 
   someCustomMethod(): this {
     return this;
@@ -17,7 +23,8 @@ class CustomQueryBuilder<M extends Model, R = M[]> extends QueryBuilder<M, R> {
 }
 
 class BaseModel extends Model {
-  QueryBuilderType!: CustomQueryBuilder<this>;
+  static QueryBuilder = CustomQueryBuilder;
+  declare QueryBuilderType: CustomQueryBuilder<this>;
 
   $query(trxOrKnex?: TransactionOrKnex) {
     return super.$query(trxOrKnex);

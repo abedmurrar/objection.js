@@ -1,3 +1,60 @@
+# Migration from objection 3.x to 4.0
+
+The runtime changes are listed in the [changelog](/release-notes/changelog.html#_4-0-0). This section covers the typescript changes.
+
+## typescript: Custom query builders declare `'~rebind'` instead of five `*QueryBuilderType` properties
+
+Custom query builders no longer redeclare `ArrayQueryBuilderType`, `SingleQueryBuilderType`, `MaybeSingleQueryBuilderType`, `NumberQueryBuilderType` and `PageQueryBuilderType`. Declare `'~rebind'` instead. The custom query builder type is now kept by every method, including `throwIfNotFound()`, `castTo()`, `runAfter()` and `castTo(ModelClass)` which used to return the base `QueryBuilder`.
+
+```ts
+// 3.x
+class MyQueryBuilder<M extends Model, R = M[]> extends QueryBuilder<M, R> {
+  ArrayQueryBuilderType!: MyQueryBuilder<M, M[]>;
+  SingleQueryBuilderType!: MyQueryBuilder<M, M>;
+  MaybeSingleQueryBuilderType!: MyQueryBuilder<M, M | undefined>;
+  NumberQueryBuilderType!: MyQueryBuilder<M, number>;
+  PageQueryBuilderType!: MyQueryBuilder<M, Page<M>>;
+}
+
+class BaseModel extends Model {
+  QueryBuilderType!: MyQueryBuilder<this>;
+  static QueryBuilder = MyQueryBuilder;
+}
+
+// 4.0
+class MyQueryBuilder<
+  M extends Model,
+  R = M[],
+  S extends QueryBuilderState = DefaultQueryBuilderState<M, R>,
+> extends QueryBuilder<M, R, S> {
+  declare '~rebind': MyQueryBuilder<this['~M'], this['~R'], this['~S']>;
+}
+
+class BaseModel extends Model {
+  static QueryBuilder = MyQueryBuilder;
+  declare QueryBuilderType: MyQueryBuilder<this>;
+}
+```
+
+The type of the static query methods like `query()` now comes from the static `QueryBuilder` property, because that decides the query builder class at runtime. Before, a model that declared `QueryBuilderType` but didn't set `static QueryBuilder` type checked custom methods that didn't exist at runtime.
+
+## typescript: `runAfter()` changes the result type
+
+The return value of the `runAfter()` callback replaces the result of the query, and the result type now reflects that. A callback that returns nothing makes the result `undefined`, which is what happens at runtime.
+
+```ts
+// string[]
+const names = await Person.query().runAfter((people) => people.map((it) => it.firstName));
+```
+
+## typescript: `castTo<T>()` sets the type of the result
+
+`castTo<T>()` sets the result type to `T`, and the methods that change the result kind are based on it. For example `castTo<Row[]>().first()` is `Row | undefined`. Before, `castTo<Row>()` after `first()` silently dropped `undefined`.
+
+## typescript: Modifiers
+
+Use `AnyQueryBuilder<M>` as the parameter type of functions that take query builders of any result kind. Modifier functions passed to `modify()` are only checked for the model type of their query builder parameter, so `(query: QueryBuilder<Person>) => void` can be used with `findById()` and `patch()` queries too. The rest of the arguments of `modify()` are checked against the parameters of the modifier.
+
 # Migration from objection 2.x to 3.0
 
 This document guides you through each breaking change in objection 3.0 and attempts to provide clear steps to follow. If you find something missing, please open an issue and we'll fix this guide ASAP.

@@ -1,0 +1,9 @@
+{
+  // The typings must also work without `strictNullChecks`.
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "strict": false,
+    "noImplicitAny": true
+  },
+  "include": ["./**/*.ts"]
+}

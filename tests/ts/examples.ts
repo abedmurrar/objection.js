@@ -1,4 +1,4 @@
-import { Equal } from './_utils/expect';
+import { Equal, expectType } from './_utils/expect';
 import Ajv from 'ajv';
 import { Knex, knex } from 'knex';
 import * as objection from '../../';
@@ -532,7 +532,8 @@ qb = qb.whereInComposite(
 );
 qb = qb.whereInComposite(['id1', 'id2'], Person.query().select('firstName', 'lastName'));
 
-// Query builder hooks. runBefore() and runAfter() don't immediately affect the result.
+// Query builder hooks. runBefore() doesn't affect the result. The return value of the
+// runAfter() callback replaces the result.
 
 const runBeforePerson: PromiseLike<Person> = qb
   .first()
@@ -543,14 +544,26 @@ const runBeforePersons: PromiseLike<Person[]> = qb.runBefore(
   async (result: any, builder: objection.QueryBuilder<Person>) => 88,
 );
 
-const runAfterPerson: PromiseLike<Person> = qb
+const runAfterNumber: PromiseLike<number> = qb
   .first()
   .throwIfNotFound()
   .runAfter(async (result: any, builder: objection.QueryBuilder<Person, Person>) => 88);
 
-const runAfterPersons: PromiseLike<Person[]> = qb.runAfter(
-  async (result: any, builder: objection.QueryBuilder<Person>) => 88,
-);
+async () => {
+  expectType<Person>()(
+    await qb
+      .first()
+      .throwIfNotFound()
+      .runAfter((result) => result),
+  );
+  expectType<Person[]>()(await qb.runAfter(async (result) => result));
+  expectType<string[]>()(await qb.runAfter((result) => result.map((it) => it.lastName)));
+  expectType<string | undefined>()(
+    await qb.runAfter((result) => result.map((it) => it.lastName)).first(),
+  );
+  // Returning nothing replaces the result with `undefined`.
+  expectType<undefined>()(await qb.runAfter(() => {}));
+};
 
 // signature-changing QueryBuilder methods:
 
@@ -753,7 +766,7 @@ const rowsPageRunAfter: PromiseLike<objection.Page<Person>> = Person.query()
     async (
       result: objection.Page<Person>,
       builder: objection.QueryBuilder<Person, objection.Page<Person>>,
-    ) => {},
+    ) => result,
   );
 
 // `retuning` should change the return value from number to T[]

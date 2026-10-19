@@ -26,7 +26,32 @@ class Person extends Model {
 Now you can do this:
 
 ```js
-await Person.query().where('id', 1).myCustomMethod(1).where('foo', 'bar');
+const person = await Person.query().active().findById(1).active(); // Person | undefined
+const numDeleted = await Person.query().where('id', 1).softDelete(); // number
+```
+
+## Typing functions that take query builders
+
+Use `AnyQueryBuilder<M>` for parameters that should accept a query builder of any result kind, for example in modifiers. Modifiers passed to `modify()` can also be typed with `QueryBuilder<M>`: only the model type of the parameter is checked, and the rest of the arguments of `modify()` are checked against the modifier's parameters.
+
+```ts
+import { AnyQueryBuilder } from 'objection';
+
+export function byName(query: AnyQueryBuilder<Person>, name: string) {
+  query.where('firstName', name);
+}
+
+await Person.query().findById(1).modify(byName, 'Jennifer');
+// Error: the second argument must be a string.
+await Person.query().modify(byName, 1);
+```
+
+Generic functions that return the query builder they get don't need casts:
+
+```ts
+function paginate<QB extends AnyQueryBuilder>(query: QB, page: number): QB {
+  return query.limit(10).offset(page * 10);
+}
 ```
 
 If you want to set the custom query builder for all model classes you can just set the [QueryBuilder](/api/model/static-methods.html#static-querybuilder) property of the [Model](/api/model/) base class. A cleaner option would be to create your own Model subclass, set its [QueryBuilder](/api/query-builder/) property and inherit all your models from the custom Model class.
@@ -70,30 +95,43 @@ TIP: Consider using [modifiers](/recipes/modifiers.html#usage-in-a-query) instea
 
 # Extending the query builder in typescript
 
-With typescript, you need to add some extra type properties for the custom query builder. These are necessary until typescript fully supports our use case. The good news is that you only need to define them once for the shared `BaseModel`. If you don't already have one, it's time to create it.
+A custom query builder class needs one extra line, the `'~rebind'` declaration. It tells the typings how to create the query builder type for other model and result types, so that your custom methods are kept after methods like `first()`, `findById()`, `throwIfNotFound()`, `patch()` and `page()`. You only need to set this up once for the shared `BaseModel`. If you don't already have one, it's time to create it.
 
 ```ts
-import { Model, Page } from 'objection';
+import {
+  Model,
+  QueryBuilder,
+  QueryBuilderState,
+  DefaultQueryBuilderState,
+} from 'objection';
 
-class MyQueryBuilder<M extends Model, R = M[]> extends QueryBuilder<M, R> {
-  // These are necessary. You can just copy-paste them and change the
-  // name of the query builder class.
-  ArrayQueryBuilderType!: MyQueryBuilder<M, M[]>;
-  SingleQueryBuilderType!: MyQueryBuilder<M, M>;
-  MaybeSingleQueryBuilderType!: MyQueryBuilder<M, M | undefined>;
-  NumberQueryBuilderType!: MyQueryBuilder<M, number>;
-  PageQueryBuilderType!: MyQueryBuilder<M, Page<M>>;
+class MyQueryBuilder<
+  M extends Model,
+  R = M[],
+  S extends QueryBuilderState = DefaultQueryBuilderState<M, R>,
+> extends QueryBuilder<M, R, S> {
+  // Copy-paste this and change the name of the class.
+  declare '~rebind': MyQueryBuilder<this['~M'], this['~R'], this['~S']>;
 
-  myCustomMethod(something: number): this {
-    doSomething(something);
-    return this;
+  active(): this {
+    return this.whereNull('deletedAt');
+  }
+
+  // Methods can call any query builder methods and the result types are
+  // inferred. In generic code like this the model type isn't known, so pass
+  // the type of the patch explicitly.
+  softDelete() {
+    return this.patch<{ deletedAt: Date }>({ deletedAt: new Date() });
   }
 }
 
 class BaseModel extends Model {
-  // Both of these are needed.
-  QueryBuilderType!: MyQueryBuilder<this>;
+  // Both of these are needed. The static property decides the query builder
+  // class at runtime and the types of the static query methods like `query()`
+  // are based on it. `QueryBuilderType` is used for the instance methods like
+  // `$query()` and `$relatedQuery()`.
   static QueryBuilder = MyQueryBuilder;
+  declare QueryBuilderType: MyQueryBuilder<this>;
 }
 ```
 
@@ -104,7 +142,32 @@ class Person extends BaseModel {
   static tableName = 'persons';
 }
 
-await Person.query().where('id', 1).myCustomMethod(1).where('foo', 'bar');
+const person = await Person.query().active().findById(1).active(); // Person | undefined
+const numDeleted = await Person.query().where('id', 1).softDelete(); // number
+```
+
+## Typing functions that take query builders
+
+Use `AnyQueryBuilder<M>` for parameters that should accept a query builder of any result kind, for example in modifiers. Modifiers passed to `modify()` can also be typed with `QueryBuilder<M>`: only the model type of the parameter is checked, and the rest of the arguments of `modify()` are checked against the modifier's parameters.
+
+```ts
+import { AnyQueryBuilder } from 'objection';
+
+export function byName(query: AnyQueryBuilder<Person>, name: string) {
+  query.where('firstName', name);
+}
+
+await Person.query().findById(1).modify(byName, 'Jennifer');
+// Error: the second argument must be a string.
+await Person.query().modify(byName, 1);
+```
+
+Generic functions that return the query builder they get don't need casts:
+
+```ts
+function paginate<QB extends AnyQueryBuilder>(query: QB, page: number): QB {
+  return query.limit(10).offset(page * 10);
+}
 ```
 
 ::: tip
