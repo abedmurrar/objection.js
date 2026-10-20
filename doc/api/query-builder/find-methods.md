@@ -1093,6 +1093,8 @@ queryBuilder = queryBuilder.whereJsonSupersetOf(
 
 Where left hand json field reference is a superset of the right hand json value or reference.
 
+Works on postgres (`@>`) and MySQL (`JSON_CONTAINS()`). Like on postgres, an object is only contained in an object on MySQL too: `whereJsonSupersetOf('arrayColumn', { a: 1 })` doesn't find `[{ "a": 1 }]`. Below the top level MySQL's rules apply, which also find objects inside arrays.
+
 ##### Arguments
 
 | Argument                    | Type                                                                                               | Description                                                            |
@@ -1279,10 +1281,10 @@ See [whereJsonIsObject](/api/query-builder/find-methods.html#wherejsonisobject)
 queryBuilder = queryBuilder.whereJsonHasAny(fieldExpression, keys);
 ```
 
-Where any of given strings is found from json object keys.
+Where any of given strings is found from json object keys, the string items of an array, or a string.
 
 ::: tip
-This doesn't work for arrays. If you want to check if an array contains an item, see [this](https://github.com/Vincit/objection.js/issues/415) and [this](https://github.com/Vincit/objection.js/issues/1133) issue.
+Only the string items of arrays are matched. To check if an array contains an item of another type, use [whereJsonSupersetOf](/api/query-builder/find-methods.html#wherejsonsupersetof) with an array: `whereJsonSupersetOf('numbers', [1])`.
 :::
 
 ##### Arguments
@@ -1308,10 +1310,10 @@ See [whereJsonHasAny](/api/query-builder/find-methods.html#wherejsonhasany)
 queryBuilder = queryBuilder.whereJsonHasAll(fieldExpression, keys);
 ```
 
-Where all of given strings are found from json object keys.
+Where all of given strings are found from json object keys, the string items of an array, or a string.
 
 ::: tip
-This doesn't work for arrays. If you want to check if an array contains an item, see [this](https://github.com/Vincit/objection.js/issues/415) and [this](https://github.com/Vincit/objection.js/issues/1133) issue.
+Only the string items of arrays are matched. To check if an array contains items of another type, use [whereJsonSupersetOf](/api/query-builder/find-methods.html#wherejsonsupersetof) with an array: `whereJsonSupersetOf('numbers', [1, 2])`.
 :::
 
 ##### Arguments
@@ -1330,3 +1332,50 @@ This doesn't work for arrays. If you want to check if an array contains an item,
 ## orWhereJsonHasAll()
 
 See [whereJsonHasAll](/api/query-builder/find-methods.html#wherejsonhasall)
+
+## whereJsonOverlaps()
+
+```js
+queryBuilder = queryBuilder.whereJsonOverlaps(
+  fieldExpression,
+  jsonObjectOrFieldExpression
+);
+```
+
+MySQL only. Where the json field and the json value or reference overlap: two arrays share an item, two objects share a key and value, or an array contains a scalar. Uses `JSON_OVERLAPS()`, which can use multi-valued indexes.
+
+##### Arguments
+
+| Argument                    | Type                                                                                               | Description           |
+| --------------------------- | -------------------------------------------------------------------------------------------------- | --------------------- |
+| fieldExpression             | [FieldExpression](/api/types/#type-fieldexpression)                                                | Reference to a field  |
+| jsonObjectOrFieldExpression | Object&nbsp;&#124;&nbsp;Array&nbsp;&#124;&nbsp;[FieldExpression](/api/types/#type-fieldexpression) | To which to compare   |
+
+##### Return value
+
+| Type                                | Description                        |
+| ----------------------------------- | ---------------------------------- |
+| [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. |
+
+##### Examples
+
+```js
+const jobs = await Job.query().whereJsonOverlaps('attributes:countryCodes', ['FI', 'SE']);
+```
+
+## orWhereJsonOverlaps()
+
+See [whereJsonOverlaps](/api/query-builder/find-methods.html#wherejsonoverlaps)
+
+## whereJsonNotOverlaps()
+
+MySQL only. The negation of [whereJsonOverlaps](/api/query-builder/find-methods.html#wherejsonoverlaps). A NULL or missing field doesn't overlap anything, so rows without the field are found.
+
+```js
+// Jobs that aren't restricted to any of the countries.
+const jobs = await Job.query().whereJsonNotOverlaps('attributes:countryCodes', ['FI', 'SE']);
+```
+
+## orWhereJsonNotOverlaps()
+
+See [whereJsonNotOverlaps](/api/query-builder/find-methods.html#wherejsonnotoverlaps)

@@ -206,9 +206,9 @@ describe('postgresJsonPath', () => {
       expect(() => TestModel.query(sqlite).patch({ 'data:a': 1 }).toKnexQuery()).to.throwException(
         /only supported on postgres and mysql/,
       );
-      expect(() => TestModel.query(mysql).whereJsonIsArray('data').toKnexQuery()).to.throwException(
-        /only supported on postgres/,
-      );
+      expect(() =>
+        TestModel.query(sqlite).whereJsonIsArray('data').toKnexQuery(),
+      ).to.throwException(/only supported on postgres and mysql/);
     });
 
     it('should allow plain refs on other databases', () => {

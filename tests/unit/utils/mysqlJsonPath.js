@@ -150,6 +150,48 @@ describe('mysqlJsonPath', () => {
       );
     });
 
+    it('whereJson* methods should use MySQL functions', () => {
+      expect(sql(TestModel.query(mysql).whereJsonSupersetOf('Model.data:a', { b: 1 }))).to.equal(
+        "select `Model`.* from `Model` where (JSON_CONTAINS(JSON_EXTRACT(`Model`.`data`, '$.\\\"a\\\"'), CAST('{\\\"b\\\":1}' AS JSON)) AND JSON_TYPE(JSON_EXTRACT(`Model`.`data`, '$.\\\"a\\\"')) = 'OBJECT')",
+      );
+
+      expect(sql(TestModel.query(mysql).whereJsonNotSubsetOf('data', [1]))).to.equal(
+        "select `Model`.* from `Model` where NOT (JSON_CONTAINS(CAST('[1]' AS JSON), `data`) AND JSON_TYPE(`data`) <> 'OBJECT')",
+      );
+
+      expect(
+        sql(TestModel.query(mysql).whereJsonIsArray('data').orWhereJsonNotArray('other')),
+      ).to.equal(
+        "select `Model`.* from `Model` where JSON_CONTAINS(`data`, CAST('[]' AS JSON)) or (NOT JSON_CONTAINS(`other`, CAST('[]' AS JSON)) OR `other` IS NULL)",
+      );
+
+      expect(sql(TestModel.query(mysql).whereJsonHasAny('data', []))).to.equal(
+        'select `Model`.* from `Model` where FALSE',
+      );
+
+      expect(sql(TestModel.query(mysql).whereJsonHasAll('data', []))).to.equal(
+        'select `Model`.* from `Model` where `data` IS NOT NULL',
+      );
+
+      expect(
+        sql(
+          TestModel.query(mysql)
+            .whereJsonOverlaps('data:a', [1])
+            .orWhereJsonNotOverlaps('data', 'other'),
+        ),
+      ).to.equal(
+        "select `Model`.* from `Model` where JSON_OVERLAPS(JSON_EXTRACT(`data`, '$.\\\"a\\\"'), CAST('[1]' AS JSON)) or NOT COALESCE(JSON_OVERLAPS(`data`, `other`), FALSE)",
+      );
+    });
+
+    it('whereJsonOverlaps should throw on postgres', () => {
+      expect(() =>
+        TestModel.query(Knex({ client: 'pg' }))
+          .whereJsonOverlaps('data', [1])
+          .toKnexQuery(),
+      ).to.throwException(/whereJsonOverlaps is only supported on mysql/);
+    });
+
     function queries(key) {
       const expr = keyExpr('data', key);
 
@@ -159,6 +201,14 @@ describe('mysqlJsonPath', () => {
         'whereIn(ref.castInt())': (qb) => qb.whereIn(ref(expr).castInt(), [1, 2]),
         'select(ref.as())': (qb) => qb.select(ref(expr).as('v')),
         'orderBy(ref)': (qb) => qb.orderBy(ref(expr)),
+        whereJsonSupersetOf: (qb) => qb.whereJsonSupersetOf(expr, { a: 1 }),
+        'whereJsonSupersetOf(ref, ref)': (qb) => qb.whereJsonSupersetOf(expr, expr),
+        whereJsonSubsetOf: (qb) => qb.whereJsonSubsetOf(expr, [1]),
+        whereJsonIsArray: (qb) => qb.whereJsonIsArray(expr),
+        whereJsonNotObject: (qb) => qb.whereJsonNotObject(expr),
+        whereJsonHasAny: (qb) => qb.whereJsonHasAny(expr, [key, 'a?b']),
+        whereJsonHasAll: (qb) => qb.whereJsonHasAll(expr, [key, "o'k"]),
+        whereJsonNotOverlaps: (qb) => qb.whereJsonNotOverlaps(expr, [key]),
         patch: (qb) => qb.patch({ [expr]: 1 }),
         'patch(ref)': (qb) => qb.patch({ [expr]: ref(expr) }),
         'onConflict().merge()': (qb) =>
@@ -178,7 +228,7 @@ describe('mysqlJsonPath', () => {
             const placeholders = stripStringLiterals(native.sql).match(/\?/g) || [];
 
             expect(placeholders).to.have.length(native.bindings.length);
-            // The path is always a binding, so the key never appears in the sql.
+            // The path and the keys are always bindings, so the key never appears in the sql.
             expect(native.sql).to.not.contain(key);
 
             const path = native.bindings.find((it) => typeof it === 'string' && it[0] === '$');

@@ -1260,6 +1260,20 @@ declare namespace Objection {
     orWhereJsonIsObject: WhereFieldExpressionMethod<this>;
     whereJsonNotObject: WhereFieldExpressionMethod<this>;
     orWhereJsonNotObject: WhereFieldExpressionMethod<this>;
+    /**
+     * MySQL only: `JSON_OVERLAPS(field, value)`. True when two arrays share an item,
+     * two objects share a key-value pair, or an array contains a scalar.
+     */
+    whereJsonOverlaps: WhereJsonMethod<this>;
+    andWhereJsonOverlaps: WhereJsonMethod<this>;
+    orWhereJsonOverlaps: WhereJsonMethod<this>;
+    /**
+     * MySQL only: the negation of `whereJsonOverlaps`. A NULL or missing field doesn't
+     * overlap anything, so it's found.
+     */
+    whereJsonNotOverlaps: WhereJsonMethod<this>;
+    andWhereJsonNotOverlaps: WhereJsonMethod<this>;
+    orWhereJsonNotOverlaps: WhereJsonMethod<this>;
     whereJsonHasAny: WhereJsonExpressionMethod<this>;
     orWhereJsonHasAny: WhereJsonExpressionMethod<this>;
     whereJsonHasAll: WhereJsonExpressionMethod<this>;
