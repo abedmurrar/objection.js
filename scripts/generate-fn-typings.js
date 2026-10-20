@@ -28,10 +28,22 @@ function functionTypes() {
   ];
 }
 
+function builderType(options) {
+  if (options.window) {
+    return 'WindowFunctionBuilder';
+  } else if (options.aggregate) {
+    return 'AggregateFunctionBuilder';
+  } else {
+    return 'FunctionBuilder';
+  }
+}
+
 function functionMembers() {
   return FUNCTIONS.flatMap(([name, sql, params, result, options = {}]) => [
-    `/** \`${sql}()\` (${options.portable ? 'portable' : 'MySQL'}) */`,
-    `${name}(${params}): FunctionBuilder<${result}>;`,
+    `/** \`${sql}()\` (${options.portable ? 'portable' : 'MySQL'}${
+      options.window ? ', window function' : options.aggregate ? ', aggregate' : ''
+    }) */`,
+    `${name}(${params}): ${builderType(options)}<${result}>;`,
   ]);
 }
 
@@ -45,7 +57,13 @@ function replaceRegion(source, region, lines) {
     throw new Error(`markers for ${region} not found in ${typingsPath}`);
   }
 
-  return source.slice(0, startIndex + start.length) + '\n' + lines.join('\n') + '\n' + source.slice(endIndex);
+  return (
+    source.slice(0, startIndex + start.length) +
+    '\n' +
+    lines.join('\n') +
+    '\n' +
+    source.slice(endIndex)
+  );
 }
 
 async function main() {

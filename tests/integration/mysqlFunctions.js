@@ -63,7 +63,8 @@ module.exports = (session) => {
         // Functions with a rest parameter need one or two arguments for it.
         for (const count of hasRest ? [required + 1, required + 2] : [required]) {
           try {
-            await value(fn[name](...new Array(count).fill(null)));
+            const builder = fn[name](...new Array(count).fill(null));
+            await value(options.window ? builder.over() : builder);
             error = null;
             break;
           } catch (err) {

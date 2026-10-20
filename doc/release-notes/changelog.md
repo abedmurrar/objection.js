@@ -19,6 +19,12 @@
 - The `whereJson*` methods (`whereJsonSupersetOf()`, `whereJsonSubsetOf()`, `whereJsonIsArray()`, `whereJsonIsObject()`, `whereJsonHasAny()`, `whereJsonHasAll()` and their variants) work on MySQL and find the same rows as on postgres
 - `fn` has a typed helper for every MySQL 8.4 built-in function, like `fn.dateFormat()`, `fn.timestampDiff('day', a, b)`, `fn.groupConcat(expr, { orderBy, separator })` and `fn.jsonObject({ ... })`. Objects and arrays passed as JSON documents are cast to JSON, and keywords like interval units are checked. MySQL-only functions throw on other databases. See [fn](/api/objection/#fn)
 - Types: `FunctionBuilder<T>` carries the type of the result of the function
+- `ref()`, `val()`, `fn()` and `raw()` have expression methods, so comparisons, conditions and arithmetic don't need raw SQL: `Pet.ref('age').gte(3)`, `eq()`, `ne()`, `gt()`, `gte()`, `lt()`, `lte()`, `in()`, `notIn()`, `like()`, `between()`, `isNull()`, `isNotNull()`, `isBlank()`, `isNotBlank()`, `and()`, `or()`, `not()`, `plus()`, `minus()`, `times()` and `div()`. They can be used in selects, wheres, havings, orderBys, join callbacks and patches. In TypeScript the values are checked against the type of the column. See [Expressions](/api/objection/#expressions)
+- Add `fn.case()`, `fn.exists()` and `fn.excluded()` (the value an upsert tried to insert)
+- Aggregate functions have `filter(condition)`: `fn.count().filter(Pet.ref('species').eq('dog'))`. `fn.count()` without arguments is `COUNT(*)`
+- Add window functions: `fn.rowNumber()`, `fn.rank()`, `fn.denseRank()`, `fn.percentRank()`, `fn.cumeDist()`, `fn.ntile()`, `fn.lag()`, `fn.lead()`, `fn.firstValue()`, `fn.lastValue()` and `fn.nthValue()`, and `over({ partitionBy, orderBy })` for them and the aggregate functions
+- Add `none()`, which makes a query match no rows
+- Fix subqueries in join callbacks on MySQL, like `join(Pet, (join) => join.on(Pet.ref('version'), Pet.query().max('version')))`. They threw `parentQuery.isUpdate is not a function`
 - Types: `Model.ref()` only accepts the columns of the model (with an optional table or alias), `'*'` and fields of JSON columns, whose first key is checked when the column type has known keys. `ReferenceBuilder<T>` carries the type of the column, and the casts change it
 - Types: `patch()`, `update()`, `*AndFetch()` and `merge()` accept field expression keys of JSON columns: `patch({ 'payload:courseName': 'Physics' })`
 - Types: Relations typed as a union of a model and an array of models are recognized as relations by `ModelProps` and `ModelRelations`

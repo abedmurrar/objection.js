@@ -266,7 +266,7 @@ await Event.query()
 - Objects and arrays passed as JSON documents (`fn.jsonContains()`, `fn.jsonSet()`, `fn.jsonObject()`...) are cast to JSON. `fn.jsonObject({ id: ref('id'), name: ref('name') })` builds `JSON_OBJECT('id', id, 'name', name)`.
 - Functions with keywords in their syntax take the keyword as an argument, which is checked against the keywords MySQL accepts: `fn.dateAdd(date, 7, 'day')`, `fn.dateSub()`, `fn.addDate()`, `fn.subDate()`, `fn.timestampAdd('week', 2, date)`, `fn.timestampDiff('day', from, to)`, `fn.extract('year_month', date)`, `fn.cast(x, 'decimal(10,2)')`, `fn.convert(x, { using: 'utf8mb4' })`, `fn.getFormat('date', 'EUR')`, `fn.trim(str, { side: 'leading', remove: '0' })`, `fn.position(substr, str)`, `fn.char(codes, { using })`, `fn.match(columns, search, { mode: 'boolean' })`, `fn.groupConcat(exprs, { distinct, orderBy, separator })`, `fn.countDistinct(...exprs)`, `fn.jsonValue(doc, path, { returning: 'unsigned' })` and `fn.memberOf(value, array)`.
 - Functions that only exist on MySQL throw an error when used with another database. Standard functions like `fn.round()`, `fn.length()` and `fn.trim()` work everywhere.
-- Window functions, spatial functions, `JSON_TABLE()` and deprecated functions aren't included. Use `fn('NAME', ...args)` for them.
+- Spatial functions, `JSON_TABLE()` and deprecated functions aren't included. Use `fn('NAME', ...args)` for them.
 
 ##### Examples
 
@@ -278,12 +278,130 @@ await Model.query().where(fn('coalesce', ref('age'), 0), '>', 30);
 
 // The same example using the fn.coalesce shortcut
 await Model.query().where(fn.coalesce(ref('age'), 0), '>', 30);
+
+// The same example using an expression
+await Model.query().where(fn.coalesce(ref('age'), 0).gt(30));
 ```
 
-Note that it can often be cleaner to use `raw` or `whereRaw`:
+## Expressions
+
+`ref()`, `val()`, `fn()` and `raw()` have methods that build comparisons, conditions and arithmetic, so that expressions don't need to be written as raw SQL. Each method returns a new [FunctionBuilder](/api/types/#class-functionbuilder), so they can be chained and used anywhere a `fn()` can: in `select()` with `.as()`, `where()`, `having()`, `orderBy()`, join callbacks, `patch()` and `onConflict().merge()` values, and as arguments of other functions.
 
 ```js
-await Model.query().whereRaw('coalesce(age, 0) > ?', 30);
+const { fn, ref, val } = require('objection');
+
+await Lesson.query()
+  .select(
+    'id',
+    val('lesson').as('type'),
+    Lesson.ref('body').isNotBlank().or(Lesson.ref('mediaUrl').isNotBlank()).as('hasContent'),
+    Submission.ref('grade').gt(2).as('passed'),
+  )
+  .where(Lesson.ref('order').between(1, 10))
+  .orderBy(Lesson.ref('courseId').eq(preferredCourseId), 'desc');
+
+// Move lessons down by one
+await Lesson.query()
+  .patch({ order: Lesson.ref('order').plus(1) })
+  .where('order', '>=', newOrder);
+
+// Never go below zero
+await Comment.query().patch({ replyCount: fn.greatest(Comment.ref('replyCount').minus(1), 0) });
+```
+
+| Method                                                | SQL                              |
+| ----------------------------------------------------- | -------------------------------- |
+| `eq(value)`, `ne(value)`                              | `(a = value)`, `(a <> value)`. `eq(null)` is `IS NULL` and `ne(null)` is `IS NOT NULL`, like `where(column, null)` |
+| `gt(value)`, `gte(value)`, `lt(value)`, `lte(value)`  | `(a > value)` ...                |
+| `in(values)`, `notIn(values)`                         | `(a IN (...))`. Takes an array or a subquery. `in([])` matches nothing |
+| `like(pattern)`, `between(min, max)`                  | `(a LIKE pattern)`, `(a BETWEEN min AND max)` |
+| `isNull()`, `isNotNull()`                             | `(a IS NULL)`, `(a IS NOT NULL)` |
+| `isBlank()`, `isNotBlank()`                           | NULL, an empty string or only spaces: `(COALESCE(TRIM(a), '') = '')` |
+| `and(...conditions)`, `or(...conditions)`, `not()`    | `(a AND b AND ...)`, `(a OR b OR ...)`, `(NOT a)` |
+| `plus(value)`, `minus(value)`, `times(value)`, `div(value)` | `(a + value)` ...           |
+
+The SQL of every method is wrapped in parentheses, so expressions can be nested without thinking about operator precedence. Like the arguments of `fn()`, strings are values: use `ref()` or `Model.ref()` for columns. In TypeScript the values are checked against the type of the column: `Lesson.ref('order').eq('2')` is an error when `order` is a number. Dates can also be compared with strings.
+
+Conditions are booleans on postgres and `0` or `1` on MySQL and SQLite.
+
+##### fn.case()
+
+`fn.case()` builds `CASE WHEN condition THEN result ... ELSE result END`, and `fn.case(value)` builds `CASE value WHEN other THEN result ... END`. Without `else()` the result is `NULL` when nothing matches.
+
+```js
+await Job.query().select(
+  fn
+    .case(Job.ref('typeCode'))
+    .when(JobType.FULL_TIME, 3)
+    .when(JobType.PART_TIME, 1)
+    .else(0)
+    .as('typeScore'),
+  fn.case().when(Job.ref('id').in(manualJobIds), 'manual').else('scraped').as('source'),
+);
+```
+
+In TypeScript the type of the result is the union of the results: `'manual' | 'scraped'` above.
+
+##### fn.exists()
+
+`fn.exists(query)` is `(EXISTS (query))`.
+
+```js
+await Quiz.query().select('id', fn.exists(Quiz.relatedQuery('questions')).as('hasContent'));
+```
+
+##### Filtered aggregates
+
+`filter(condition)` of the aggregate functions (`fn.count()`, `fn.sum()`, `fn.avg()`, `fn.min()`, `fn.max()`, `fn.countDistinct()`, `fn.groupConcat()`, `fn.jsonArrayAgg()`, `fn.std()`, `fn.variance()`...) only aggregates the rows that match the condition. It's written as `CASE WHEN condition THEN value END`, which works on every database. Calling `filter()` again adds a condition with `AND`. `fn.count()` without arguments is `COUNT(*)`.
+
+```js
+await EventUser.query()
+  .select(
+    'eventId',
+    fn.count().as('registrants'),
+    fn.count().filter(EventUser.ref('hasAttended')).as('attended'),
+    fn.countDistinct(EventUser.ref('userId')).filter(EventUser.ref('statusCode').eq(ACCEPTED)).as('accepted'),
+    fn.avg(Submission.ref('grade')).filter(Submission.ref('grade').isNotNull()).as('averageGrade'),
+  )
+  .groupBy('eventId')
+  .having(fn.count().gt(0));
+```
+
+##### Window functions
+
+`over({ partitionBy, orderBy })` turns an aggregate or a window function into a window function call. Strings in `partitionBy` and `orderBy` are column names. `orderBy` takes a column, `[column, 'desc']`, or a list of them. The window functions are `fn.rowNumber()`, `fn.rank()`, `fn.denseRank()`, `fn.percentRank()`, `fn.cumeDist()`, `fn.ntile(buckets)`, `fn.lag(x, offset, default)`, `fn.lead(x, offset, default)`, `fn.firstValue(x)`, `fn.lastValue(x)` and `fn.nthValue(x, n)`, and they can only be used with `over()`. They work on postgres, MySQL 8 and SQLite 3.25 or newer.
+
+```js
+// The first three attendees of each event
+await EventUser.query()
+  .from(
+    EventUser.query()
+      .select(
+        'event_users.*',
+        fn.rowNumber().over({ partitionBy: 'eventId', orderBy: ['createdAt', 'asc'] }).as('rn'),
+      )
+      .as('event_users'),
+  )
+  .where('rn', '<=', 3);
+
+await Payment.query().select('id', fn.sum(Payment.ref('amount')).over({ partitionBy: 'ownerId' }).as('ownerTotal'));
+```
+
+##### fn.excluded()
+
+`fn.excluded(column)` is the value an upsert tried to insert: `VALUES(column)` on MySQL and `excluded.column` on postgres and SQLite.
+
+```js
+await CourseUser.query()
+  .insert({ userId, courseId, type })
+  .onConflict(['userId', 'courseId'])
+  .merge({
+    // Keep instructors instructors.
+    type: fn
+      .case()
+      .when(CourseUser.ref('type').eq(CourseUserType.INSTRUCTOR), CourseUser.ref('type'))
+      .else(fn.excluded('type')),
+  });
 ```
 
 ## mixin

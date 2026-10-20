@@ -404,6 +404,30 @@ See [knex documentation](https://knexjs.org/guide/query-builder.html#where)
 | ----------------------------------- | ---------------------------------- |
 | [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. |
 
+## none()
+
+```js
+queryBuilder = queryBuilder.none();
+```
+
+Makes the query match no rows by adding `where (1 = 0)`. Useful in modifiers when there is nothing to match:
+
+```js
+function forUsers(query, userIds) {
+  if (userIds.length === 0) {
+    return query.none();
+  }
+
+  query.whereIn('userId', userIds);
+}
+```
+
+##### Return value
+
+| Type                                | Description                        |
+| ----------------------------------- | ---------------------------------- |
+| [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. |
+
 ## andWhere()
 
 See [knex documentation](https://knexjs.org/guide/query-builder.html#where)

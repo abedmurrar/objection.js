@@ -50,13 +50,17 @@ declare namespace Objection {
   const NotNullViolationError: typeof dbErrors.NotNullViolationError;
 
   export interface RawBuilder extends Aliasable {}
+  /**
+   * What `raw()` returns: a `RawBuilder` with the expression methods.
+   */
+  export interface RawExpressionBuilder extends RawBuilder, ExpressionMethods {}
 
-  export interface RawFunction extends RawInterface<RawBuilder> {}
+  export interface RawFunction extends RawInterface<RawExpressionBuilder> {}
   export interface RawInterface<R> {
     (sql: string, ...bindings: any[]): R;
   }
 
-  export interface ValueBuilder extends Castable {}
+  export interface ValueBuilder extends Castable, ExpressionMethods {}
   export interface ValueFunction {
     (
       value: PrimitiveValue | PrimitiveValue[] | PrimitiveValueObject | PrimitiveValueObject[],
@@ -66,7 +70,7 @@ declare namespace Objection {
   /**
    * A reference to a column or a field of a JSON column. `T` is the type of the value.
    */
-  export interface ReferenceBuilder<T = unknown> extends Aliasable {
+  export interface ReferenceBuilder<T = unknown> extends Aliasable, ExpressionMethods {
     /**
      * The type of the referenced value. Only used by the typings.
      */
@@ -146,7 +150,7 @@ declare namespace Objection {
       ? M[C & keyof M]
       : M[E & keyof M];
 
-  export interface FunctionBuilder<T = unknown> extends Castable {
+  export interface FunctionBuilder<T = unknown> extends Castable, ExpressionMethods {
     /**
      * The type of the result of the function. Only used by the typings.
      */
@@ -154,6 +158,137 @@ declare namespace Objection {
   }
   export interface SqlFunctionShortcut<T = unknown> {
     (...args: any[]): FunctionBuilder<T>;
+  }
+  export interface AggregateFunctionShortcut<T = unknown> {
+    (...args: any[]): AggregateFunctionBuilder<T>;
+  }
+
+  /**
+   * An aggregate function like `fn.count()` or `fn.sum()`.
+   */
+  export interface AggregateFunctionBuilder<T = unknown> extends FunctionBuilder<T> {
+    /**
+     * Only aggregates the rows that match `condition`.
+     * `fn.count().filter(Pet.ref('species').eq('dog'))` is
+     * `COUNT(CASE WHEN species = 'dog' THEN 1 END)`. Calling it again adds a
+     * condition with `AND`.
+     */
+    filter(condition: FnArg): this;
+    /**
+     * Uses the function as a window function: `fn.sum(ref('amount')).over({ partitionBy: 'ownerId' })`.
+     */
+    over(window?: FnWindow): this;
+  }
+
+  /**
+   * A window function like `fn.rowNumber()`. It can only be used after `over()`.
+   */
+  export interface WindowFunctionBuilder<T = unknown> {
+    over(window?: FnWindow): FunctionBuilder<T>;
+  }
+
+  /**
+   * The window of `over()`. Strings are column names.
+   */
+  interface FnWindow {
+    partitionBy?: FnArg | readonly FnArg[];
+    orderBy?: FnOrderBy | readonly FnOrderBy[];
+  }
+
+  /**
+   * `fn.case()` and `fn.case(value)`.
+   */
+  export interface CaseBuilder<T = never> extends FunctionBuilder<T | null> {
+    /**
+     * `WHEN condition THEN result`, or `WHEN value THEN result` for `fn.case(value)`.
+     */
+    when<const R>(condition: FnArg, result: R): CaseBuilder<T | FnResult<R>>;
+    else<const R>(result: R): FunctionBuilder<T | FnResult<R>>;
+  }
+
+  /**
+   * The type of the value of an expression.
+   */
+  type FnResult<R> =
+    R extends FunctionBuilder<infer U>
+      ? U
+      : R extends ReferenceBuilder<infer U>
+        ? U
+        : R extends Raw | ValueBuilder | AnyQueryBuilder
+          ? unknown
+          : R;
+
+  /**
+   * The value of a condition: a boolean on postgres, 0 or 1 on MySQL and SQLite, and
+   * NULL when a compared value is NULL.
+   */
+  type SqlBoolean = boolean | 0 | 1 | null;
+
+  /**
+   * An expression with a known value type.
+   */
+  interface Typed {
+    '~type'?: unknown;
+  }
+
+  /**
+   * A value to compare with a value of type `T`. Dates can also be compared with
+   * strings.
+   */
+  type CompareValue<T> = unknown extends T
+    ? FnArg
+    : Exclude<T, undefined> | (Date extends T ? string : never) | null | FnExpression;
+
+  /**
+   * Comparison, logic and arithmetic methods of `ref()`, `val()`, `fn()` and `raw()`:
+   * `Person.ref('age').gte(18)`, `Pet.ref('order').plus(1)`. The sql of each one is
+   * wrapped in parentheses. Values are checked against the type of the expression.
+   */
+  interface ExpressionMethods {
+    /**
+     * The type of the value. Only used by the typings.
+     */
+    '~type'?: unknown;
+    /**
+     * `= value`. `eq(null)` is `IS NULL`.
+     */
+    eq<S extends Typed>(this: S, value: CompareValue<S['~type']>): FunctionBuilder<SqlBoolean>;
+    /**
+     * `<> value`. `ne(null)` is `IS NOT NULL`.
+     */
+    ne<S extends Typed>(this: S, value: CompareValue<S['~type']>): FunctionBuilder<SqlBoolean>;
+    gt<S extends Typed>(this: S, value: CompareValue<S['~type']>): FunctionBuilder<SqlBoolean>;
+    gte<S extends Typed>(this: S, value: CompareValue<S['~type']>): FunctionBuilder<SqlBoolean>;
+    lt<S extends Typed>(this: S, value: CompareValue<S['~type']>): FunctionBuilder<SqlBoolean>;
+    lte<S extends Typed>(this: S, value: CompareValue<S['~type']>): FunctionBuilder<SqlBoolean>;
+    in<S extends Typed>(
+      this: S,
+      values: readonly CompareValue<S['~type']>[] | AnyQueryBuilder,
+    ): FunctionBuilder<SqlBoolean>;
+    notIn<S extends Typed>(
+      this: S,
+      values: readonly CompareValue<S['~type']>[] | AnyQueryBuilder,
+    ): FunctionBuilder<SqlBoolean>;
+    like(pattern: string | FnExpression): FunctionBuilder<SqlBoolean>;
+    between<S extends Typed>(
+      this: S,
+      min: CompareValue<S['~type']>,
+      max: CompareValue<S['~type']>,
+    ): FunctionBuilder<SqlBoolean>;
+    isNull(): FunctionBuilder<SqlBoolean>;
+    isNotNull(): FunctionBuilder<SqlBoolean>;
+    /**
+     * NULL, an empty string or a string of only spaces.
+     */
+    isBlank(): FunctionBuilder<SqlBoolean>;
+    isNotBlank(): FunctionBuilder<SqlBoolean>;
+    and(...conditions: FnArg[]): FunctionBuilder<SqlBoolean>;
+    or(...conditions: FnArg[]): FunctionBuilder<SqlBoolean>;
+    not(): FunctionBuilder<SqlBoolean>;
+    plus(value: FnArg): FunctionBuilder<FnNumeric | null>;
+    minus(value: FnArg): FunctionBuilder<FnNumeric | null>;
+    times(value: FnArg): FunctionBuilder<FnNumeric | null>;
+    div(value: FnArg): FunctionBuilder<FnNumeric | null>;
   }
 
   /**
@@ -175,6 +310,10 @@ declare namespace Objection {
    * A JSON document argument. Objects and arrays are cast to JSON.
    */
   type FnJsonArg = FnArg | object;
+  /**
+   * An `fn` argument that isn't a plain value.
+   */
+  type FnExpression = Exclude<FnArg, PrimitiveValue>;
   type FnOrderBy = FnArg | [FnArg, 'asc' | 'desc' | 'ASC' | 'DESC'];
 
   // <generated:mysql-function-types>
@@ -248,13 +387,34 @@ declare namespace Objection {
 
     coalesce: SqlFunctionShortcut;
     concat: SqlFunctionShortcut<string | null>;
-    sum: SqlFunctionShortcut<FnNumeric | null>;
-    avg: SqlFunctionShortcut<FnNumeric | null>;
-    min: SqlFunctionShortcut;
-    max: SqlFunctionShortcut;
-    count: SqlFunctionShortcut<FnNumeric>;
+    sum: AggregateFunctionShortcut<FnNumeric | null>;
+    avg: AggregateFunctionShortcut<FnNumeric | null>;
+    min: AggregateFunctionShortcut;
+    max: AggregateFunctionShortcut;
+    /**
+     * `fn.count()` and `fn.count('*')` are `COUNT(*)`.
+     */
+    count: AggregateFunctionShortcut<FnNumeric>;
     upper: SqlFunctionShortcut<string | null>;
     lower: SqlFunctionShortcut<string | null>;
+
+    /**
+     * `fn.case().when(condition, result).else(result)` is `CASE WHEN ... END`.
+     */
+    case(): CaseBuilder;
+    /**
+     * `fn.case(value).when(other, result).else(result)` is `CASE value WHEN ... END`.
+     */
+    case(value: FnArg): CaseBuilder;
+    /**
+     * `EXISTS (subquery)`.
+     */
+    exists(subquery: AnyQueryBuilder): FunctionBuilder<SqlBoolean>;
+    /**
+     * The value an upsert tried to insert, for `onConflict().merge({ ... })`:
+     * `VALUES(column)` on MySQL, `excluded.column` on postgres and SQLite.
+     */
+    excluded(column: string | ReferenceBuilder): FunctionBuilder;
 
     // The MySQL built-in functions. Generated from lib/queryBuilder/functions/mysql.js
     // by scripts/generate-fn-typings.js.
@@ -597,37 +757,59 @@ declare namespace Objection {
     year(date: FnArg): FunctionBuilder<number | null>;
     /** `YEARWEEK()` (MySQL) */
     yearWeek(date: FnArg, mode?: FnArg): FunctionBuilder<number | null>;
-    /** `BIT_AND()` (MySQL) */
-    bitAnd(x: FnArg): FunctionBuilder<FnNumeric | null>;
-    /** `BIT_OR()` (MySQL) */
-    bitOr(x: FnArg): FunctionBuilder<FnNumeric | null>;
-    /** `BIT_XOR()` (MySQL) */
-    bitXor(x: FnArg): FunctionBuilder<FnNumeric | null>;
-    /** `COUNT()` (MySQL) */
-    countDistinct(...exprs: FnArg[]): FunctionBuilder<number>;
-    /** `GROUP_CONCAT()` (MySQL) */
+    /** `BIT_AND()` (MySQL, aggregate) */
+    bitAnd(x: FnArg): AggregateFunctionBuilder<FnNumeric | null>;
+    /** `BIT_OR()` (MySQL, aggregate) */
+    bitOr(x: FnArg): AggregateFunctionBuilder<FnNumeric | null>;
+    /** `BIT_XOR()` (MySQL, aggregate) */
+    bitXor(x: FnArg): AggregateFunctionBuilder<FnNumeric | null>;
+    /** `COUNT()` (portable, aggregate) */
+    countDistinct(...exprs: FnArg[]): AggregateFunctionBuilder<number>;
+    /** `GROUP_CONCAT()` (MySQL, aggregate) */
     groupConcat(
       exprs: FnArg | FnArg[],
       options?: { distinct?: boolean; orderBy?: FnOrderBy | FnOrderBy[]; separator?: string },
-    ): FunctionBuilder<string | null>;
-    /** `JSON_ARRAYAGG()` (MySQL) */
-    jsonArrayAgg(x: FnArg): FunctionBuilder<unknown[] | null>;
+    ): AggregateFunctionBuilder<string | null>;
+    /** `JSON_ARRAYAGG()` (MySQL, aggregate) */
+    jsonArrayAgg(x: FnArg): AggregateFunctionBuilder<unknown[] | null>;
     /** `JSON_OBJECTAGG()` (MySQL) */
     jsonObjectAgg(key: FnArg, value: FnArg): FunctionBuilder<Record<string, unknown> | null>;
-    /** `STD()` (MySQL) */
-    std(x: FnArg): FunctionBuilder<number | null>;
-    /** `STDDEV()` (portable) */
-    stddev(x: FnArg): FunctionBuilder<number | null>;
-    /** `STDDEV_POP()` (portable) */
-    stddevPop(x: FnArg): FunctionBuilder<number | null>;
-    /** `STDDEV_SAMP()` (portable) */
-    stddevSamp(x: FnArg): FunctionBuilder<number | null>;
-    /** `VARIANCE()` (portable) */
-    variance(x: FnArg): FunctionBuilder<number | null>;
-    /** `VAR_POP()` (portable) */
-    varPop(x: FnArg): FunctionBuilder<number | null>;
-    /** `VAR_SAMP()` (portable) */
-    varSamp(x: FnArg): FunctionBuilder<number | null>;
+    /** `STD()` (MySQL, aggregate) */
+    std(x: FnArg): AggregateFunctionBuilder<number | null>;
+    /** `STDDEV()` (portable, aggregate) */
+    stddev(x: FnArg): AggregateFunctionBuilder<number | null>;
+    /** `STDDEV_POP()` (portable, aggregate) */
+    stddevPop(x: FnArg): AggregateFunctionBuilder<number | null>;
+    /** `STDDEV_SAMP()` (portable, aggregate) */
+    stddevSamp(x: FnArg): AggregateFunctionBuilder<number | null>;
+    /** `VARIANCE()` (portable, aggregate) */
+    variance(x: FnArg): AggregateFunctionBuilder<number | null>;
+    /** `VAR_POP()` (portable, aggregate) */
+    varPop(x: FnArg): AggregateFunctionBuilder<number | null>;
+    /** `VAR_SAMP()` (portable, aggregate) */
+    varSamp(x: FnArg): AggregateFunctionBuilder<number | null>;
+    /** `ROW_NUMBER()` (portable, window function) */
+    rowNumber(): WindowFunctionBuilder<number>;
+    /** `RANK()` (portable, window function) */
+    rank(): WindowFunctionBuilder<number>;
+    /** `DENSE_RANK()` (portable, window function) */
+    denseRank(): WindowFunctionBuilder<number>;
+    /** `PERCENT_RANK()` (portable, window function) */
+    percentRank(): WindowFunctionBuilder<number>;
+    /** `CUME_DIST()` (portable, window function) */
+    cumeDist(): WindowFunctionBuilder<number>;
+    /** `NTILE()` (portable, window function) */
+    ntile(buckets: number): WindowFunctionBuilder<number>;
+    /** `LAG()` (portable, window function) */
+    lag(x: FnArg, offset?: number, defaultValue?: FnArg): WindowFunctionBuilder<unknown>;
+    /** `LEAD()` (portable, window function) */
+    lead(x: FnArg, offset?: number, defaultValue?: FnArg): WindowFunctionBuilder<unknown>;
+    /** `FIRST_VALUE()` (portable, window function) */
+    firstValue(x: FnArg): WindowFunctionBuilder<unknown>;
+    /** `LAST_VALUE()` (portable, window function) */
+    lastValue(x: FnArg): WindowFunctionBuilder<unknown>;
+    /** `NTH_VALUE()` (portable, window function) */
+    nthValue(x: FnArg, n: number): WindowFunctionBuilder<unknown>;
     /** `GREATEST()` (portable) */
     greatest(...values: FnArg[]): FunctionBuilder<unknown>;
     /** `IF()` (MySQL) */
@@ -2012,6 +2194,10 @@ declare namespace Objection {
     andWhereILike: WhereMethod<this>;
     orWhereILike: WhereMethod<this>;
 
+    /**
+     * Makes the query match no rows: `where (1 = 0)`.
+     */
+    none(): this;
     whereRaw: WhereRawMethod<this>;
     orWhereRaw: WhereRawMethod<this>;
     andWhereRaw: WhereRawMethod<this>;

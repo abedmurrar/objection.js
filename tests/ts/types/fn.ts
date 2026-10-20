@@ -1,4 +1,4 @@
-import { Model, fn, ref, FunctionBuilder } from '../../../';
+import { Model, fn, ref, FunctionBuilder, AggregateFunctionBuilder } from '../../../';
 import { expectType } from '../_utils/expect';
 
 class Event extends Model {
@@ -17,9 +17,9 @@ expectType<FunctionBuilder<number | null>>()(fn.timestampDiff('DAY', ref('a'), r
 expectType<FunctionBuilder<Date | string | null>>()(fn.dateSub(fn.curDate(), 7, 'day'));
 expectType<FunctionBuilder<0 | 1 | null>>()(fn.jsonContains(Event.ref('tags'), ['a']));
 expectType<FunctionBuilder<0 | 1 | null>>()(fn.memberOf('a', Event.ref('tags')));
-expectType<FunctionBuilder<unknown[] | null>>()(fn.jsonArrayAgg(Event.ref('id')));
+expectType<AggregateFunctionBuilder<unknown[] | null>>()(fn.jsonArrayAgg(Event.ref('id')));
 expectType<FunctionBuilder<Record<string, unknown>>>()(fn.jsonObject({ id: Event.ref('id') }));
-expectType<FunctionBuilder<string | null>>()(
+expectType<AggregateFunctionBuilder<string | null>>()(
   fn.groupConcat(Event.ref('id'), {
     distinct: true,
     orderBy: [Event.ref('id'), 'desc'],
@@ -27,8 +27,8 @@ expectType<FunctionBuilder<string | null>>()(
   }),
 );
 expectType<FunctionBuilder<number | null>>()(fn.length(Event.ref('id')));
-expectType<FunctionBuilder<number>>()(fn.countDistinct(Event.ref('id')));
-expectType<FunctionBuilder<string | number>>()(fn.count(Event.ref('id')));
+expectType<AggregateFunctionBuilder<number>>()(fn.countDistinct(Event.ref('id')));
+expectType<AggregateFunctionBuilder<string | number>>()(fn.count(Event.ref('id')));
 
 async () => {
   await Event.query()

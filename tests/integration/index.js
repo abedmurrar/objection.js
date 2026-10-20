@@ -92,6 +92,7 @@ describe('integration tests', () => {
       require('./modifiers')(session);
       require('./toKnexQuery')(session);
       require('./relationOwnerGrouping')(session);
+      require('./expressions')(session);
 
       if (session.isPostgres() || session.isMySql()) {
         require('./jsonQueries')(session);
