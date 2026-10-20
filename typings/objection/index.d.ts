@@ -70,25 +70,738 @@ declare namespace Objection {
     (expression: string): ReferenceBuilder;
   }
 
-  export interface FunctionBuilder extends Castable {}
-  export interface SqlFunctionShortcut {
-    (...args: any[]): FunctionBuilder;
+  export interface FunctionBuilder<T = unknown> extends Castable {
+    /**
+     * The type of the result of the function. Only used by the typings.
+     */
+    '~type'?: T;
   }
+  export interface SqlFunctionShortcut<T = unknown> {
+    (...args: any[]): FunctionBuilder<T>;
+  }
+
+  /**
+   * A number that the database driver may return as a string, like `DECIMAL` and
+   * `BIGINT` values with mysql2's and pg's default settings.
+   */
+  type FnNumeric = number | string;
+  /**
+   * An argument of an `fn` helper. Strings are values; use `ref()` for columns.
+   */
+  type FnArg =
+    | ReferenceBuilder
+    | Raw
+    | FunctionBuilder<any>
+    | ValueBuilder
+    | AnyQueryBuilder
+    | PrimitiveValue;
+  /**
+   * A JSON document argument. Objects and arrays are cast to JSON.
+   */
+  type FnJsonArg = FnArg | object;
+  type FnOrderBy = FnArg | [FnArg, 'asc' | 'desc' | 'ASC' | 'DESC'];
+
+  // <generated:mysql-function-types>
+  type FnIntervalUnit =
+    | 'MICROSECOND'
+    | 'microsecond'
+    | 'SECOND'
+    | 'second'
+    | 'MINUTE'
+    | 'minute'
+    | 'HOUR'
+    | 'hour'
+    | 'DAY'
+    | 'day'
+    | 'WEEK'
+    | 'week'
+    | 'MONTH'
+    | 'month'
+    | 'QUARTER'
+    | 'quarter'
+    | 'YEAR'
+    | 'year'
+    | 'SECOND_MICROSECOND'
+    | 'second_microsecond'
+    | 'MINUTE_MICROSECOND'
+    | 'minute_microsecond'
+    | 'MINUTE_SECOND'
+    | 'minute_second'
+    | 'HOUR_MICROSECOND'
+    | 'hour_microsecond'
+    | 'HOUR_SECOND'
+    | 'hour_second'
+    | 'HOUR_MINUTE'
+    | 'hour_minute'
+    | 'DAY_MICROSECOND'
+    | 'day_microsecond'
+    | 'DAY_SECOND'
+    | 'day_second'
+    | 'DAY_MINUTE'
+    | 'day_minute'
+    | 'DAY_HOUR'
+    | 'day_hour'
+    | 'YEAR_MONTH'
+    | 'year_month';
+  type FnTimestampUnit =
+    | 'MICROSECOND'
+    | 'microsecond'
+    | 'SECOND'
+    | 'second'
+    | 'MINUTE'
+    | 'minute'
+    | 'HOUR'
+    | 'hour'
+    | 'DAY'
+    | 'day'
+    | 'WEEK'
+    | 'week'
+    | 'MONTH'
+    | 'month'
+    | 'QUARTER'
+    | 'quarter'
+    | 'YEAR'
+    | 'year';
+  // </generated:mysql-function-types>
+
   export interface FunctionFunction {
     (functionName: string, ...arguments: any[]): FunctionBuilder;
 
-    now(precision: number): FunctionBuilder;
-    now(): FunctionBuilder;
+    now(precision: number): FunctionBuilder<Date | string>;
+    now(): FunctionBuilder<Date | string>;
 
     coalesce: SqlFunctionShortcut;
-    concat: SqlFunctionShortcut;
-    sum: SqlFunctionShortcut;
-    avg: SqlFunctionShortcut;
+    concat: SqlFunctionShortcut<string | null>;
+    sum: SqlFunctionShortcut<FnNumeric | null>;
+    avg: SqlFunctionShortcut<FnNumeric | null>;
     min: SqlFunctionShortcut;
     max: SqlFunctionShortcut;
-    count: SqlFunctionShortcut;
-    upper: SqlFunctionShortcut;
-    lower: SqlFunctionShortcut;
+    count: SqlFunctionShortcut<FnNumeric>;
+    upper: SqlFunctionShortcut<string | null>;
+    lower: SqlFunctionShortcut<string | null>;
+
+    // The MySQL built-in functions. Generated from lib/queryBuilder/functions/mysql.js
+    // by scripts/generate-fn-typings.js.
+    // <generated:mysql-functions>
+    /** `ASCII()` (portable) */
+    ascii(str: FnArg): FunctionBuilder<number | null>;
+    /** `BIN()` (MySQL) */
+    bin(n: FnArg): FunctionBuilder<string | null>;
+    /** `BIT_LENGTH()` (portable) */
+    bitLength(str: FnArg): FunctionBuilder<number | null>;
+    /** `CHAR()` (MySQL) */
+    char(codes: FnArg | FnArg[], options?: { using?: string }): FunctionBuilder<Buffer | null>;
+    /** `CHAR_LENGTH()` (portable) */
+    charLength(str: FnArg): FunctionBuilder<number | null>;
+    /** `CHARACTER_LENGTH()` (portable) */
+    characterLength(str: FnArg): FunctionBuilder<number | null>;
+    /** `CONCAT_WS()` (portable) */
+    concatWs(separator: FnArg, ...strs: FnArg[]): FunctionBuilder<string | null>;
+    /** `ELT()` (MySQL) */
+    elt(n: FnArg, ...strs: FnArg[]): FunctionBuilder<string | null>;
+    /** `EXPORT_SET()` (MySQL) */
+    exportSet(
+      bits: FnArg,
+      on: FnArg,
+      off: FnArg,
+      separator?: FnArg,
+      numberOfBits?: FnArg,
+    ): FunctionBuilder<string | null>;
+    /** `FIELD()` (MySQL) */
+    field(str: FnArg, ...strs: FnArg[]): FunctionBuilder<number | null>;
+    /** `FIND_IN_SET()` (MySQL) */
+    findInSet(str: FnArg, strList: FnArg): FunctionBuilder<number | null>;
+    /** `FORMAT()` (MySQL) */
+    format(x: FnArg, decimals: FnArg, locale?: FnArg): FunctionBuilder<string | null>;
+    /** `FROM_BASE64()` (MySQL) */
+    fromBase64(str: FnArg): FunctionBuilder<Buffer | null>;
+    /** `HEX()` (MySQL) */
+    hex(x: FnArg): FunctionBuilder<string | null>;
+    /** `INSERT()` (MySQL) */
+    insert(str: FnArg, pos: FnArg, len: FnArg, newStr: FnArg): FunctionBuilder<string | null>;
+    /** `INSTR()` (MySQL) */
+    instr(str: FnArg, substr: FnArg): FunctionBuilder<number | null>;
+    /** `LCASE()` (MySQL) */
+    lcase(str: FnArg): FunctionBuilder<string | null>;
+    /** `LEFT()` (portable) */
+    left(str: FnArg, len: FnArg): FunctionBuilder<string | null>;
+    /** `LENGTH()` (portable) */
+    length(str: FnArg): FunctionBuilder<number | null>;
+    /** `LOCATE()` (MySQL) */
+    locate(substr: FnArg, str: FnArg, pos?: FnArg): FunctionBuilder<number | null>;
+    /** `LPAD()` (portable) */
+    lpad(str: FnArg, len: FnArg, padStr: FnArg): FunctionBuilder<string | null>;
+    /** `LTRIM()` (portable) */
+    ltrim(str: FnArg): FunctionBuilder<string | null>;
+    /** `MAKE_SET()` (MySQL) */
+    makeSet(bits: FnArg, ...strs: FnArg[]): FunctionBuilder<string | null>;
+    /** `MID()` (MySQL) */
+    mid(str: FnArg, pos: FnArg, len?: FnArg): FunctionBuilder<string | null>;
+    /** `OCT()` (MySQL) */
+    oct(n: FnArg): FunctionBuilder<string | null>;
+    /** `OCTET_LENGTH()` (portable) */
+    octetLength(str: FnArg): FunctionBuilder<number | null>;
+    /** `ORD()` (MySQL) */
+    ord(str: FnArg): FunctionBuilder<number | null>;
+    /** `POSITION()` (portable) */
+    position(substr: FnArg, str: FnArg): FunctionBuilder<number | null>;
+    /** `QUOTE()` (MySQL) */
+    quote(str: FnArg): FunctionBuilder<string | null>;
+    /** `REGEXP_INSTR()` (MySQL) */
+    regexpInstr(
+      expr: FnArg,
+      pattern: FnArg,
+      pos?: FnArg,
+      occurrence?: FnArg,
+      returnOption?: FnArg,
+      matchType?: FnArg,
+    ): FunctionBuilder<number | null>;
+    /** `REGEXP_LIKE()` (MySQL) */
+    regexpLike(expr: FnArg, pattern: FnArg, matchType?: FnArg): FunctionBuilder<0 | 1 | null>;
+    /** `REGEXP_REPLACE()` (MySQL) */
+    regexpReplace(
+      expr: FnArg,
+      pattern: FnArg,
+      replacement: FnArg,
+      pos?: FnArg,
+      occurrence?: FnArg,
+      matchType?: FnArg,
+    ): FunctionBuilder<string | null>;
+    /** `REGEXP_SUBSTR()` (MySQL) */
+    regexpSubstr(
+      expr: FnArg,
+      pattern: FnArg,
+      pos?: FnArg,
+      occurrence?: FnArg,
+      matchType?: FnArg,
+    ): FunctionBuilder<string | null>;
+    /** `REPEAT()` (portable) */
+    repeat(str: FnArg, count: FnArg): FunctionBuilder<string | null>;
+    /** `REPLACE()` (portable) */
+    replace(str: FnArg, from: FnArg, to: FnArg): FunctionBuilder<string | null>;
+    /** `REVERSE()` (portable) */
+    reverse(str: FnArg): FunctionBuilder<string | null>;
+    /** `RIGHT()` (portable) */
+    right(str: FnArg, len: FnArg): FunctionBuilder<string | null>;
+    /** `RPAD()` (portable) */
+    rpad(str: FnArg, len: FnArg, padStr: FnArg): FunctionBuilder<string | null>;
+    /** `RTRIM()` (portable) */
+    rtrim(str: FnArg): FunctionBuilder<string | null>;
+    /** `SOUNDEX()` (MySQL) */
+    soundex(str: FnArg): FunctionBuilder<string | null>;
+    /** `SPACE()` (MySQL) */
+    space(n: FnArg): FunctionBuilder<string | null>;
+    /** `STRCMP()` (MySQL) */
+    strcmp(a: FnArg, b: FnArg): FunctionBuilder<-1 | 0 | 1 | null>;
+    /** `SUBSTR()` (portable) */
+    substr(str: FnArg, pos: FnArg, len?: FnArg): FunctionBuilder<string | null>;
+    /** `SUBSTRING()` (portable) */
+    substring(str: FnArg, pos: FnArg, len?: FnArg): FunctionBuilder<string | null>;
+    /** `SUBSTRING_INDEX()` (MySQL) */
+    substringIndex(str: FnArg, delimiter: FnArg, count: FnArg): FunctionBuilder<string | null>;
+    /** `TO_BASE64()` (MySQL) */
+    toBase64(str: FnArg): FunctionBuilder<string | null>;
+    /** `TRIM()` (portable) */
+    trim(
+      str: FnArg,
+      options?: { side?: 'both' | 'leading' | 'trailing'; remove?: FnArg },
+    ): FunctionBuilder<string | null>;
+    /** `UCASE()` (MySQL) */
+    ucase(str: FnArg): FunctionBuilder<string | null>;
+    /** `UNHEX()` (MySQL) */
+    unhex(str: FnArg): FunctionBuilder<Buffer | null>;
+    /** `WEIGHT_STRING()` (MySQL) */
+    weightString(str: FnArg): FunctionBuilder<Buffer | null>;
+    /** `MATCH()` (MySQL) */
+    match(
+      columns: FnArg | FnArg[],
+      search: FnArg,
+      options?: {
+        mode?: 'natural' | 'natural with query expansion' | 'boolean' | 'with query expansion';
+      },
+    ): FunctionBuilder<number | null>;
+    /** `ABS()` (portable) */
+    abs(x: FnArg): FunctionBuilder<FnNumeric | null>;
+    /** `ACOS()` (portable) */
+    acos(x: FnArg): FunctionBuilder<number | null>;
+    /** `ASIN()` (portable) */
+    asin(x: FnArg): FunctionBuilder<number | null>;
+    /** `ATAN()` (MySQL) */
+    atan(x: FnArg, y?: FnArg): FunctionBuilder<number | null>;
+    /** `ATAN2()` (portable) */
+    atan2(y: FnArg, x: FnArg): FunctionBuilder<number | null>;
+    /** `CEIL()` (portable) */
+    ceil(x: FnArg): FunctionBuilder<FnNumeric | null>;
+    /** `CEILING()` (portable) */
+    ceiling(x: FnArg): FunctionBuilder<FnNumeric | null>;
+    /** `CONV()` (MySQL) */
+    conv(n: FnArg, fromBase: FnArg, toBase: FnArg): FunctionBuilder<string | null>;
+    /** `COS()` (portable) */
+    cos(x: FnArg): FunctionBuilder<number | null>;
+    /** `COT()` (portable) */
+    cot(x: FnArg): FunctionBuilder<number | null>;
+    /** `CRC32()` (MySQL) */
+    crc32(x: FnArg): FunctionBuilder<number | null>;
+    /** `DEGREES()` (portable) */
+    degrees(x: FnArg): FunctionBuilder<number | null>;
+    /** `EXP()` (portable) */
+    exp(x: FnArg): FunctionBuilder<number | null>;
+    /** `FLOOR()` (portable) */
+    floor(x: FnArg): FunctionBuilder<FnNumeric | null>;
+    /** `LN()` (portable) */
+    ln(x: FnArg): FunctionBuilder<number | null>;
+    /** `LOG()` (MySQL) */
+    log(baseOrX: FnArg, x?: FnArg): FunctionBuilder<number | null>;
+    /** `LOG10()` (MySQL) */
+    log10(x: FnArg): FunctionBuilder<number | null>;
+    /** `LOG2()` (MySQL) */
+    log2(x: FnArg): FunctionBuilder<number | null>;
+    /** `MOD()` (portable) */
+    mod(n: FnArg, m: FnArg): FunctionBuilder<FnNumeric | null>;
+    /** `PI()` (portable) */
+    pi(): FunctionBuilder<number | null>;
+    /** `POW()` (MySQL) */
+    pow(x: FnArg, y: FnArg): FunctionBuilder<number | null>;
+    /** `POWER()` (portable) */
+    power(x: FnArg, y: FnArg): FunctionBuilder<number | null>;
+    /** `RADIANS()` (portable) */
+    radians(x: FnArg): FunctionBuilder<number | null>;
+    /** `RAND()` (MySQL) */
+    rand(seed?: FnArg): FunctionBuilder<number | null>;
+    /** `ROUND()` (portable) */
+    round(x: FnArg, decimals?: FnArg): FunctionBuilder<FnNumeric | null>;
+    /** `SIGN()` (portable) */
+    sign(x: FnArg): FunctionBuilder<number | null>;
+    /** `SIN()` (portable) */
+    sin(x: FnArg): FunctionBuilder<number | null>;
+    /** `SQRT()` (portable) */
+    sqrt(x: FnArg): FunctionBuilder<number | null>;
+    /** `TAN()` (portable) */
+    tan(x: FnArg): FunctionBuilder<number | null>;
+    /** `TRUNCATE()` (MySQL) */
+    truncate(x: FnArg, decimals: FnArg): FunctionBuilder<FnNumeric | null>;
+    /** `ADDDATE()` (MySQL) */
+    addDate(
+      date: FnArg,
+      amount: FnArg,
+      unit?: FnIntervalUnit,
+    ): FunctionBuilder<Date | string | null>;
+    /** `ADDTIME()` (MySQL) */
+    addTime(datetime: FnArg, time: FnArg): FunctionBuilder<Date | string | null>;
+    /** `CONVERT_TZ()` (MySQL) */
+    convertTz(datetime: FnArg, fromTz: FnArg, toTz: FnArg): FunctionBuilder<Date | string | null>;
+    /** `CURDATE()` (MySQL) */
+    curDate(): FunctionBuilder<Date | string | null>;
+    /** `CURRENT_DATE()` (MySQL) */
+    currentDate(): FunctionBuilder<Date | string | null>;
+    /** `CURRENT_TIME()` (MySQL) */
+    currentTime(fsp?: number): FunctionBuilder<string | null>;
+    /** `CURRENT_TIMESTAMP()` (MySQL) */
+    currentTimestamp(fsp?: number): FunctionBuilder<Date | string | null>;
+    /** `CURTIME()` (MySQL) */
+    curTime(fsp?: number): FunctionBuilder<string | null>;
+    /** `DATE()` (MySQL) */
+    date(x: FnArg): FunctionBuilder<Date | string | null>;
+    /** `DATE_ADD()` (MySQL) */
+    dateAdd(
+      date: FnArg,
+      amount: FnArg,
+      unit: FnIntervalUnit,
+    ): FunctionBuilder<Date | string | null>;
+    /** `DATEDIFF()` (MySQL) */
+    dateDiff(a: FnArg, b: FnArg): FunctionBuilder<number | null>;
+    /** `DATE_FORMAT()` (MySQL) */
+    dateFormat(date: FnArg, format: FnArg): FunctionBuilder<string | null>;
+    /** `DATE_SUB()` (MySQL) */
+    dateSub(
+      date: FnArg,
+      amount: FnArg,
+      unit: FnIntervalUnit,
+    ): FunctionBuilder<Date | string | null>;
+    /** `DAY()` (MySQL) */
+    day(date: FnArg): FunctionBuilder<number | null>;
+    /** `DAYNAME()` (MySQL) */
+    dayName(date: FnArg): FunctionBuilder<string | null>;
+    /** `DAYOFMONTH()` (MySQL) */
+    dayOfMonth(date: FnArg): FunctionBuilder<number | null>;
+    /** `DAYOFWEEK()` (MySQL) */
+    dayOfWeek(date: FnArg): FunctionBuilder<number | null>;
+    /** `DAYOFYEAR()` (MySQL) */
+    dayOfYear(date: FnArg): FunctionBuilder<number | null>;
+    /** `EXTRACT()` (MySQL) */
+    extract(unit: FnIntervalUnit, date: FnArg): FunctionBuilder<number | null>;
+    /** `FROM_DAYS()` (MySQL) */
+    fromDays(days: FnArg): FunctionBuilder<Date | string | null>;
+    /** `FROM_UNIXTIME()` (MySQL) */
+    fromUnixTime(timestamp: FnArg, format?: FnArg): FunctionBuilder<Date | string | null>;
+    /** `GET_FORMAT()` (MySQL) */
+    getFormat(
+      type: 'DATE' | 'TIME' | 'DATETIME' | 'TIMESTAMP',
+      locale: FnArg,
+    ): FunctionBuilder<string | null>;
+    /** `HOUR()` (MySQL) */
+    hour(time: FnArg): FunctionBuilder<number | null>;
+    /** `LAST_DAY()` (MySQL) */
+    lastDay(date: FnArg): FunctionBuilder<Date | string | null>;
+    /** `LOCALTIME()` (MySQL) */
+    localTime(fsp?: number): FunctionBuilder<Date | string | null>;
+    /** `LOCALTIMESTAMP()` (MySQL) */
+    localTimestamp(fsp?: number): FunctionBuilder<Date | string | null>;
+    /** `MAKEDATE()` (MySQL) */
+    makeDate(year: FnArg, dayOfYear: FnArg): FunctionBuilder<Date | string | null>;
+    /** `MAKETIME()` (MySQL) */
+    makeTime(hour: FnArg, minute: FnArg, second: FnArg): FunctionBuilder<string | null>;
+    /** `MICROSECOND()` (MySQL) */
+    microsecond(time: FnArg): FunctionBuilder<number | null>;
+    /** `MINUTE()` (MySQL) */
+    minute(time: FnArg): FunctionBuilder<number | null>;
+    /** `MONTH()` (MySQL) */
+    month(date: FnArg): FunctionBuilder<number | null>;
+    /** `MONTHNAME()` (MySQL) */
+    monthName(date: FnArg): FunctionBuilder<string | null>;
+    /** `PERIOD_ADD()` (MySQL) */
+    periodAdd(period: FnArg, months: FnArg): FunctionBuilder<number | null>;
+    /** `PERIOD_DIFF()` (MySQL) */
+    periodDiff(a: FnArg, b: FnArg): FunctionBuilder<number | null>;
+    /** `QUARTER()` (MySQL) */
+    quarter(date: FnArg): FunctionBuilder<number | null>;
+    /** `SECOND()` (MySQL) */
+    second(time: FnArg): FunctionBuilder<number | null>;
+    /** `SEC_TO_TIME()` (MySQL) */
+    secToTime(seconds: FnArg): FunctionBuilder<string | null>;
+    /** `STR_TO_DATE()` (MySQL) */
+    strToDate(str: FnArg, format: FnArg): FunctionBuilder<Date | string | null>;
+    /** `SUBDATE()` (MySQL) */
+    subDate(
+      date: FnArg,
+      amount: FnArg,
+      unit?: FnIntervalUnit,
+    ): FunctionBuilder<Date | string | null>;
+    /** `SUBTIME()` (MySQL) */
+    subTime(datetime: FnArg, time: FnArg): FunctionBuilder<Date | string | null>;
+    /** `SYSDATE()` (MySQL) */
+    sysdate(fsp?: number): FunctionBuilder<Date | string | null>;
+    /** `TIME()` (MySQL) */
+    time(x: FnArg): FunctionBuilder<string | null>;
+    /** `TIMEDIFF()` (MySQL) */
+    timeDiff(a: FnArg, b: FnArg): FunctionBuilder<string | null>;
+    /** `TIMESTAMP()` (MySQL) */
+    timestamp(x: FnArg, time?: FnArg): FunctionBuilder<Date | string | null>;
+    /** `TIMESTAMPADD()` (MySQL) */
+    timestampAdd(
+      unit: FnTimestampUnit,
+      amount: FnArg,
+      date: FnArg,
+    ): FunctionBuilder<Date | string | null>;
+    /** `TIMESTAMPDIFF()` (MySQL) */
+    timestampDiff(unit: FnTimestampUnit, from: FnArg, to: FnArg): FunctionBuilder<number | null>;
+    /** `TIME_FORMAT()` (MySQL) */
+    timeFormat(time: FnArg, format: FnArg): FunctionBuilder<string | null>;
+    /** `TIME_TO_SEC()` (MySQL) */
+    timeToSec(time: FnArg): FunctionBuilder<number | null>;
+    /** `TO_DAYS()` (MySQL) */
+    toDays(date: FnArg): FunctionBuilder<number | null>;
+    /** `TO_SECONDS()` (MySQL) */
+    toSeconds(date: FnArg): FunctionBuilder<number | null>;
+    /** `UNIX_TIMESTAMP()` (MySQL) */
+    unixTimestamp(date?: FnArg): FunctionBuilder<FnNumeric | null>;
+    /** `UTC_DATE()` (MySQL) */
+    utcDate(): FunctionBuilder<Date | string | null>;
+    /** `UTC_TIME()` (MySQL) */
+    utcTime(fsp?: number): FunctionBuilder<string | null>;
+    /** `UTC_TIMESTAMP()` (MySQL) */
+    utcTimestamp(fsp?: number): FunctionBuilder<Date | string | null>;
+    /** `WEEK()` (MySQL) */
+    week(date: FnArg, mode?: FnArg): FunctionBuilder<number | null>;
+    /** `WEEKDAY()` (MySQL) */
+    weekday(date: FnArg): FunctionBuilder<number | null>;
+    /** `WEEKOFYEAR()` (MySQL) */
+    weekOfYear(date: FnArg): FunctionBuilder<number | null>;
+    /** `YEAR()` (MySQL) */
+    year(date: FnArg): FunctionBuilder<number | null>;
+    /** `YEARWEEK()` (MySQL) */
+    yearWeek(date: FnArg, mode?: FnArg): FunctionBuilder<number | null>;
+    /** `BIT_AND()` (MySQL) */
+    bitAnd(x: FnArg): FunctionBuilder<FnNumeric | null>;
+    /** `BIT_OR()` (MySQL) */
+    bitOr(x: FnArg): FunctionBuilder<FnNumeric | null>;
+    /** `BIT_XOR()` (MySQL) */
+    bitXor(x: FnArg): FunctionBuilder<FnNumeric | null>;
+    /** `COUNT()` (MySQL) */
+    countDistinct(...exprs: FnArg[]): FunctionBuilder<number>;
+    /** `GROUP_CONCAT()` (MySQL) */
+    groupConcat(
+      exprs: FnArg | FnArg[],
+      options?: { distinct?: boolean; orderBy?: FnOrderBy | FnOrderBy[]; separator?: string },
+    ): FunctionBuilder<string | null>;
+    /** `JSON_ARRAYAGG()` (MySQL) */
+    jsonArrayAgg(x: FnArg): FunctionBuilder<unknown[] | null>;
+    /** `JSON_OBJECTAGG()` (MySQL) */
+    jsonObjectAgg(key: FnArg, value: FnArg): FunctionBuilder<Record<string, unknown> | null>;
+    /** `STD()` (MySQL) */
+    std(x: FnArg): FunctionBuilder<number | null>;
+    /** `STDDEV()` (portable) */
+    stddev(x: FnArg): FunctionBuilder<number | null>;
+    /** `STDDEV_POP()` (portable) */
+    stddevPop(x: FnArg): FunctionBuilder<number | null>;
+    /** `STDDEV_SAMP()` (portable) */
+    stddevSamp(x: FnArg): FunctionBuilder<number | null>;
+    /** `VARIANCE()` (portable) */
+    variance(x: FnArg): FunctionBuilder<number | null>;
+    /** `VAR_POP()` (portable) */
+    varPop(x: FnArg): FunctionBuilder<number | null>;
+    /** `VAR_SAMP()` (portable) */
+    varSamp(x: FnArg): FunctionBuilder<number | null>;
+    /** `GREATEST()` (portable) */
+    greatest(...values: FnArg[]): FunctionBuilder<unknown>;
+    /** `IF()` (MySQL) */
+    if(condition: FnArg, then: FnArg, otherwise: FnArg): FunctionBuilder<unknown>;
+    /** `IFNULL()` (MySQL) */
+    ifNull(value: FnArg, otherwise: FnArg): FunctionBuilder<unknown>;
+    /** `INTERVAL()` (MySQL) */
+    interval(n: FnArg, ...ns: FnArg[]): FunctionBuilder<number | null>;
+    /** `ISNULL()` (MySQL) */
+    isNull(x: FnArg): FunctionBuilder<0 | 1 | null>;
+    /** `LEAST()` (portable) */
+    least(...values: FnArg[]): FunctionBuilder<unknown>;
+    /** `NULLIF()` (portable) */
+    nullIf(a: FnArg, b: FnArg): FunctionBuilder<unknown>;
+    /** `CAST()` (MySQL) */
+    cast(x: FnArg, type: string): FunctionBuilder<unknown>;
+    /** `CONVERT()` (MySQL) */
+    convert(x: FnArg, type: string | { using: string }): FunctionBuilder<unknown>;
+    /** `CHARSET()` (MySQL) */
+    charset(str: FnArg): FunctionBuilder<string | null>;
+    /** `COERCIBILITY()` (MySQL) */
+    coercibility(str: FnArg): FunctionBuilder<number | null>;
+    /** `COLLATION()` (MySQL) */
+    collation(str: FnArg): FunctionBuilder<string | null>;
+    /** `CONNECTION_ID()` (MySQL) */
+    connectionId(): FunctionBuilder<number | null>;
+    /** `CURRENT_ROLE()` (MySQL) */
+    currentRole(): FunctionBuilder<string | null>;
+    /** `CURRENT_USER()` (MySQL) */
+    currentUser(): FunctionBuilder<string | null>;
+    /** `DATABASE()` (MySQL) */
+    database(): FunctionBuilder<string | null>;
+    /** `ICU_VERSION()` (MySQL) */
+    icuVersion(): FunctionBuilder<string | null>;
+    /** `LAST_INSERT_ID()` (MySQL) */
+    lastInsertId(x?: FnArg): FunctionBuilder<number | null>;
+    /** `ROLES_GRAPHML()` (MySQL) */
+    rolesGraphml(): FunctionBuilder<string | null>;
+    /** `ROW_COUNT()` (MySQL) */
+    rowCount(): FunctionBuilder<number | null>;
+    /** `SCHEMA()` (MySQL) */
+    schema(): FunctionBuilder<string | null>;
+    /** `SESSION_USER()` (MySQL) */
+    sessionUser(): FunctionBuilder<string | null>;
+    /** `SYSTEM_USER()` (MySQL) */
+    systemUser(): FunctionBuilder<string | null>;
+    /** `USER()` (MySQL) */
+    user(): FunctionBuilder<string | null>;
+    /** `VERSION()` (MySQL) */
+    version(): FunctionBuilder<string | null>;
+    /** `AES_DECRYPT()` (MySQL) */
+    aesDecrypt(crypt: FnArg, key: FnArg, ...options: FnArg[]): FunctionBuilder<Buffer | null>;
+    /** `AES_ENCRYPT()` (MySQL) */
+    aesEncrypt(str: FnArg, key: FnArg, ...options: FnArg[]): FunctionBuilder<Buffer | null>;
+    /** `COMPRESS()` (MySQL) */
+    compress(str: FnArg): FunctionBuilder<Buffer | null>;
+    /** `MD5()` (portable) */
+    md5(str: FnArg): FunctionBuilder<string | null>;
+    /** `RANDOM_BYTES()` (MySQL) */
+    randomBytes(length: FnArg): FunctionBuilder<Buffer | null>;
+    /** `SHA1()` (MySQL) */
+    sha1(str: FnArg): FunctionBuilder<string | null>;
+    /** `SHA2()` (MySQL) */
+    sha2(str: FnArg, hashLength: FnArg): FunctionBuilder<string | null>;
+    /** `STATEMENT_DIGEST()` (MySQL) */
+    statementDigest(statement: FnArg): FunctionBuilder<string | null>;
+    /** `STATEMENT_DIGEST_TEXT()` (MySQL) */
+    statementDigestText(statement: FnArg): FunctionBuilder<string | null>;
+    /** `UNCOMPRESS()` (MySQL) */
+    uncompress(str: FnArg): FunctionBuilder<Buffer | null>;
+    /** `UNCOMPRESSED_LENGTH()` (MySQL) */
+    uncompressedLength(str: FnArg): FunctionBuilder<number | null>;
+    /** `GET_LOCK()` (MySQL) */
+    getLock(name: FnArg, timeout: FnArg): FunctionBuilder<0 | 1 | null>;
+    /** `IS_FREE_LOCK()` (MySQL) */
+    isFreeLock(name: FnArg): FunctionBuilder<0 | 1 | null>;
+    /** `IS_USED_LOCK()` (MySQL) */
+    isUsedLock(name: FnArg): FunctionBuilder<number | null>;
+    /** `RELEASE_ALL_LOCKS()` (MySQL) */
+    releaseAllLocks(): FunctionBuilder<number | null>;
+    /** `RELEASE_LOCK()` (MySQL) */
+    releaseLock(name: FnArg): FunctionBuilder<0 | 1 | null>;
+    /** `ANY_VALUE()` (MySQL) */
+    anyValue(x: FnArg): FunctionBuilder<unknown>;
+    /** `BIN_TO_UUID()` (MySQL) */
+    binToUuid(bin: FnArg, swap?: FnArg): FunctionBuilder<string | null>;
+    /** `DEFAULT()` (MySQL) */
+    default(column: FnArg): FunctionBuilder<unknown>;
+    /** `GROUPING()` (MySQL) */
+    grouping(...exprs: FnArg[]): FunctionBuilder<number | null>;
+    /** `INET6_ATON()` (MySQL) */
+    inet6Aton(address: FnArg): FunctionBuilder<Buffer | null>;
+    /** `INET6_NTOA()` (MySQL) */
+    inet6Ntoa(address: FnArg): FunctionBuilder<string | null>;
+    /** `INET_ATON()` (MySQL) */
+    inetAton(address: FnArg): FunctionBuilder<number | null>;
+    /** `INET_NTOA()` (MySQL) */
+    inetNtoa(address: FnArg): FunctionBuilder<string | null>;
+    /** `IS_IPV4()` (MySQL) */
+    isIpv4(address: FnArg): FunctionBuilder<0 | 1 | null>;
+    /** `IS_IPV4_COMPAT()` (MySQL) */
+    isIpv4Compat(address: FnArg): FunctionBuilder<0 | 1 | null>;
+    /** `IS_IPV4_MAPPED()` (MySQL) */
+    isIpv4Mapped(address: FnArg): FunctionBuilder<0 | 1 | null>;
+    /** `IS_IPV6()` (MySQL) */
+    isIpv6(address: FnArg): FunctionBuilder<0 | 1 | null>;
+    /** `IS_UUID()` (MySQL) */
+    isUuid(uuid: FnArg): FunctionBuilder<0 | 1 | null>;
+    /** `SLEEP()` (MySQL) */
+    sleep(seconds: FnArg): FunctionBuilder<number | null>;
+    /** `UUID()` (MySQL) */
+    uuid(): FunctionBuilder<string>;
+    /** `UUID_SHORT()` (MySQL) */
+    uuidShort(): FunctionBuilder<FnNumeric>;
+    /** `UUID_TO_BIN()` (MySQL) */
+    uuidToBin(uuid: FnArg, swap?: FnArg): FunctionBuilder<Buffer | null>;
+    /** `BIT_COUNT()` (MySQL) */
+    bitCount(x: FnArg): FunctionBuilder<number | null>;
+    /** `FORMAT_BYTES()` (MySQL) */
+    formatBytes(bytes: FnArg): FunctionBuilder<string | null>;
+    /** `FORMAT_PICO_TIME()` (MySQL) */
+    formatPicoTime(time: FnArg): FunctionBuilder<string | null>;
+    /** `PS_CURRENT_THREAD_ID()` (MySQL) */
+    psCurrentThreadId(): FunctionBuilder<number | null>;
+    /** `PS_THREAD_ID()` (MySQL) */
+    psThreadId(connectionId: FnArg): FunctionBuilder<number | null>;
+    /** `GTID_SUBSET()` (MySQL) */
+    gtidSubset(set1: FnArg, set2: FnArg): FunctionBuilder<0 | 1 | null>;
+    /** `GTID_SUBTRACT()` (MySQL) */
+    gtidSubtract(set1: FnArg, set2: FnArg): FunctionBuilder<string | null>;
+    /** `SOURCE_POS_WAIT()` (MySQL) */
+    sourcePosWait(
+      logName: FnArg,
+      logPos: FnArg,
+      ...options: FnArg[]
+    ): FunctionBuilder<number | null>;
+    /** `WAIT_FOR_EXECUTED_GTID_SET()` (MySQL) */
+    waitForExecutedGtidSet(gtidSet: FnArg, timeout?: FnArg): FunctionBuilder<number | null>;
+    /** `EXTRACTVALUE()` (MySQL) */
+    extractValue(xml: FnArg, xpath: FnArg): FunctionBuilder<string | null>;
+    /** `UPDATEXML()` (MySQL) */
+    updateXml(xml: FnArg, xpath: FnArg, newXml: FnArg): FunctionBuilder<string | null>;
+    /** `JSON_ARRAY()` (MySQL) */
+    jsonArray(...values: FnJsonArg[]): FunctionBuilder<unknown[]>;
+    /** `JSON_ARRAY_APPEND()` (MySQL) */
+    jsonArrayAppend(
+      doc: FnJsonArg,
+      path: FnArg,
+      value: FnJsonArg,
+      ...pathsAndValues: FnJsonArg[]
+    ): FunctionBuilder<unknown>;
+    /** `JSON_ARRAY_INSERT()` (MySQL) */
+    jsonArrayInsert(
+      doc: FnJsonArg,
+      path: FnArg,
+      value: FnJsonArg,
+      ...pathsAndValues: FnJsonArg[]
+    ): FunctionBuilder<unknown>;
+    /** `JSON_CONTAINS()` (MySQL) */
+    jsonContains(
+      target: FnJsonArg,
+      candidate: FnJsonArg,
+      path?: FnArg,
+    ): FunctionBuilder<0 | 1 | null>;
+    /** `JSON_CONTAINS_PATH()` (MySQL) */
+    jsonContainsPath(
+      doc: FnJsonArg,
+      oneOrAll: 'one' | 'all',
+      ...paths: FnArg[]
+    ): FunctionBuilder<0 | 1 | null>;
+    /** `JSON_DEPTH()` (MySQL) */
+    jsonDepth(doc: FnJsonArg): FunctionBuilder<number | null>;
+    /** `JSON_EXTRACT()` (MySQL) */
+    jsonExtract(doc: FnJsonArg, ...paths: FnArg[]): FunctionBuilder<unknown>;
+    /** `JSON_INSERT()` (MySQL) */
+    jsonInsert(
+      doc: FnJsonArg,
+      path: FnArg,
+      value: FnJsonArg,
+      ...pathsAndValues: FnJsonArg[]
+    ): FunctionBuilder<unknown>;
+    /** `JSON_KEYS()` (MySQL) */
+    jsonKeys(doc: FnJsonArg, path?: FnArg): FunctionBuilder<string[] | null>;
+    /** `JSON_LENGTH()` (MySQL) */
+    jsonLength(doc: FnJsonArg, path?: FnArg): FunctionBuilder<number | null>;
+    /** `JSON_MERGE_PATCH()` (MySQL) */
+    jsonMergePatch(...docs: FnJsonArg[]): FunctionBuilder<unknown>;
+    /** `JSON_MERGE_PRESERVE()` (MySQL) */
+    jsonMergePreserve(...docs: FnJsonArg[]): FunctionBuilder<unknown>;
+    /** `JSON_OBJECT()` (MySQL) */
+    jsonObject(
+      objectOrKeysAndValues?: { [key: string]: FnJsonArg } | FnJsonArg,
+      ...keysAndValues: FnJsonArg[]
+    ): FunctionBuilder<Record<string, unknown>>;
+    /** `JSON_OVERLAPS()` (MySQL) */
+    jsonOverlaps(a: FnJsonArg, b: FnJsonArg): FunctionBuilder<0 | 1 | null>;
+    /** `JSON_PRETTY()` (MySQL) */
+    jsonPretty(doc: FnJsonArg): FunctionBuilder<string | null>;
+    /** `JSON_QUOTE()` (MySQL) */
+    jsonQuote(str: FnArg): FunctionBuilder<string | null>;
+    /** `JSON_REMOVE()` (MySQL) */
+    jsonRemove(doc: FnJsonArg, ...paths: FnArg[]): FunctionBuilder<unknown>;
+    /** `JSON_REPLACE()` (MySQL) */
+    jsonReplace(
+      doc: FnJsonArg,
+      path: FnArg,
+      value: FnJsonArg,
+      ...pathsAndValues: FnJsonArg[]
+    ): FunctionBuilder<unknown>;
+    /** `JSON_SCHEMA_VALID()` (MySQL) */
+    jsonSchemaValid(schema: FnJsonArg, doc: FnJsonArg): FunctionBuilder<0 | 1 | null>;
+    /** `JSON_SCHEMA_VALIDATION_REPORT()` (MySQL) */
+    jsonSchemaValidationReport(
+      schema: FnJsonArg,
+      doc: FnJsonArg,
+    ): FunctionBuilder<Record<string, unknown> | null>;
+    /** `JSON_SEARCH()` (MySQL) */
+    jsonSearch(
+      doc: FnJsonArg,
+      oneOrAll: 'one' | 'all',
+      search: FnArg,
+      escape?: FnArg,
+      ...paths: FnArg[]
+    ): FunctionBuilder<string | string[] | null>;
+    /** `JSON_SET()` (MySQL) */
+    jsonSet(
+      doc: FnJsonArg,
+      path: FnArg,
+      value: FnJsonArg,
+      ...pathsAndValues: FnJsonArg[]
+    ): FunctionBuilder<unknown>;
+    /** `JSON_STORAGE_FREE()` (MySQL) */
+    jsonStorageFree(doc: FnJsonArg): FunctionBuilder<number | null>;
+    /** `JSON_STORAGE_SIZE()` (MySQL) */
+    jsonStorageSize(doc: FnJsonArg): FunctionBuilder<number | null>;
+    /** `JSON_TYPE()` (MySQL) */
+    jsonType(value: FnJsonArg): FunctionBuilder<string | null>;
+    /** `JSON_UNQUOTE()` (MySQL) */
+    jsonUnquote(str: FnArg): FunctionBuilder<string | null>;
+    /** `JSON_VALID()` (MySQL) */
+    jsonValid(value: FnArg): FunctionBuilder<0 | 1 | null>;
+    /** `JSON_VALUE()` (MySQL) */
+    jsonValue(
+      doc: FnJsonArg,
+      path: FnArg,
+      options?: { returning?: string },
+    ): FunctionBuilder<unknown>;
+    /** `MEMBER OF()` (MySQL) */
+    memberOf(value: FnJsonArg, array: FnJsonArg): FunctionBuilder<0 | 1 | null>;
+    // </generated:mysql-functions>
   }
 
   export interface ComposeFunction {

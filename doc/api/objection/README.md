@@ -243,6 +243,29 @@ fn.lower(...args);
 
 All arguments are interpreted as values by default. Use `ref` to refer to columns. you can also pass `raw` instances, other `fn` instances, `QueryBuilders` knex builders, knex raw and anything else just like to any other objection method.
 
+##### MySQL functions
+
+`fn` has a helper for every MySQL 8.4 built-in function, named in camel case: `fn.dateFormat()` calls `DATE_FORMAT()`, `fn.jsonArrayAgg()` calls `JSON_ARRAYAGG()` and so on. In TypeScript the helpers check the number of arguments and type the result, which `select(fn.x().as('alias'))` will use.
+
+```js
+const { fn, ref } = require('objection');
+
+await Event.query()
+  .select(
+    fn.dateFormat(Event.ref('startsAt'), '%Y-%m').as('month'),
+    fn.groupConcat(Event.ref('name'), { orderBy: [Event.ref('name'), 'desc'], separator: ', ' }).as('names'),
+    fn.jsonArrayAgg(Event.ref('id')).as('ids'),
+  )
+  .where(fn.timestampDiff('day', Event.ref('createdAt'), fn.now()), '<', 30)
+  .whereNot(fn.jsonOverlaps(Event.ref('tags'), ['hidden', 'draft']), 1)
+  .groupBy('month');
+```
+
+- Objects and arrays passed as JSON documents (`fn.jsonContains()`, `fn.jsonSet()`, `fn.jsonObject()`...) are cast to JSON. `fn.jsonObject({ id: ref('id'), name: ref('name') })` builds `JSON_OBJECT('id', id, 'name', name)`.
+- Functions with keywords in their syntax take the keyword as an argument, which is checked against the keywords MySQL accepts: `fn.dateAdd(date, 7, 'day')`, `fn.dateSub()`, `fn.addDate()`, `fn.subDate()`, `fn.timestampAdd('week', 2, date)`, `fn.timestampDiff('day', from, to)`, `fn.extract('year_month', date)`, `fn.cast(x, 'decimal(10,2)')`, `fn.convert(x, { using: 'utf8mb4' })`, `fn.getFormat('date', 'EUR')`, `fn.trim(str, { side: 'leading', remove: '0' })`, `fn.position(substr, str)`, `fn.char(codes, { using })`, `fn.match(columns, search, { mode: 'boolean' })`, `fn.groupConcat(exprs, { distinct, orderBy, separator })`, `fn.countDistinct(...exprs)`, `fn.jsonValue(doc, path, { returning: 'unsigned' })` and `fn.memberOf(value, array)`.
+- Functions that only exist on MySQL throw an error when used with another database. Standard functions like `fn.round()`, `fn.length()` and `fn.trim()` work everywhere.
+- Window functions, spatial functions, `JSON_TABLE()` and deprecated functions aren't included. Use `fn('NAME', ...args)` for them.
+
 ##### Examples
 
 ```js

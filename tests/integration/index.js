@@ -100,6 +100,10 @@ describe('integration tests', () => {
       if (session.isPostgres()) {
         require('./jsonRelations')(session);
       }
+
+      if (session.isMySql()) {
+        require('./mysqlFunctions')(session);
+      }
     });
 
     return session;

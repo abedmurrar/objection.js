@@ -7,7 +7,7 @@
   "scripts": {
     "test": "npm run eslint && mocha --slow 10 --timeout 15000 --reporter spec --recursive tests --exclude \"tests/unit/relations/files/**\" && npm run test:typings",
     "test:fast": "mocha --slow 10 --timeout 15000 --reporter spec --recursive tests --bail --exclude \"tests/unit/relations/files/**\"",
-    "test:typings": "tsc && tsc -p tests/ts/tsconfig.loose.json && node scripts/typings-errors.js",
+    "test:typings": "node scripts/generate-fn-typings.js --check && tsc && tsc -p tests/ts/tsconfig.loose.json && node scripts/typings-errors.js",
     "test:typings:ts7": "npx -y -p typescript@7 tsc -p tests/ts/tsconfig.ts7.json",
     "bench:typings": "node scripts/typings-bench.js",
     "prettier": "prettier --write \"{examples,lib,tests,testUtils,typings,doc}/**/*.{js,ts}\"",
