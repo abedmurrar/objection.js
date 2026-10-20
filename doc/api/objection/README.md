@@ -65,6 +65,8 @@ Factory function that returns a [ReferenceBuilder](/api/types/#class-referencebu
 
 See [FieldExpression](/api/types/#type-fieldexpression) for more information about how to refer to json fields.
 
+`Model.ref()` refers to a column of the model and qualifies it with the model's table, or the alias of the table in the query. In TypeScript the column must be a property of the model: `Person.ref('firstName')`, `Person.ref('p.firstName')`, `Person.ref('address:street')` or `Person.ref('*')`. Pass the expression as a type argument for columns the model doesn't declare: `Person.ref<'legacy_column'>('legacy_column')`.
+
 ##### Examples
 
 ```js

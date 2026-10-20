@@ -63,12 +63,88 @@ declare namespace Objection {
     ): ValueBuilder;
   }
 
-  export interface ReferenceBuilder extends Castable {
+  /**
+   * A reference to a column or a field of a JSON column. `T` is the type of the value.
+   */
+  export interface ReferenceBuilder<T = unknown> extends Aliasable {
+    /**
+     * The type of the referenced value. Only used by the typings.
+     */
+    '~type'?: T;
     from(tableReference: string): this;
+    table(tableReference: string): this;
+    castText(): ReferenceBuilder<string | null>;
+    castInt(): ReferenceBuilder<number | null>;
+    castBigInt(): ReferenceBuilder<FnNumeric | null>;
+    castFloat(): ReferenceBuilder<number | null>;
+    castDecimal(): ReferenceBuilder<FnNumeric | null>;
+    castReal(): ReferenceBuilder<number | null>;
+    castBool(): ReferenceBuilder<boolean | 0 | 1 | null>;
+    castJson(): ReferenceBuilder<unknown>;
+    castTo<U = unknown>(sqlType: string): ReferenceBuilder<U>;
   }
   export interface ReferenceFunction {
     (expression: string): ReferenceBuilder;
   }
+
+  /**
+   * The columns of model `M`: its data properties, without relations and methods.
+   */
+  type RefColumnName<M> = Extract<ModelProps<Extract<M, Model>>, string>;
+
+  type IsJsonType<T> = 0 extends 1 & T
+    ? true
+    : unknown extends T
+      ? true
+      : [Exclude<T, null | undefined>] extends [Date | Buffer]
+        ? false
+        : [Exclude<T, null | undefined>] extends [object]
+          ? true
+          : false;
+
+  /**
+   * The columns of model `M` that hold JSON objects or arrays.
+   */
+  type JsonColumnName<M> = {
+    [K in RefColumnName<M>]: IsJsonType<M[K & keyof M]> extends true ? K : never;
+  }[RefColumnName<M>];
+
+  /**
+   * The json field part of a field expression (`a.b`, `[0]`, `[key]`) for a column of
+   * type `T`. The first key is checked when `T` has known keys.
+   */
+  type JsonFieldPath<T> = 0 extends 1 & T
+    ? string
+    : unknown extends T
+      ? string
+      : T extends readonly unknown[]
+        ? `[${string}` | `${number}${string}`
+        : string extends keyof T
+          ? string
+          : `${Extract<keyof T, string>}${'' | `.${string}` | `[${string}`}` | `[${string}`;
+
+  /**
+   * The expressions `Model.ref()` accepts for model `M`: a column, optionally with a
+   * table or alias (`alias.column`), and field expressions of JSON columns
+   * (`column:a.b`). Models that declare no columns accept any string.
+   */
+  type RefExpression<M> = [RefColumnName<M>] extends [never]
+    ? string
+    :
+        | RefColumnName<M>
+        | `${string}.${RefColumnName<M>}`
+        | '*'
+        | {
+            [K in JsonColumnName<M>]: `${K | `${string}.${K}`}:${JsonFieldPath<
+              Exclude<M[K & keyof M], null | undefined>
+            >}`;
+          }[JsonColumnName<M>];
+
+  type RefValue<M, E> = E extends `${string}:${string}`
+    ? unknown
+    : E extends `${string}.${infer C}`
+      ? M[C & keyof M]
+      : M[E & keyof M];
 
   export interface FunctionBuilder<T = unknown> extends Castable {
     /**
@@ -945,6 +1021,29 @@ declare namespace Objection {
         : Expression<T[K]>;
   };
 
+  type JsonFieldKey<T> = `${JsonColumnName<T>}:${string}`;
+
+  /**
+   * Checks an object for `patch()`, `update()` and `merge()` that sets fields of JSON
+   * columns one at a time: `patch({ 'payload:courseName': 'Physics' })`. The other keys
+   * must be properties of the model. Keys that aren't allowed get the type `never`.
+   */
+  type CheckModelUpdate<M extends Model, U> = [Extract<keyof U, `${string}:${string}`>] extends [
+    never,
+  ]
+    ? // Objects without field keys are checked by the plain overload, which gives better
+      // errors and is cheaper for values like subqueries.
+      never
+    : {
+        [K in keyof U]: K extends `${string}:${string}`
+          ? K extends JsonFieldKey<M>
+            ? U[K]
+            : never
+          : K extends keyof PartialModelObject<M>
+            ? PartialModelObject<M>[K]
+            : never;
+      };
+
   /**
    * Additional optional parameters that may be used in graphs.
    */
@@ -979,7 +1078,7 @@ declare namespace Objection {
    */
   type ModelProps<T extends Model> = Exclude<
     {
-      [K in keyof T]?: NonNullable<T[K]> extends Model
+      [K in ModelDataKeys<T>]-?: NonNullable<T[K]> extends Model | readonly Model[]
         ? never
         : NonNullable<T[K]> extends Array<infer I>
           ? I extends Model
@@ -988,16 +1087,23 @@ declare namespace Objection {
           : T[K] extends Function
             ? never
             : K;
-    }[keyof T],
-    undefined | 'QueryBuilderType'
+    }[ModelDataKeys<T>],
+    undefined
   >;
+
+  /**
+   * The keys of a model, without the ones objection uses internally. They are left out
+   * before looking at the property types, since `QueryBuilderType` refers back to the
+   * model.
+   */
+  type ModelDataKeys<T> = Exclude<keyof T, 'QueryBuilderType' | `~${string}`>;
 
   /**
    * Extracts the relation names of the a model class.
    */
   type ModelRelations<T extends Model> = Defined<
     {
-      [K in keyof T]?: NonNullable<T[K]> extends Model
+      [K in keyof T]?: NonNullable<T[K]> extends Model | readonly Model[]
         ? K
         : NonNullable<T[K]> extends Array<infer I>
           ? I extends Model
@@ -2087,17 +2193,29 @@ declare namespace Objection {
     // These overloads come first so that the errors of the other overloads are
     // the ones that are reported.
     update<T extends object = never>(update: NoInfer<T>): this['~count'];
+    update<U extends object>(update: U & CheckModelUpdate<M, U>): this['~count'];
     update(update: PartialModelObject<M>): this['~count'];
     update(): this['~count'];
+    updateAndFetch<U extends object>(update: U & CheckModelUpdate<M, U>): this['~one'];
     updateAndFetch(update: PartialModelObject<M>): this['~one'];
+    updateAndFetchById<U extends object>(
+      id: MaybeCompositeId,
+      update: U & CheckModelUpdate<M, U>,
+    ): this['~one'];
     updateAndFetchById(id: MaybeCompositeId, update: PartialModelObject<M>): this['~one'];
 
     // For generic code (like custom query builder methods) where the model type
     // isn't known: `this.patch<{ deletedAt: Date }>({ deletedAt: new Date() })`.
     patch<T extends object = never>(update: NoInfer<T>): this['~count'];
+    patch<U extends object>(update: U & CheckModelUpdate<M, U>): this['~count'];
     patch(update: PartialModelObject<M>): this['~count'];
     patch(): this['~count'];
+    patchAndFetch<U extends object>(update: U & CheckModelUpdate<M, U>): this['~one'];
     patchAndFetch(update: PartialModelObject<M>): this['~one'];
+    patchAndFetchById<U extends object>(
+      id: MaybeCompositeId,
+      update: U & CheckModelUpdate<M, U>,
+    ): this['~one'];
     patchAndFetchById(id: MaybeCompositeId, update: PartialModelObject<M>): this['~one'];
 
     del(): this['~count'];
@@ -2114,6 +2232,7 @@ declare namespace Objection {
 
     onConflict(column?: ColumnRef | ColumnRef[] | true): this;
     ignore(): this;
+    merge<U extends object>(merge: U & CheckModelUpdate<M, U>): this;
     merge(merge?: PartialModelObject<M> | string[]): this;
 
     insertAndFetch(insert: PartialModelObject<M>): this['~one'];
@@ -2784,7 +2903,19 @@ declare namespace Objection {
     static columnNameMappers: ColumnNameMappers;
 
     static raw: RawFunction;
-    static ref: ReferenceFunction;
+    /**
+     * A reference to a column of this model, qualified with the table (or the alias
+     * of the table) in the query. The column must be a property of the model. Pass the
+     * expression as a type argument for columns the model doesn't declare:
+     * `Person.ref<'legacy_column'>('legacy_column')`.
+     */
+    static ref<E extends string = never>(
+      expression: [E] extends [never] ? never : NoInfer<E>,
+    ): ReferenceBuilder;
+    static ref<MC extends AnyModelConstructor, E extends RefExpression<ModelInstance<MC>>>(
+      this: MC,
+      expression: E,
+    ): ReferenceBuilder<RefValue<ModelInstance<MC>, E>>;
     static fn: FunctionFunction;
 
     static BelongsToOneRelation: RelationType<'one'>;

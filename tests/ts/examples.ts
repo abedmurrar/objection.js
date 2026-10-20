@@ -512,7 +512,7 @@ qb = qb.where(raw('random()', 1, '2'));
 qb = qb.where(raw('random()', 1, '2'), '=', Person.knex().raw('foo'));
 qb = qb.where(Person.raw('random()', 1, '2', raw('3')));
 qb = qb.where(fn.coalesce(null, fn('random')), '=', 1);
-qb = qb.where(Person.ref('column1'), 1);
+qb = qb.where(Person.ref('firstName'), 1);
 qb = qb.alias('someAlias');
 qb = qb.with('alias', Movie.query());
 qb = qb.with('alias', (qb) => qb.from('someTable').select('id'));

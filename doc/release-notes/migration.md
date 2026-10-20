@@ -69,6 +69,21 @@ With `strictFunctionTypes` disabled (as with `strict: false`), passing a `Callba
 
 Use `AnyQueryBuilder<M>` as the parameter type of functions that take query builders of any result kind. Modifier functions passed to `modify()` are only checked for the model type of their query builder parameter, so `(query: QueryBuilder<Person>) => void` can be used with `findById()` and `patch()` queries too. The rest of the arguments of `modify()` are checked against the parameters of the modifier.
 
+## typescript: `Model.ref()` only accepts the columns of the model
+
+`Person.ref('firstName')` must name a property of `Person` (not a relation or a method), optionally qualified with a table or an alias (`'p.firstName'`), or a field of a JSON column (`'address:street'`). `Person.ref('*')` works too.
+
+- Declare the columns the model is missing: `country?: string | null;`.
+- For a column that belongs to another table, use `ref('alias.column')` or the other model's `ref()`.
+- Dynamic column names need a column type: `columns: ModelProps<UserProfile>[]` instead of `string[]`, or `as const` on a list of allowed columns.
+- To skip the check, pass the expression as a type argument: `Person.ref<'legacy_column'>('legacy_column')`, or `<string>` in generic code that works with any model class.
+
+Models that declare no columns accept any string.
+
+## Field expressions and `NULL` JSON columns
+
+`patch({ 'col:key': value })` on a row where `col` is `NULL` sets `col` to `{ "key": value }` (or an array, if the path starts with an index). Before, `col` stayed `NULL` on postgres.
+
 # Migration from objection 2.x to 3.0
 
 This document guides you through each breaking change in objection 3.0 and attempts to provide clear steps to follow. If you find something missing, please open an issue and we'll fix this guide ASAP.
