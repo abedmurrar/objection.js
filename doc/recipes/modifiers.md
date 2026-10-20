@@ -97,3 +97,24 @@ class Person extends Model {
 ```
 
 When `ref` is used, the modifiers work even when you have specified an alias for a table in a query.
+
+## TypeScript
+
+The names and the arguments of named modifiers are checked when the types can know them, which is when `modifiers` is an object without a type annotation, or a getter:
+
+```ts
+class Person extends Model {
+  static modifiers = {
+    filterGender(query: QueryBuilder<Person>, gender: 'male' | 'female') {
+      query.where(Person.ref('gender'), gender);
+    },
+  };
+}
+
+Person.query().modify('filterGender', 'female');
+Person.query().modify('filterGender', 'x'); // Error
+Person.query().modify('filterGendr'); // Error: Unknown modifier "filterGendr"
+Person.query().withGraphFetched('children(filterGendr)'); // Error
+```
+
+Modifiers added with [modifiers()](/api/query-builder/other-methods.html#modifiers), or by a modifier the types can't see, aren't known, so names aren't checked after them. Modifier functions are checked in any case: the model of their query builder parameter must match the query, and their other arguments are typed.

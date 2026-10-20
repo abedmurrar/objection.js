@@ -832,8 +832,11 @@ const pageQb = Person.query().page(1, 10);
 let pagePromise: PromiseLike<objection.Page<Person>> = pageQb;
 pagePromise = pageQb.execute();
 
+// @ts-expect-error unknown named modifier
+Person.query().modify('someModifier');
+
 Person.query()
-  .modify('someModifier')
+  .modify('myFilter')
   .modify('someModifier', 1, 'foo', { bar: true })
   .modify(['someModifier', 'someOtherModifier'])
   .modify((qb) => qb.where('firstName', 'lol'));

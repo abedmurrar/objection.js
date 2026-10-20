@@ -161,8 +161,12 @@ import { Model, transaction } from '../../../typings/objection';
 
   builder.connection(Person.knex());
 
+  Person.query().modify('defaultSelects');
+  Person.query().modify(['defaultSelects', 'orderByAge']);
+  // @ts-expect-error unknown named modifier
   Person.query().modify('someModifier', 'foo', 1);
-  Person.query().modify(['someModifier', 'someOtherModifier'], 'foo', 1);
+  // @ts-expect-error
+  Person.query().modify(['someModifier', 'orderByAge']);
 
   function modifierFunc(query: any, arg1: any, arg2: any) {
     query.where(arg1, arg2);

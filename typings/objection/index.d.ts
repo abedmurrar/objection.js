@@ -1176,12 +1176,12 @@ declare namespace Objection {
    * that says what's wrong with it. Expressions that aren't known at compile time
    * (like a `string`) aren't checked.
    */
-  type CheckRelationExpression<M, E> =
+  type CheckRelationExpression<M, E, CheckModifiers extends boolean = true> =
     ParseRelationExpression<E> extends infer G
       ? G extends ParseError<infer Message>
         ? Message
         : G extends GraphNode
-          ? GraphErrors<M, G['children'], ''> extends infer Errors
+          ? GraphErrors<M, G['children'], '', CheckModifiers> extends infer Errors
             ? [Errors] extends [never]
               ? E
               : Errors
@@ -1191,21 +1191,45 @@ declare namespace Objection {
 
   // The errors of the nodes of a relation graph of model `M`. `Path` is the path
   // of the parent node followed by a dot, or an empty string at the root.
-  type GraphErrors<M, Children, Path extends string> =
+  type GraphErrors<M, Children, Path extends string, CheckModifiers extends boolean> =
     IsUncheckedModel<M> extends true
       ? never
       : {
           [P in keyof Children & string]: Children[P] extends GraphNode
-            ? NodeErrors<M, Children[P], P, Path>
+            ? NodeErrors<M, Children[P], P, Path, CheckModifiers>
             : never;
         }[keyof Children & string];
 
-  type NodeErrors<M, N extends GraphNode, Prop extends string, Path extends string> =
+  type NodeErrors<
+    M,
+    N extends GraphNode,
+    Prop extends string,
+    Path extends string,
+    CheckModifiers extends boolean,
+  > =
     N['rel'] extends RelationNameKeys<M>
-      ? GraphErrors<RelatedModel<M, N['rel']>, N['children'], `${Path}${Prop}.`>
+      ?
+          | (CheckModifiers extends true
+              ? ModifierNameErrors<RelatedModel<M, N['rel']>, N['mods'], `${Path}${Prop}`>
+              : never)
+          | GraphErrors<RelatedModel<M, N['rel']>, N['children'], `${Path}${Prop}.`, CheckModifiers>
       : Path extends `${infer Parent}.`
         ? `Unknown relation "${N['rel']}" at "${Parent}"`
         : `Unknown relation "${N['rel']}"`;
+
+  // Named modifiers of a node must be modifiers of the related model, when its
+  // modifiers are known.
+  type ModifierNameErrors<RM, Mods extends readonly unknown[], Path extends string> = [
+    KnownModifiers<RM>,
+  ] extends [never]
+    ? never
+    : {
+        [I in keyof Mods]: Mods[I] extends string
+          ? Mods[I] extends keyof KnownModifiers<RM>
+            ? never
+            : `Unknown modifier "${Mods[I]}" for "${Path}"`
+          : never;
+      }[number];
 
   // The names that are accepted as relations of `M`: its relation properties, and
   // the properties typed as objects, since relations are sometimes declared with
@@ -1335,7 +1359,11 @@ declare namespace Objection {
   // adds what it loaded. Anything else may load relations the types can't see.
   type ModifiedItem<I, M, Modifier> = Modifier extends (...args: any[]) => infer Ret
     ? ReturnedItem<I, M, Ret>
-    : MakeOpaque<I, M>;
+    : [KnownModifiers<M>] extends [never]
+      ? MakeOpaque<I, M>
+      : Modifier extends keyof KnownModifiers<M>
+        ? ModifiedItem<I, M, KnownModifiers<M>[Modifier]>
+        : MakeOpaque<I, M>;
 
   type ReturnedItem<I, M, Ret> = Ret extends { '~state': infer S extends QueryBuilderState }
     ? IsAnyType<S['item']> extends true
@@ -2089,7 +2117,7 @@ declare namespace Objection {
 
   interface JoinRelatedMethod<QB extends AnyQueryBuilder> {
     <const E extends RelationExpression<ModelType<QB>>>(
-      expr: CheckRelationExpression<GraphModel<QB>, E>,
+      expr: CheckRelationExpression<GraphModel<QB>, E, ChecksModifierNames<QB>>,
       opt?: JoinRelatedOptions,
     ): QB;
   }
@@ -2241,7 +2269,7 @@ declare namespace Objection {
 
   interface WithGraphMethod<QB extends AnyQueryBuilder> {
     <const E extends RelationExpression<ModelType<QB>>>(
-      expr: CheckRelationExpression<GraphModel<QB>, E>,
+      expr: CheckRelationExpression<GraphModel<QB>, E, ChecksModifierNames<QB>>,
       options?: GraphOptions,
     ): WithGraphQueryBuilder<QB, E>;
   }
@@ -2266,7 +2294,7 @@ declare namespace Objection {
 
   interface AllowGraphMethod<QB extends AnyQueryBuilder> {
     <const E extends RelationExpression<ModelType<QB>>>(
-      expr: CheckRelationExpression<GraphModel<QB>, E>,
+      expr: CheckRelationExpression<GraphModel<QB>, E, ChecksModifierNames<QB>>,
     ): QB;
   }
 
@@ -2563,14 +2591,53 @@ declare namespace Objection {
       modifier: F & CheckModifierModel<QB, F>,
       ...args: ModifierArgs<F>
     ): ModifiedQueryBuilder<QB, ReturnType<F>>;
-    (
-      modifier: Exclude<Modifier<QB>, ModifierFunction<any>> | Modifier<QB>[],
+    (modifier: object & Record<string, Expression<PrimitiveValue>>): OpaqueQueryBuilder<QB>;
+    // The arguments are passed to every modifier of the list.
+    <const L extends readonly (string | ((qb: any, ...args: any[]) => unknown))[]>(
+      modifiers: L & CheckModifierList<QB, L>,
       ...args: unknown[]
+    ): OpaqueQueryBuilder<QB>;
+    // Named modifiers are checked when the model's static `modifiers` are known.
+    <const N extends string>(
+      modifier: N & CheckModifierName<QB, N>,
+      ...args: NamedModifierArgs<QB, N>
     ): OpaqueQueryBuilder<QB>;
   }
 
+  // Names are checked unless the query builder is opaque: something the types
+  // can't see may have added modifiers with `modifiers()`.
+  type ChecksModifierNames<QB extends AnyQueryBuilder> = QB['~state'] extends { opaque: true }
+    ? false
+    : true;
+
+  type QueryModifiers<QB extends AnyQueryBuilder> =
+    ChecksModifierNames<QB> extends true ? KnownModifiers<ModelType<QB>> : never;
+
+  type ModifierNameOf<QB extends AnyQueryBuilder> = [QueryModifiers<QB>] extends [never]
+    ? string
+    : keyof QueryModifiers<QB> & string;
+
+  type NamedModifierArgs<QB extends AnyQueryBuilder, N> = [QueryModifiers<QB>] extends [never]
+    ? unknown[]
+    : N extends keyof QueryModifiers<QB>
+      ? ModifierArgs<QueryModifiers<QB>[N]>
+      : unknown[];
+
+  type CheckModifierName<QB extends AnyQueryBuilder, N> =
+    N extends ModifierNameOf<QB> ? unknown : { '~error': `Unknown modifier "${N & string}"` };
+
+  type CheckModifierList<QB extends AnyQueryBuilder, L> = {
+    [I in keyof L]: L[I] extends string
+      ? L[I] extends ModifierNameOf<QB>
+        ? unknown
+        : { '~error': `Unknown modifier "${L[I]}"` }
+      : CheckModifierModel<QB, L[I]>;
+  };
+
   interface ModifiersMethod<QB extends AnyQueryBuilder> {
-    (modifiers: Modifiers): QB;
+    // Named modifiers added here aren't known to the types, so they aren't checked
+    // after this.
+    (modifiers: Modifiers): OpaqueQueryBuilder<QB>;
     (): QB;
   }
 
@@ -3191,10 +3258,41 @@ declare namespace Objection {
    * inferred from its `relationMappings` that the class doesn't declare.
    */
   export type ModelInstance<MC> = MC extends abstract new (...args: any[]) => infer I
-    ? [Exclude<keyof RelationMappingsOf<MC>, keyof I>] extends [never]
-      ? I
-      : I & InferredRelationProps<MC, I>
+    ? WithModelModifiers<
+        MC,
+        [Exclude<keyof RelationMappingsOf<MC>, keyof I>] extends [never]
+          ? I
+          : I & InferredRelationProps<MC, I>
+      >
     : never;
+
+  // Named modifiers are static, so the types of the instances carry them for the
+  // query builders, which only know the instance type.
+  type WithModelModifiers<MC, I> = [ModifiersOf<MC>] extends [never] ? I : I & ModelModifiers<MC>;
+
+  interface ModelModifiers<MC> {
+    '~modifiers'?: ModifiersOf<MC>;
+  }
+
+  // The named modifiers of model class `MC` from its static `modifiers`, or
+  // `never` when their names can't be known (like with the type `Modifiers`).
+  type ModifiersOf<MC> = MC extends { modifiers: infer Mods }
+    ? IsAnyType<Mods> extends true
+      ? never
+      : string extends keyof Mods
+        ? never
+        : Mods
+    : never;
+
+  // The named modifiers of model `M`, or `never` when they're not known.
+  type KnownModifiers<M> =
+    RelationsModel<M> extends infer RM
+      ? IsAnyType<RM> extends true
+        ? never
+        : '~modifiers' extends keyof RM
+          ? NonNullable<RM['~modifiers' & keyof RM]>
+          : never
+      : never;
 
   /**
    * The names of the relations of model class `MC` inferred from its
