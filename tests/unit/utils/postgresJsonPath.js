@@ -94,7 +94,7 @@ describe('postgresJsonPath', () => {
 
     before(() => {
       pg = Knex({ client: 'pg' });
-      mysql = Knex({ client: 'mysql' });
+      mysql = Knex({ client: 'mysql2' });
     });
 
     beforeEach(() => {

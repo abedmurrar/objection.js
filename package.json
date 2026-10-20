@@ -61,12 +61,12 @@
   ],
   "types": "./typings/objection/index.d.ts",
   "dependencies": {
-    "ajv": "^8.17.1",
+    "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",
     "db-errors": "^0.2.3"
   },
   "peerDependencies": {
-    "knex": ">=1.0.1"
+    "knex": ">=3.1.0"
   },
   "devDependencies": {
     "@types/node": "^22.15.3",
@@ -76,14 +76,13 @@
     "eslint-formatter-codeframe": "^7.32.1",
     "eslint-plugin-prettier": "^5.3.1",
     "expect.js": "^0.3.1",
-    "knex": "^3.1.0",
+    "knex": "^3.3.0",
     "mocha": "^11.2.2",
-    "mysql": "^2.18.1",
     "mysql2": "^3.24.6",
     "pg": "^8.15.6",
     "prettier": "3.5.3",
     "sqlite3": "^5.1.7",
-    "typescript": ">=5.8.3",
+    "typescript": "~5.8.3",
     "vuepress": "1.9.10"
   }
 }
