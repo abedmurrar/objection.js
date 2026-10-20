@@ -18,11 +18,14 @@ properties - see [this recipe](/recipes/returning-tricks.html) for some examples
 `returning(['only', 'some', 'props'])` note that the result object will still contain the input properies
 **plus** the properties listed in `returning`. On other databases you can use the [insertAndFetch](/api/query-builder/mutate-methods.html#insertandfetch) method.
 
-Batch inserts only work on Postgres because Postgres is the only database engine
-that returns the identifiers of _all_ inserted rows. knex supports batch inserts on
-other databases also, but you only get the id of the first (or last) inserted object
-as a result. If you need batch insert on other databases you can use knex directly
-through [knexQuery](/api/model/static-methods.html#static-knexquery).
+Batch inserts work on all databases. Postgres, SQL Server and SQLite return the
+ids of all inserted rows (SQLite 3.35 or newer is needed for batch inserts). MySQL only
+returns the id of the first row, so objection computes the other ids. InnoDB gives the rows of
+one multi-row insert consecutive ids, `@@auto_increment_increment` apart. On MySQL:
+
+- Set the id of either all rows or none of them. A batch where only some rows have an id
+  fails before anything is inserted, because the ids of the other rows can't be known.
+- With `onConflict()`, rows can be skipped or updated, so the ids aren't set.
 
 ##### Arguments
 
@@ -47,7 +50,7 @@ const jennifer = await Person.query().insert({
 console.log(jennifer.id);
 ```
 
-Batch insert (Only works on Postgres):
+Batch insert:
 
 ```js
 const actors = await Movie.relatedQuery('actors')

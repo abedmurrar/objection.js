@@ -14,6 +14,7 @@
 
 ### What's new
 
+- Batch inserts (`insert([...])`, `insertAndFetch([...])` and relation inserts) work on MySQL and SQLite. On MySQL the ids of the inserted rows are computed from the id of the first row, using `@@auto_increment_increment`. A MySQL batch where only some rows have an id is rejected before inserting. SQLite batch inserts need SQLite 3.35 or newer
 - Types: Custom query builders only need to declare `'~rebind'` and keep their type through every method, including `throwIfNotFound()`, `castTo()` and `runAfter()`. See the [migration guide](/release-notes/migration.html)
 - Types: The type of `query()` comes from the static `QueryBuilder` property
 - Types: `runAfter()` and `castTo<T>()` set the result type, which is used by `first()`, `throwIfNotFound()` and the other methods that change the result kind
