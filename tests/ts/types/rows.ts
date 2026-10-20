@@ -78,7 +78,11 @@ async () => {
   expectType<Person[]>()(await Person.query().modify(withPets));
   expectType<Person | undefined>()(await Person.query().findById(1).modify(withPets));
   expectType<Person[]>()(await Person.query().modify('someModifier'));
-  expectType<Person[]>()(await Person.query().modify((qb) => qb.withGraphFetched('pets')));
+  expectType<Person[]>()(
+    await Person.query().modify((qb) => {
+      qb.withGraphFetched('pets');
+    }),
+  );
   // It stays that way.
   expectType<Person | undefined>()(await Person.query().modify(withPets).first());
 
@@ -104,8 +108,7 @@ async () => {
   expectType<Owner[]>()(await Owner.query());
 };
 
-// Rows of models with `private` members can't be used where the model is
-// expected. Make the member public, or move it out of the model.
+// So do models with `private` members.
 class WithPrivate extends Model {
   static tableName = 'withPrivate';
 
@@ -118,8 +121,26 @@ class WithPrivate extends Model {
 }
 
 async () => {
-  const row = await WithPrivate.query().findById(1).throwIfNotFound();
-  expectType<number>()(row.id);
-  // @ts-expect-error
-  const model: WithPrivate = row;
+  expectType<WithPrivate | undefined>()(await WithPrivate.query().findById(1));
+  const withPets = await WithPrivate.query().withGraphFetched('pets').findById(1);
+  const model: WithPrivate | undefined = withPets;
 };
+
+// Opaque query builders can be assigned to variables of the others.
+() => {
+  let query = Person.query();
+  query = query.modify(withPets);
+  query = query.withGraphFetched('pets');
+  let explicit: QueryBuilder<Person> = Person.query();
+  explicit = explicit.modify(withPets);
+};
+
+// Casting `$modelClass` to the class of an abstract base model still works.
+abstract class BaseModel extends Model {
+  static datetimeFields?: string[] = [];
+
+  datetimeFieldsOf() {
+    const modelClass = this.$modelClass as typeof BaseModel;
+    return modelClass.datetimeFields;
+  }
+}

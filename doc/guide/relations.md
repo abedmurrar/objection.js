@@ -177,13 +177,13 @@ class Person extends Model {
   }));
 }
 
-const person = await Person.query().findById(1).throwIfNotFound();
+const person = Person.fromJson({ firstName: 'Jennifer' });
 
 person.pets; // Animal[] | undefined
 person.mom; // Person | null | undefined
 person.movies; // (Movie & { role: PersonMovie['role'] })[] | undefined
 
-await Person.relatedQuery('pets').for(1); // Animal[]
+await Person.relatedQuery('pets').for(1); // ModelRow<Animal>[]
 ```
 
 - To-many relations (`HasManyRelation`, `ManyToManyRelation`) are arrays. To-one relations (`BelongsToOneRelation`, `HasOneRelation`, `HasOneThroughRelation`) are `Model | null`, because objection sets them to `null` when there is no related model.
@@ -196,6 +196,39 @@ The relation properties are added to the models objection creates (the results o
 ```ts
 interface Person extends RelationsOf<typeof Person> {}
 ```
+
+### Loaded relations
+
+Query results only have the relations the query loaded. A result is a `ModelRow<Person>`: the model without its relation properties. `withGraphFetched()`, `withGraphJoined()` and `fetchGraph()` add the relations they load:
+
+```ts
+const person = await Person.query().findById(1).throwIfNotFound();
+person.pets; // Error: the query didn't load `pets`
+
+const withPets = await Person.query()
+  .withGraphFetched('[pets.owner, mom]')
+  .findById(1)
+  .throwIfNotFound();
+
+withPets.pets[0].owner; // ModelRow<Person> | null
+withPets.mom; // ModelRow<Person> | null
+withPets.movies; // Error: not loaded
+```
+
+Relation expressions are checked, in string and in object notation: `withGraphFetched('pets.ownr')` is an error `Unknown relation "ownr" at "pets"`. Use `Loaded<Person, '[pets, mom]'>` to annotate the type of a result.
+
+To-one relations are `| null` when the relation is typed with `| null`, like the inferred ones. Relations declared as `mom?: Person` are `| undefined` instead, so that the rows can still be used where `Person` is expected, but objection sets them to `null`.
+
+The types can't see everything that loads relations. In these cases the result has all relations of the model as optional properties, like in objection 3:
+
+- Modifiers that don't return the query builder, and modifiers given by name. Return the query builder from a modifier to keep its relations in the types: `(query) => query.withGraphFetched('pets')`.
+- Relation expressions that aren't known at compile time, like a `string` variable.
+- `insertGraph()`, `upsertGraph()` and `castTo(Model)`.
+- Query builders whose type is written explicitly, like `const query: QueryBuilder<Person> = ...`.
+
+Query builders change in place, but their types don't. Calls like `query.withGraphFetched('pets')` that don't use the returned query builder aren't in the type of `query`. Give `query` an explicit type, or chain the calls.
+
+Models whose rows couldn't be used where the model is expected keep their relations as optional properties: models with `private` or `protected` members, and models that declare a relation as required (`pets!: Animal[]`).
 
 ## Require loops (non ECMAScript modules only)
 

@@ -1201,28 +1201,28 @@ declare namespace Objection {
         }[keyof Children & string];
 
   type NodeErrors<M, N extends GraphNode, Prop extends string, Path extends string> =
-    N['rel'] extends RelationKeys<M>
-      ?
-          | ModifierErrors<RelatedModel<M, N['rel']>, N['mods'], `${Path}${Prop}`>
-          | GraphErrors<RelatedModel<M, N['rel']>, N['children'], `${Path}${Prop}.`>
+    N['rel'] extends RelationNameKeys<M>
+      ? GraphErrors<RelatedModel<M, N['rel']>, N['children'], `${Path}${Prop}.`>
       : Path extends `${infer Parent}.`
         ? `Unknown relation "${N['rel']}" at "${Parent}"`
         : `Unknown relation "${N['rel']}"`;
 
-  // Modifier functions in object notation must be written for the related model.
-  type ModifierErrors<RM, Mods extends readonly unknown[], Path extends string> = {
-    [I in keyof Mods]: Mods[I] extends (qb: infer P, ...args: any[]) => any
-      ? IsAnyType<P> extends true
-        ? never
-        : P extends { ModelType: infer PM }
-          ? RM extends PM
+  // The names that are accepted as relations of `M`: its relation properties, and
+  // the properties typed as objects, since relations are sometimes declared with
+  // types that aren't models, like `programs?: Pick<Program, 'id' | 'name'>[]`.
+  type RelationNameKeys<M> =
+    | RelationKeys<M>
+    | {
+        [K in ModelDataKeys<M>]-?: K extends `$${string}`
+          ? never
+          : IsAnyType<M[K]> extends true
             ? never
-            : PM extends RM
+            : NonNullable<M[K]> extends Function | Date
               ? never
-              : `The modifier of "${Path}" is for a different model than the relation`
-          : never
-      : never;
-  }[number];
+              : NonNullable<M[K]> extends object
+                ? K
+                : never;
+      }[ModelDataKeys<M>];
 
   // The related model of relation `K` of model `M`.
   type RelatedModel<M, K extends keyof M> = ElementOrSelf<NonNullable<M[K]>>;
@@ -1237,6 +1237,210 @@ declare namespace Objection {
       : [Exclude<keyof M, keyof Model>] extends [never]
         ? true
         : false;
+
+  /**
+   * The type of model `M` with the relations of the relation expression `E`
+   * loaded: `Loaded<Person, '[pets.toys, mom]'>`.
+   */
+  export type Loaded<M, E> = WithGraph<ModelRow<M>, M, E>;
+
+  // Result item `I` of model `M` after loading the relations of expression `E`.
+  type WithGraph<I, M, E> =
+    IsAnyType<I> extends true
+      ? any
+      : ParseRelationExpression<E> extends infer G
+        ? G extends GraphNode
+          ? G['all'] extends true
+            ? MakeOpaque<I, M>
+            : WithChildren<I, M, G['children']>
+          : MakeOpaque<I, M>
+        : never;
+
+  type WithChildren<I, M, Children> = [keyof Children] extends [never]
+    ? I
+    : [Extract<keyof Children, keyof I>] extends [never]
+      ? I & LoadedRelations<I, M, Children>
+      : Replace<I, M, Extract<keyof Children, keyof I>, LoadedRelations<I, M, Children>>;
+
+  // `I` with the properties `K` replaced by `Props`. The rows of models that keep
+  // their relations (see `ModelRow`) aren't copied, since the copy couldn't be
+  // used where the model is expected. `Props` is intersected with them instead.
+  type Replace<I, M, K, Props> = [Row<M>] extends [ModelRow<M>] ? Without<I, K> & Props : I & Props;
+
+  // `I` without the properties `K`.
+  type Without<I, K> = { [P in keyof I as P extends K ? never : P]: I[P] };
+
+  type LoadedRelations<I, M, Children> = {
+    -readonly [P in keyof Children as Children[P] extends { maybe: true }
+      ? never
+      : P]: LoadedRelation<I, M, P, Children[P]>;
+  } & MaybeLoadedRelations<I, M, Children>;
+
+  // Relations with a `boolean` in object notation, which may not be loaded.
+  type MaybeLoadedRelations<I, M, Children> = [
+    { [P in keyof Children]: Children[P] extends { maybe: true } ? P : never }[keyof Children],
+  ] extends [never]
+    ? unknown
+    : {
+        -readonly [P in keyof Children as Children[P] extends { maybe: true }
+          ? P
+          : never]?: LoadedRelation<I, M, P, Children[P]>;
+      };
+
+  // The type of the relation property `P` loaded by node `N`.
+  type LoadedRelation<I, M, P, N> = N extends GraphNode
+    ? N['rel'] extends keyof M
+      ? RelationValue<M[N['rel']], LoadedNodeRow<PreviousRow<I, P>, RelatedModel<M, N['rel']>, N>>
+      : unknown
+    : unknown;
+
+  // To-many relations are arrays. Objection sets to-one relations to `null` when
+  // there's no related model, but rows must still be usable where the model is
+  // expected, so the declared type decides: `Row | null` for relations declared
+  // with `| null` (like the inferred ones), `Row | undefined` for optional ones.
+  type RelationValue<Declared, Row> = [NonNullable<Declared>] extends [readonly any[]]
+    ? Row[]
+    : [Extract<NonNullable<Declared>, readonly any[]>] extends [never]
+      ? null extends Declared
+        ? Row | null
+        : undefined extends Declared
+          ? Row | undefined
+          : Row
+      : Row | Row[] | null;
+
+  // The row of a relation that an earlier call already loaded, so that calls
+  // add to each other like they do at runtime.
+  type PreviousRow<I, P> = P extends keyof I
+    ? {} extends Pick<I, P>
+      ? never
+      : ElementOrSelf<NonNullable<I[P]>>
+    : never;
+
+  // The row of the related model `RM` loaded by node `N`, starting from `Previous`.
+  type LoadedNodeRow<Previous, RM, N extends GraphNode> = WithChildren<
+    ApplyNodeModifiers<
+      [Previous] extends [never] ? ModelRow<RM> : Previous,
+      RM,
+      N['recursive'] extends true ? ['~opaque'] : N['all'] extends true ? ['~opaque'] : N['mods']
+    >,
+    RM,
+    N['children']
+  >;
+
+  type ApplyNodeModifiers<I, RM, Mods> = Mods extends readonly [infer First, ...infer Rest]
+    ? ApplyNodeModifiers<ModifiedItem<I, RM, First>, RM, Rest>
+    : I;
+
+  // The item after a modifier. A modifier function that returns the query builder
+  // adds what it loaded. Anything else may load relations the types can't see.
+  type ModifiedItem<I, M, Modifier> = Modifier extends (...args: any[]) => infer Ret
+    ? ReturnedItem<I, M, Ret>
+    : MakeOpaque<I, M>;
+
+  type ReturnedItem<I, M, Ret> = Ret extends { '~state': infer S extends QueryBuilderState }
+    ? IsAnyType<S['item']> extends true
+      ? MakeOpaque<I, M>
+      : S extends { opaque: true }
+        ? MakeOpaque<MergeLoaded<I, M, S['item']>, M>
+        : MergeLoaded<I, M, S['item']>
+    : MakeOpaque<I, M>;
+
+  // Adds to `I` the relations `Other` has loaded: its required relation
+  // properties and the properties that aren't properties of the model (aliases).
+  type MergeLoaded<I, M, Other> = [LoadedKeys<M, Other>] extends [never]
+    ? I
+    : [Extract<LoadedKeys<M, Other>, keyof I>] extends [never]
+      ? I & Only<Other, LoadedKeys<M, Other>>
+      : Replace<I, M, LoadedKeys<M, Other>, Only<Other, LoadedKeys<M, Other>>>;
+
+  // Like `Pick`, but shown as an object type in messages.
+  type Only<T, K> = { [P in keyof T as P extends K ? P : never]: T[P] };
+
+  type LoadedKeys<M, Other> =
+    | {
+        [K in keyof Other]-?: K extends RelationKeys<M>
+          ? {} extends Pick<Other, K>
+            ? never
+            : K
+          : never;
+      }[keyof Other]
+    | Exclude<keyof Other, keyof M>;
+
+  // The query builder `QB` after loading the relations of expression `E`.
+  type WithGraphQueryBuilder<QB extends AnyQueryBuilder, E> = QB['~state'] extends {
+    cast: true;
+  }
+    ? OpaqueQueryBuilder<QB>
+    : ParseRelationExpression<E> extends GraphNode
+      ? ItemQueryBuilder<QB, WithGraph<QB['~state']['item'], GraphModel<QB>, E>>
+      : OpaqueQueryBuilder<QB>;
+
+  // An interface instead of a static method, so that it isn't compared every
+  // time a model class is compared with another one.
+  interface StaticFetchGraphMethod {
+    <
+      MC extends Constructor<Model>,
+      T extends PartialModelObject<Extract<ModelInstance<MC>, Model>>,
+      const E extends RelationExpression<Extract<ModelInstance<MC>, Model>>,
+    >(
+      this: MC,
+      modelOrObject: T,
+      expression: CheckRelationExpression<ModelInstance<MC>, E>,
+      options?: FetchGraphOptions,
+    ): StaticFetchGraphQueryBuilder<MC, T, E, 'one'>;
+    <
+      MC extends Constructor<Model>,
+      T extends PartialModelObject<Extract<ModelInstance<MC>, Model>>,
+      const E extends RelationExpression<Extract<ModelInstance<MC>, Model>>,
+    >(
+      this: MC,
+      modelOrObject: T[],
+      expression: CheckRelationExpression<ModelInstance<MC>, E>,
+      options?: FetchGraphOptions,
+    ): StaticFetchGraphQueryBuilder<MC, T, E, 'many'>;
+  }
+
+  type StaticFetchGraphQueryBuilder<MC, T, E, Kind extends 'one' | 'many'> =
+    Extract<ModelInstance<MC>, Model> extends infer M extends Model
+      ? [M] extends [never]
+        ? any
+        : FetchGraphQueryBuilder<QueryBuilderType<M>, M, T, E, Kind>
+      : any;
+
+  // The query builder of `fetchGraph()` for objects of type `T` of model `M`.
+  // Plain objects are turned into models.
+  type FetchGraphQueryBuilder<QB extends AnyQueryBuilder, M, T, E, Kind extends 'one' | 'many'> =
+    WithGraph<T extends Model ? T : M, M, E> extends infer I
+      ? RebindQueryBuilder<
+          QB,
+          ModelType<QB>,
+          Kind extends 'one' ? I : I[],
+          ParseRelationExpression<E> extends GraphNode
+            ? QueryBuilderItemState<I>
+            : OpaqueItemState<I>
+        >
+      : never;
+
+  // The query builder `QB` with result items of type `I`.
+  type ItemQueryBuilder<QB extends AnyQueryBuilder, I> = RebindQueryBuilder<
+    QB,
+    ModelType<QB>,
+    ReplaceResultItem<ResultType<QB>, I>,
+    QB['~state'] extends { opaque: true } ? OpaqueItemState<I> : QueryBuilderItemState<I>
+  >;
+
+  // The query builder `QB` after a modifier that returned `Ret`.
+  type ModifiedQueryBuilder<QB extends AnyQueryBuilder, Ret> = Ret extends {
+    '~state': infer S extends QueryBuilderState;
+  }
+    ? IsAnyType<S['item']> extends true
+      ? OpaqueQueryBuilder<QB>
+      : S extends { opaque: true }
+        ? OpaqueQueryBuilder<
+            ItemQueryBuilder<QB, MergeLoaded<QB['~state']['item'], GraphModel<QB>, S['item']>>
+          >
+        : ItemQueryBuilder<QB, MergeLoaded<QB['~state']['item'], GraphModel<QB>, S['item']>>
+    : OpaqueQueryBuilder<QB>;
 
   /**
    * If T is an array, returns the item type, otherwise returns T.
@@ -1446,22 +1650,35 @@ declare namespace Objection {
     // The type of the result items, for example `Person` when the result is
     // `Person[]`, `Person | undefined` or `Page<Person>`.
     item: unknown;
-    // True when something ran that may have loaded relations the types can't
-    // see, like a modifier that doesn't return the query builder.
-    opaque: boolean;
+    // `true` when something ran that may have loaded relations the types can't
+    // see, like a modifier that doesn't return the query builder. Only opaque
+    // states have it, so that opaque query builders can be assigned to
+    // variables of the others.
+    opaque?: true;
+    // `true` after `castTo(ModelClass)`.
+    cast?: true;
   }
 
-  type QueryBuilderItemState<T, O extends boolean = false> = { item: T; opaque: O };
+  type QueryBuilderItemState<T> = { item: T };
+
+  type OpaqueItemState<T> = { item: T; opaque: true };
+
+  // The state after `castTo(ModelClass)`.
+  type CastItemState<T> = { item: T; opaque: true; cast: true };
 
   /**
    * A model as a query returns it: without the relations the query didn't load.
    * Loaded relations are added by `withGraphFetched()` and the other graph methods.
    *
-   * Models that declare a relation as required (`pets!: Pet[]` instead of
-   * `pets?: Pet[]`) keep their relations, since rows without them couldn't be
-   * used where the model is expected.
+   * Models whose rows couldn't be used where the model is expected keep their
+   * relations: models that declare a relation as required (`pets!: Pet[]`
+   * instead of `pets?: Pet[]`), and models with `private` or `protected` members.
    */
-  export type ModelRow<M> = [RequiredRelationKeys<M>] extends [never] ? Row<M> : M;
+  export type ModelRow<M> = [RequiredRelationKeys<M>] extends [never]
+    ? Row<M> extends M
+      ? Row<M>
+      : M
+    : M;
 
   type RequiredRelationKeys<M> = {
     [K in RelationKeys<M>]: {} extends Pick<M, K> ? never : K;
@@ -1474,10 +1691,14 @@ declare namespace Objection {
   type RelationKeys<M> = {
     [K in keyof M]-?: IsAnyType<M[K]> extends true
       ? never
-      : NonNullable<M[K]> extends Model | readonly Model[]
+      : NonNullable<M[K]> extends ModelLike | readonly ModelLike[]
         ? K
         : never;
   }[keyof M];
+
+  // Checking for a few members of `Model` is much cheaper than comparing with
+  // `Model`, which compares the types of all its methods.
+  type ModelLike = { $modelClass: unknown; $relatedQuery: unknown; $fetchGraph: unknown };
 
   // Adds back the relations of `M` that `I` doesn't have, as optional
   // properties, for results that may contain relations the types can't see.
@@ -1490,13 +1711,16 @@ declare namespace Objection {
 
   // The query builder `QB` after something ran that may have loaded relations
   // the types can't see.
-  type OpaqueQueryBuilder<QB extends AnyQueryBuilder> = QB['~state']['opaque'] extends true
+  type OpaqueQueryBuilder<QB extends AnyQueryBuilder> = QB['~state'] extends { opaque: true }
     ? QB
     : RebindQueryBuilder<
         QB,
         ModelType<QB>,
-        ReplaceResultItem<ResultType<QB>, MakeOpaque<QB['~state']['item'], ModelType<QB>>>,
-        QueryBuilderItemState<MakeOpaque<QB['~state']['item'], ModelType<QB>>, true>
+        ReplaceResultItem<
+          ResultType<QB>,
+          MakeOpaque<QB['~state']['item'], RelationsModel<ModelType<QB>>>
+        >,
+        OpaqueItemState<MakeOpaque<QB['~state']['item'], RelationsModel<ModelType<QB>>>>
       >;
 
   // The query builder `QB` for model `M` with rows as the result items.
@@ -1560,17 +1784,18 @@ declare namespace Objection {
 
   // Replaces the item type of result `R` with `I`, keeping the result kind.
   type ReplaceResultItem<R, I> =
-    IsAnyType<R> extends true
-      ? any
-      : [R] extends [number]
-        ? number
-        : [R] extends [readonly any[]]
-          ? I[]
-          : [R] extends [Page<any>]
-            ? Page<I>
-            : undefined extends R
-              ? I | undefined
-              : I;
+    IsAnyType<R> extends true ? any : [R] extends [never] ? never : ReplaceResultMember<R, I>;
+
+  // Each member of a union like `Person[] | Person | number | undefined`.
+  type ReplaceResultMember<R, I> = R extends number
+    ? number
+    : R extends readonly any[]
+      ? I[]
+      : R extends Page<any>
+        ? Page<I>
+        : R extends undefined | null
+          ? R
+          : I;
 
   /**
    * The query builder type of the static `query()` method of model class `MC`.
@@ -1864,7 +2089,7 @@ declare namespace Objection {
 
   interface JoinRelatedMethod<QB extends AnyQueryBuilder> {
     <const E extends RelationExpression<ModelType<QB>>>(
-      expr: CheckRelationExpression<ModelType<QB>, E>,
+      expr: CheckRelationExpression<GraphModel<QB>, E>,
       opt?: JoinRelatedOptions,
     ): QB;
   }
@@ -2014,9 +2239,34 @@ declare namespace Objection {
 
   type ForIdValue = MaybeCompositeId | AnyQueryBuilder;
 
+  interface WithGraphMethod<QB extends AnyQueryBuilder> {
+    <const E extends RelationExpression<ModelType<QB>>>(
+      expr: CheckRelationExpression<GraphModel<QB>, E>,
+      options?: GraphOptions,
+    ): WithGraphQueryBuilder<QB, E>;
+  }
+
+  // The model whose relations the graph methods of `QB` use, or `any` if they're
+  // not known.
+  type GraphModel<QB extends AnyQueryBuilder> = QB['~state'] extends { cast: true }
+    ? any
+    : RelationsModel<ModelType<QB>>;
+
+  // The model with the relations of `M`. Generic code like
+  // `<M extends Model>(query: QueryBuilder<M, M[]>)` can infer a row type as the
+  // model type, but rows still have the `QueryBuilderType` of their model.
+  type RelationsModel<M> =
+    IsAnyType<M> extends true
+      ? any
+      : M extends { QueryBuilderType: { ModelType: infer RM } }
+        ? IsAnyType<RM> extends true
+          ? M
+          : RM
+        : M;
+
   interface AllowGraphMethod<QB extends AnyQueryBuilder> {
     <const E extends RelationExpression<ModelType<QB>>>(
-      expr: CheckRelationExpression<ModelType<QB>, E>,
+      expr: CheckRelationExpression<GraphModel<QB>, E>,
     ): QB;
   }
 
@@ -2183,12 +2433,96 @@ declare namespace Objection {
     maxBatchSize?: number;
   }
 
+  // The expression refers to the relations of the graph by their names, which can
+  // be aliases. The modifier gets the query builder of the related model when the
+  // expression is a single relation path like `'pets.toys'`.
   interface ModifyGraphMethod<QB extends AnyQueryBuilder> {
-    <M extends Model>(
-      expr: RelationExpression<ModelType<QB>>,
-      modifier: Modifier<QueryBuilderType<M>>,
+    // With the related model type given explicitly: `modifyGraph<Pet>(expr, modifier)`.
+    <RM extends Model = never>(
+      expr: [RM] extends [never] ? never : RelationExpression<ModelType<QB>>,
+      modifier: Modifier<QueryBuilderType<RM>>,
+    ): QB;
+    <const E extends RelationExpression<ModelType<QB>>>(
+      expr: CheckGraphPath<QB['~state']['item'], GraphModel<QB>, E>,
+      modifier: Modifier<GraphPathQueryBuilder<QB['~state']['item'], GraphModel<QB>, E>>,
     ): QB;
   }
+
+  type CheckGraphPath<I, M, E> =
+    ParseRelationExpression<E> extends infer G
+      ? G extends ParseError<infer Message>
+        ? Message
+        : G extends GraphNode
+          ? GraphPathErrors<I, M, G['children'], ''> extends infer Errors
+            ? [Errors] extends [never]
+              ? E
+              : Errors
+            : never
+          : E
+      : never;
+
+  type GraphPathErrors<I, M, Children, Path extends string> =
+    IsUncheckedModel<M> extends true
+      ? never
+      : {
+          [P in keyof Children & string]: Children[P] extends GraphNode
+            ? GraphPathStep<I, M, P, Children[P]> extends infer Step
+              ? [Step] extends [never]
+                ? Path extends `${infer Parent}.`
+                  ? `Unknown relation "${P}" at "${Parent}"`
+                  : `Unknown relation "${P}"`
+                : Step extends [infer NextI, infer RM]
+                  ? GraphPathErrors<NextI, RM, Children[P]['children'], `${Path}${P}.`>
+                  : never
+              : never
+            : never;
+        }[keyof Children & string];
+
+  // The item and the model of the relation called `P` in the graph of item `I`:
+  // a relation of `M`, or an alias that was loaded.
+  type GraphPathStep<I, M, P, N extends GraphNode> =
+    N['rel'] extends RelationNameKeys<M>
+      ? [
+          [PreviousRow<I, P>] extends [never]
+            ? ModelRow<RelatedModel<M, N['rel']>>
+            : PreviousRow<I, P>,
+          RelatedModel<M, N['rel']>,
+        ]
+      : P extends keyof I
+        ? ElementOrSelf<NonNullable<I[P]>> extends infer Row
+          ? [Row, ModelOfRow<Row>]
+          : never
+        : never;
+
+  type ModelOfRow<Row> = Row extends { QueryBuilderType: { ModelType: infer RM } } ? RM : Model;
+
+  type GraphPathQueryBuilder<I, M, E> =
+    ParseRelationExpression<E> extends infer G extends GraphNode
+      ? GraphPathTarget<I, M, G['children']> extends infer Target
+        ? [Target] extends [never]
+          ? AnyQueryBuilder
+          : Target extends [any, infer RM extends Model]
+            ? RowQueryBuilder<QueryBuilderType<RM>, RM>
+            : AnyQueryBuilder
+        : AnyQueryBuilder
+      : AnyQueryBuilder;
+
+  // The item and the model at the end of a single relation path.
+  type GraphPathTarget<I, M, Children> = [keyof Children] extends [never]
+    ? never
+    : IsUnion<keyof Children> extends true
+      ? never
+      : {
+          [P in keyof Children]: Children[P] extends GraphNode
+            ? GraphPathStep<I, M, P, Children[P]> extends [infer NextI, infer RM]
+              ? [keyof Children[P]['children']] extends [never]
+                ? [NextI, RM]
+                : GraphPathTarget<NextI, RM, Children[P]['children']>
+              : never
+            : never;
+        }[keyof Children];
+
+  type IsUnion<T, U = T> = T extends any ? ([U] extends [T] ? false : true) : never;
 
   interface ContextMethod<QB extends AnyQueryBuilder> {
     (context: object): QB;
@@ -2224,11 +2558,11 @@ declare namespace Objection {
   // Modifiers may load relations the types can't see, so the result may contain
   // any relation of the model.
   interface ModifyMethod<QB extends AnyQueryBuilder> {
-    (modifier: (qb: QB) => unknown): OpaqueQueryBuilder<QB>;
+    <Ret>(modifier: (qb: QB) => Ret): ModifiedQueryBuilder<QB, Ret>;
     <F extends (qb: any, ...args: any[]) => unknown>(
       modifier: F & CheckModifierModel<QB, F>,
       ...args: ModifierArgs<F>
-    ): OpaqueQueryBuilder<QB>;
+    ): ModifiedQueryBuilder<QB, ReturnType<F>>;
     (
       modifier: Exclude<Modifier<QB>, ModifierFunction<any>> | Modifier<QB>[],
       ...args: unknown[]
@@ -2507,9 +2841,11 @@ declare namespace Objection {
     findOne: WhereMethod<this['~maybe']>;
 
     execute(): Promise<R>;
+    // `castTo()` only changes the types. The relations of the graph methods are
+    // still the relations of the original model, so they aren't checked after it.
     castTo<MC extends Model>(
       modelClass: ModelConstructor<MC>,
-    ): RebindQueryBuilder<this, MC, ReplaceResultItem<R, MC>, QueryBuilderItemState<MC>>;
+    ): RebindQueryBuilder<this, MC, ReplaceResultItem<R, MC>, CastItemState<MC>>;
     castTo<T>(): RebindQueryBuilder<this, M, T, QueryBuilderItemState<ResultItemOf<T, M>>>;
 
     // For generic code (like custom query builder methods) where the model type
@@ -2570,14 +2906,8 @@ declare namespace Objection {
     unrelate(): this['~count'];
     for(ids: ForIdValue | ForIdValue[]): this;
 
-    withGraphFetched<const E extends RelationExpression<M>>(
-      expr: CheckRelationExpression<M, E>,
-      options?: GraphOptions,
-    ): this;
-    withGraphJoined<const E extends RelationExpression<M>>(
-      expr: CheckRelationExpression<M, E>,
-      options?: GraphOptions,
-    ): this;
+    withGraphFetched: WithGraphMethod<this>;
+    withGraphJoined: WithGraphMethod<this>;
 
     truncate(): Promise<void>;
     allowGraph: AllowGraphMethod<this>;
@@ -3174,17 +3504,17 @@ declare namespace Objection {
     bindKnex(trxOrKnex: TransactionOrKnex): this;
     bindTransaction(trxOrKnex: TransactionOrKnex): this;
 
-    fetchGraph(
-      modelOrObject: PartialModelObject<M>,
-      expression: RelationExpression<M>,
+    fetchGraph<T extends PartialModelObject<M>, const E extends RelationExpression<M>>(
+      modelOrObject: T,
+      expression: CheckRelationExpression<M, E>,
       options?: FetchGraphOptions,
-    ): SingleQueryBuilder<QueryBuilderType<M>>;
+    ): FetchGraphQueryBuilder<QueryBuilderType<M>, M, T, E, 'one'>;
 
-    fetchGraph(
-      modelOrObject: PartialModelObject<M>[],
-      expression: RelationExpression<M>,
+    fetchGraph<T extends PartialModelObject<M>, const E extends RelationExpression<M>>(
+      modelOrObject: T[],
+      expression: CheckRelationExpression<M, E>,
       options?: FetchGraphOptions,
-    ): QueryBuilderType<M>;
+    ): FetchGraphQueryBuilder<QueryBuilderType<M>, M, T, E, 'many'>;
 
     getRelations(): Relations;
     getRelation(name: string): Relation;
@@ -3319,19 +3649,7 @@ declare namespace Objection {
     static bindKnex<M>(this: M, trxOrKnex: TransactionOrKnex): M;
     static bindTransaction<M>(this: M, trxOrKnex: TransactionOrKnex): M;
 
-    static fetchGraph<M extends Model>(
-      this: Constructor<M>,
-      modelOrObject: PartialModelObject<M>,
-      expression: RelationExpression<M>,
-      options?: FetchGraphOptions,
-    ): SingleQueryBuilder<QueryBuilderType<M>>;
-
-    static fetchGraph<M extends Model>(
-      this: Constructor<M>,
-      modelOrObject: PartialModelObject<M>[],
-      expression: RelationExpression<M>,
-      options?: FetchGraphOptions,
-    ): QueryBuilderType<M>;
+    static fetchGraph: StaticFetchGraphMethod;
 
     static getRelations(): Relations;
     static getRelation(name: string): Relation;
@@ -3377,10 +3695,13 @@ declare namespace Objection {
     $id(id: any): void;
     $id(): any;
 
-    $fetchGraph(
-      expression: RelationExpression<this>,
+    // `this` is a type parameter so that the signature is the same for every model,
+    // which makes comparing models much faster.
+    $fetchGraph<T extends Model, const E extends RelationExpression<Model>>(
+      this: T,
+      expression: CheckRelationExpression<ModelOfRow<T>, E>,
       options?: FetchGraphOptions,
-    ): SingleQueryBuilder<QueryBuilderType<this>>;
+    ): FetchGraphQueryBuilder<QueryBuilderType<T>, ModelOfRow<T>, T, E, 'one'>;
 
     $formatDatabaseJson(json: Pojo): Pojo;
     $parseDatabaseJson(json: Pojo): Pojo;

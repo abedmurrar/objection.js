@@ -114,12 +114,28 @@ declare const anyExpression: RelationExpression<Person>;
   Person.query().withGraphFetched({ pets: { toyz: true } });
   // @ts-expect-error
   Person.query().withGraphFetched({ animals: { $relation: 'animals' } });
-  // @ts-expect-error a modifier for another model
-  Person.query().withGraphFetched({ pets: { $modify: forPersons } });
   // @ts-expect-error
   Movie.query().withGraphFetched('actors.pets.toyz');
   // @ts-expect-error
   Person.query().joinRelated('pets.toyz');
   // @ts-expect-error
   Person.query().allowGraph('nope');
+};
+
+// Relations declared with types that aren't models are accepted too.
+class Course extends Model {
+  static tableName = 'courses';
+
+  id!: number;
+  title!: string;
+  programs?: { id: number; name: string }[];
+}
+
+() => {
+  Course.query().withGraphFetched('programs');
+  // @ts-expect-error a column isn't a relation
+  Course.query().withGraphFetched('title');
+
+  // `castTo()` only changes the types, so the relations aren't checked after it.
+  Pet.query().joinRelated('owner').castTo(Person).withGraphFetched('toys');
 };
