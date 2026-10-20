@@ -12,6 +12,9 @@ function expectArraysEqual(arr1, arr2) {
 }
 
 module.exports = (session) => {
+  // Tests that use postgres-only features, like `returning` or `to_jsonb()`.
+  const itPostgres = session.isPostgres() ? it : () => {};
+
   describe('JSON queries', () => {
     class ModelJson extends Model {
       static get tableName() {
@@ -150,36 +153,46 @@ module.exports = (session) => {
             .orderBy(ref('jsonObject:attr'), 'desc')
             .then((result) => {
               expect(result).to.have.length(4);
-              // null is first
-              expect(_.first(result).name).to.equal('test1');
+              // null is first on postgres and last on mysql.
+              expect(result.map((it) => it.name)).to.eql(
+                session.isPostgres()
+                  ? ['test1', 'test4', 'test3', 'test2']
+                  : ['test4', 'test3', 'test2', 'test1'],
+              );
             });
         });
 
-        it('should be able to use ref with groupBy and having (last argument of having is ref)', () => {
-          return BoundModel.query()
-            .select(['id', ref('jsonObject:attr').as('foo')])
-            .groupBy([ref('jsonObject:attr'), 'id'])
-            .having('id', '>=', ref('jsonObject:attr').castInt())
-            .orderBy('foo')
-            .then((result) => {
-              expect(result).to.have.length(3);
-              expect(_.first(result)).to.eql({ id: 2, foo: 2 });
-            });
-        });
+        itPostgres(
+          'should be able to use ref with groupBy and having (last argument of having is ref)',
+          () => {
+            return BoundModel.query()
+              .select(['id', ref('jsonObject:attr').as('foo')])
+              .groupBy([ref('jsonObject:attr'), 'id'])
+              .having('id', '>=', ref('jsonObject:attr').castInt())
+              .orderBy('foo')
+              .then((result) => {
+                expect(result).to.have.length(3);
+                expect(_.first(result)).to.eql({ id: 2, foo: 2 });
+              });
+          },
+        );
 
-        it('should be able to use ref with groupBy and having (also first arg is ref)', () => {
-          return BoundModel.query()
-            .select('id', ref('jsonObject:attr').as('foo'))
-            .groupBy([ref('jsonObject:attr'), 'id'])
-            .having(ref('id').castInt(), '>=', ref('jsonObject:attr').castInt())
-            .orderBy('foo')
-            .then((result) => {
-              expect(result).to.have.length(3);
-              expect(_.first(result)).to.eql({ id: 2, foo: 2 });
-            });
-        });
+        itPostgres(
+          'should be able to use ref with groupBy and having (also first arg is ref)',
+          () => {
+            return BoundModel.query()
+              .select('id', ref('jsonObject:attr').as('foo'))
+              .groupBy([ref('jsonObject:attr'), 'id'])
+              .having(ref('id').castInt(), '>=', ref('jsonObject:attr').castInt())
+              .orderBy('foo')
+              .then((result) => {
+                expect(result).to.have.length(3);
+                expect(_.first(result)).to.eql({ id: 2, foo: 2 });
+              });
+          },
+        );
 
-        it('should be able to use ref with groupBy and nested having', () => {
+        itPostgres('should be able to use ref with groupBy and nested having', () => {
           return BoundModel.query()
             .select(['id', ref('jsonObject:attr').as('foo')])
             .groupBy([ref('jsonObject:attr'), 'id'])
@@ -225,7 +238,7 @@ module.exports = (session) => {
             });
         });
 
-        it('should be able to use knex.raw to jsonb column in update', () => {
+        itPostgres('should be able to use knex.raw to jsonb column in update', () => {
           return BoundModel.query()
             .update({
               jsonArray: BoundModel.knex().raw('to_jsonb(??)', ['name']),
@@ -235,56 +248,62 @@ module.exports = (session) => {
             });
         });
 
-        it('should be able to update internal field of json column and allow ref() syntax', () => {
-          // should do something like:
-          // update 'ModelJson' set
-          //   'jsonArray' = jsonb_set('[]', '{0}', to_jsonb('name'), true),
-          //   'jsonObject' = jsonb_set('jsonObject', '{attr}', to_jsonb('name'), true),
-          //   'name' = 'jsonArray'#>>'{0}' where 'id' = 1 returning *;
-          return BoundModel.query()
-            .update({
-              name: ref('jsonArray:[0]').castText(),
-              'jsonObject:attr': ref('name'),
-              // each attribute which is updated with ref must be updated separately
-              // e.g. SET 'jsonArray' = '[ ref(...), ref(...) ]' just isn't valid SQL
-              // (though it could be kind of parsed to multiple jsonb_set calls which would be insanely cool)
-              jsonArray: ref('name').castJson(),
-            })
-            .where('id', 1)
-            .returning('*')
-            .then((result) => {
-              expect(result).to.eql([
-                {
-                  id: 1,
-                  name: '1',
-                  jsonObject: { attr: 'test1' },
-                  jsonArray: 'test1',
-                },
-              ]);
-            });
-        });
+        itPostgres(
+          'should be able to update internal field of json column and allow ref() syntax',
+          () => {
+            // should do something like:
+            // update 'ModelJson' set
+            //   'jsonArray' = jsonb_set('[]', '{0}', to_jsonb('name'), true),
+            //   'jsonObject' = jsonb_set('jsonObject', '{attr}', to_jsonb('name'), true),
+            //   'name' = 'jsonArray'#>>'{0}' where 'id' = 1 returning *;
+            return BoundModel.query()
+              .update({
+                name: ref('jsonArray:[0]').castText(),
+                'jsonObject:attr': ref('name'),
+                // each attribute which is updated with ref must be updated separately
+                // e.g. SET 'jsonArray' = '[ ref(...), ref(...) ]' just isn't valid SQL
+                // (though it could be kind of parsed to multiple jsonb_set calls which would be insanely cool)
+                jsonArray: ref('name').castJson(),
+              })
+              .where('id', 1)
+              .returning('*')
+              .then((result) => {
+                expect(result).to.eql([
+                  {
+                    id: 1,
+                    name: '1',
+                    jsonObject: { attr: 'test1' },
+                    jsonArray: 'test1',
+                  },
+                ]);
+              });
+          },
+        );
 
-        it('should be able to patch internal field of json column and allow ref() syntax', () => {
-          // same stuff that with patch but different api method
-          return BoundModel.query()
-            .patch({
-              name: ref('jsonArray:[0]').castText(),
-              'jsonObject:attr': ref('name'),
-              jsonArray: ref('name').castJson(),
-            })
-            .where('id', 1)
-            .returning('*')
-            .then((result) => {
-              expect(result).to.eql([
-                {
-                  id: 1,
-                  name: '1',
-                  jsonObject: { attr: 'test1' },
-                  jsonArray: 'test1',
-                },
-              ]);
-            });
-        });
+        itPostgres(
+          'should be able to patch internal field of json column and allow ref() syntax',
+          () => {
+            // same stuff that with patch but different api method
+            return BoundModel.query()
+              .patch({
+                name: ref('jsonArray:[0]').castText(),
+                'jsonObject:attr': ref('name'),
+                jsonArray: ref('name').castJson(),
+              })
+              .where('id', 1)
+              .returning('*')
+              .then((result) => {
+                expect(result).to.eql([
+                  {
+                    id: 1,
+                    name: '1',
+                    jsonObject: { attr: 'test1' },
+                    jsonArray: 'test1',
+                  },
+                ]);
+              });
+          },
+        );
 
         it('should be able to patch internal field of json column using an array literal', () => {
           return BoundModel.query()
@@ -361,6 +380,67 @@ module.exports = (session) => {
             });
         });
 
+        it('should create the object when patching a field of a NULL column', async () => {
+          await BoundModel.knex()('ModelJson')
+            .update({ jsonObject: null, jsonArray: null })
+            .where('id', 1);
+          await BoundModel.query()
+            .patch({ 'jsonObject:a': 1, 'jsonObject:b': { c: 'x' }, 'jsonArray:[0]': 'first' })
+            .where('id', 1);
+
+          const [row1, row2] = await BoundModel.query().whereIn('id', [1, 2]).orderBy('id');
+          expect(row1.jsonObject).to.eql({ a: 1, b: { c: 'x' } });
+          expect(row1.jsonArray).to.eql(['first']);
+          expect(row2.jsonObject).to.eql({ attr: 2 });
+        });
+
+        it('should patch nested fields and array items', async () => {
+          await BoundModel.query()
+            .patch({ jsonObject: { a: { b: [1, 2] } }, jsonArray: [1, 2, 3] })
+            .where('id', 1);
+          await BoundModel.query()
+            .patch({ 'jsonObject:a.b[1]': true, 'jsonObject:a.c': null, 'jsonArray:[1]': 'two' })
+            .where('id', 1);
+
+          const row = await BoundModel.query().findById(1);
+          expect(row.jsonObject).to.eql({ a: { b: [1, true], c: null } });
+          expect(row.jsonArray).to.eql([1, 'two', 3]);
+        });
+
+        it('should cast field values', async () => {
+          await BoundModel.query()
+            .patch({ jsonObject: { s: 'Abc', n: '12', f: 1.5, t: true, z: false } })
+            .where('id', 1);
+
+          const row = await BoundModel.query()
+            .select(
+              ref('jsonObject:s').as('json'),
+              ref('jsonObject:s').castText().as('text'),
+              ref('jsonObject:n').castInt().as('int'),
+              ref('jsonObject:f').castDecimal().as('decimal'),
+              ref('jsonObject:t').castBool().as('t'),
+              ref('jsonObject:z').castBool().as('z'),
+              ref('jsonObject:missing').castBool().as('missing'),
+            )
+            .findById(1);
+
+          expect(row.json).to.equal('Abc');
+          expect(row.text).to.equal('Abc');
+          expect(row.int).to.equal(12);
+          expect(Number(row.decimal)).to.equal(1.5);
+          expect(Boolean(row.t)).to.equal(true);
+          expect(Boolean(row.z)).to.equal(false);
+          expect(row.missing).to.equal(null);
+
+          expectIdsEqual(
+            await BoundModel.query().whereIn(ref('jsonObject:n').castInt(), [12, 13]),
+            [1],
+          );
+          expectIdsEqual(await BoundModel.query().where(ref('jsonObject:s').castText(), 'Abc'), [
+            1,
+          ]);
+        });
+
         it('should be able to patch fields using $query().patch()', () => {
           return BoundModel.query()
             .findById(1)
@@ -383,7 +463,7 @@ module.exports = (session) => {
             });
         });
 
-        it('should not have the json reference property in the result object', async () => {
+        itPostgres('should not have the json reference property in the result object', async () => {
           const item = await BoundModel.query().findById(1);
           await item.$query().patch({ 'jsonObject:attr': 'bar' }).returning('*');
           expect(item).to.eql({
@@ -396,7 +476,7 @@ module.exports = (session) => {
       });
     });
 
-    describe('QueryBuilder JSON queries', () => {
+    (session.isPostgres() ? describe : describe.skip)('QueryBuilder JSON queries', () => {
       let complexJsonObj;
 
       before(() => {
@@ -1503,7 +1583,7 @@ module.exports = (session) => {
             expectIdsEqual(await BoundModel.query().whereNotNull(ref(expr)), [1]);
           });
 
-          it('whereJson* methods', async () => {
+          itPostgres('whereJson* methods', async () => {
             expectIdsEqual(await BoundModel.query().whereJsonIsObject(expr), [1]);
             expectIdsEqual(await BoundModel.query().whereJsonNotObject(expr), [2]);
             expectIdsEqual(await BoundModel.query().whereJsonSupersetOf(expr, { n: i }), [1]);
@@ -1511,7 +1591,7 @@ module.exports = (session) => {
             expectIdsEqual(await BoundModel.query().where(ref(`${expr}.n`), '=', i), [1]);
           });
 
-          it('whereJsonHasAny and whereJsonHasAll with the key as a value', async () => {
+          itPostgres('whereJsonHasAny and whereJsonHasAll with the key as a value', async () => {
             expectIdsEqual(await BoundModel.query().whereJsonHasAny('jsonObject', key), [1]);
             expectIdsEqual(await BoundModel.query().whereJsonHasAll('jsonObject', [key, 'a?b']), [
               1,
@@ -1539,7 +1619,7 @@ module.exports = (session) => {
         });
       });
 
-      it('works with standard_conforming_strings = off', async () => {
+      itPostgres('works with standard_conforming_strings = off', async () => {
         await session.knex.transaction(async (trx) => {
           await trx.raw('SET LOCAL standard_conforming_strings = off');
 

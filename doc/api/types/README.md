@@ -134,7 +134,7 @@ This page contains the documentation of all other types and classes than [Model]
 
 ## `type` FieldExpression
 
-Field expressions are strings that allow you to refer to JSONB fields inside columns.
+Field expressions are strings that allow you to refer to fields inside JSON columns. They work on postgres (`jsonb` columns) and MySQL (`json` columns).
 
 Syntax: `<column reference>[:<json field reference>]`
 
@@ -177,7 +177,25 @@ await Person.query()
   .where('age', '>', ref('someTable.ageLimit'));
 ```
 
-In the above example, we assume `persons` table has a column named `jsonColumn` of type `jsonb` (only works on postgres).
+In the above example, we assume `persons` table has a column named `jsonColumn` of type `jsonb` on postgres or `json` on MySQL.
+
+Field expressions can also be used as keys in [patch](/api/query-builder/mutate-methods.html#patch), [update](/api/query-builder/mutate-methods.html#update) and `onConflict().merge()` to change a single field. A `NULL` column is treated as an empty object (or array, if the path starts with an index):
+
+```js
+await Notification.query()
+  .patch({ 'payload:courseName': 'Physics' })
+  .where(ref('payload:courseId').castInt(), 5);
+```
+
+| SQL                 | postgres                                | MySQL                                              |
+| ------------------- | --------------------------------------- | -------------------------------------------------- |
+| `ref('payload:a')`  | `"payload"#>'{a}'`                      | `JSON_EXTRACT(payload, '$."a"')`                   |
+| `.castText()`       | `CAST("payload"#>>'{a}' AS text)`       | `JSON_UNQUOTE(JSON_EXTRACT(payload, '$."a"'))`     |
+| `.castInt()`        | `CAST("payload"#>>'{a}' AS integer)`    | `CAST(JSON_UNQUOTE(JSON_EXTRACT(…)) AS SIGNED)`    |
+| `.castBool()`       | `CAST("payload"#>>'{a}' AS boolean)`    | `(JSON_UNQUOTE(JSON_EXTRACT(…)) IN ('true', '1'))` |
+| patch `'payload:a'` | `jsonb_set(COALESCE(payload, '{}'), …)` | `JSON_SET(COALESCE(payload, JSON_OBJECT()), …)`    |
+
+On MySQL the casts use MySQL's types: `castInt()` and `castBigInt()` cast to `SIGNED`, `castText()` to `CHAR`, `castDecimal()` to `DECIMAL(65,30)`, `castReal()` to `DOUBLE` and `castJson()` to `JSON`. `castText()` of a JSON field doesn't cast at all, so the value keeps the same case sensitive collation as MySQL's `->>` operator.
 
 ## `type` RelationExpression
 

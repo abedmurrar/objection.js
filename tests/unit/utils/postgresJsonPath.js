@@ -161,7 +161,7 @@ describe('postgresJsonPath', () => {
       ).to.equal(`select "Model".* from "Model" where CAST("data"#>>'{a,b,1}' AS text) = 'x'`);
 
       expect(TestModel.query(pg).patch({ 'data:a.b': 1 }).toKnexQuery().toString()).to.equal(
-        `update "Model" set "data" = jsonb_set("data", '{a,b}', '1', true)`,
+        `update "Model" set "data" = jsonb_set(COALESCE("data", '{}'::jsonb), '{a,b}', '1', true)`,
       );
 
       expect(
@@ -188,7 +188,7 @@ describe('postgresJsonPath', () => {
       expect(native.bindings).to.eql([1]);
 
       expect(TestModel.query(pg).patch({ 'data:a?b': 1 }).toKnexQuery().toSQL().toNative()).to.eql({
-        sql: `update "Model" set "data" = jsonb_set("data", '{a?b}', $1, true)`,
+        sql: `update "Model" set "data" = jsonb_set(COALESCE("data", '{}'::jsonb), '{a?b}', $1, true)`,
         bindings: ['1'],
       });
 
@@ -198,11 +198,13 @@ describe('postgresJsonPath', () => {
     });
 
     it('should throw for field expressions on other databases', () => {
-      expect(() => TestModel.query(mysql).where(ref('data:a'), 1).toKnexQuery()).to.throwException(
-        /only supported on postgres/,
+      const sqlite = Knex({ client: 'sqlite3', useNullAsDefault: true });
+
+      expect(() => TestModel.query(sqlite).where(ref('data:a'), 1).toKnexQuery()).to.throwException(
+        /only supported on postgres and mysql/,
       );
-      expect(() => TestModel.query(mysql).patch({ 'data:a': 1 }).toKnexQuery()).to.throwException(
-        /only supported on postgres/,
+      expect(() => TestModel.query(sqlite).patch({ 'data:a': 1 }).toKnexQuery()).to.throwException(
+        /only supported on postgres and mysql/,
       );
       expect(() => TestModel.query(mysql).whereJsonIsArray('data').toKnexQuery()).to.throwException(
         /only supported on postgres/,

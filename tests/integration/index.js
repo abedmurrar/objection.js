@@ -93,8 +93,11 @@ describe('integration tests', () => {
       require('./toKnexQuery')(session);
       require('./relationOwnerGrouping')(session);
 
-      if (session.isPostgres()) {
+      if (session.isPostgres() || session.isMySql()) {
         require('./jsonQueries')(session);
+      }
+
+      if (session.isPostgres()) {
         require('./jsonRelations')(session);
       }
     });
