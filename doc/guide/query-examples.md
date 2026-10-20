@@ -111,6 +111,27 @@ and exists (
 order by "persons"."lastName" asc
 ```
 
+Model classes can be used in place of table names in joins, `from` and the other methods that take a table. Use `Model.ref()` to refer to their columns, also inside join callbacks. An object maps an alias to a model class:
+
+```js
+const people = await Person.query()
+  .innerJoin(Animal, Animal.ref('ownerId'), Person.ref('id'))
+  .leftJoin(Movie, (join) => {
+    join.on(Movie.ref('directorId'), Person.ref('id')).andOnVal(Movie.ref('year'), '>', 2000);
+  })
+  .innerJoin({ parent: Person }, 'parent.id', Person.ref('parentId'));
+```
+
+```sql
+select "persons".*
+from "persons"
+inner join "animals" on "animals"."ownerId" = "persons"."id"
+left join "movies" on "movies"."directorId" = "persons"."id" and "movies"."year" > 2000
+inner join "persons" as "parent" on "parent"."id" = "persons"."parentId"
+```
+
+`Model.ref()` refers to the table of the model, or to the alias set with [alias](/api/query-builder/other-methods.html#alias) or `from({ alias: Model })` for the root model. Refer to the columns of an aliased join with `ref('parent.id')`.
+
 In addition to knex methods, the [QueryBuilder](/api/query-builder/) has a lot of helpers for dealing with relations like the [joinRelated](/api/query-builder/join-methods.html#joinrelated) method:
 
 ```js

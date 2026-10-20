@@ -127,7 +127,16 @@ declare namespace Objection {
   type Raw = RawBuilder | Knex.Raw;
   type Operator = string;
   type ColumnRef = string | Raw | ReferenceBuilder;
-  type TableRef<QB extends AnyQueryBuilder> = ColumnRef | AnyQueryBuilder | CallbackVoid<QB>;
+  /**
+   * A table: a name, a model class, a subquery, or an object that maps aliases to
+   * any of these (`{ p: Pet }`).
+   */
+  type TableRef<QB extends AnyQueryBuilder> =
+    | ColumnRef
+    | AnyQueryBuilder
+    | CallbackVoid<QB>
+    | AnyModelConstructor
+    | { [alias: string]: string | AnyModelConstructor | AnyQueryBuilder | Raw };
 
   type PrimitiveValue =
     | string
@@ -729,9 +738,102 @@ declare namespace Objection {
   interface JoinMethod<QB extends AnyQueryBuilder> {
     (table: TableRef<QB>, leftCol: ColumnRef, op: Operator, rightCol: ColumnRef): QB;
     (table: TableRef<QB>, leftCol: ColumnRef, rightCol: ColumnRef): QB;
-    (table: TableRef<QB>, cb: CallbackVoid<Knex.JoinClause>): QB;
+    (table: TableRef<QB>, cb: CallbackVoid<JoinBuilder>): QB;
     (table: TableRef<QB>, raw: Raw): QB;
     (raw: Raw): QB;
+  }
+
+  interface CrossJoinMethod<QB extends AnyQueryBuilder> extends JoinMethod<QB> {
+    (table: TableRef<QB>): QB;
+  }
+
+  type JoinValue = PrimitiveValue | Raw | ReferenceBuilder | ValueBuilder | AnyQueryBuilder;
+
+  interface JoinOnMethod {
+    (column1: ColumnRef, column2: ColumnRef): JoinBuilder;
+    (column1: ColumnRef, operator: Operator, column2: ColumnRef): JoinBuilder;
+    (columns: { [column: string]: ColumnRef }): JoinBuilder;
+    (callback: CallbackVoid<JoinBuilder>): JoinBuilder;
+    (raw: Raw): JoinBuilder;
+  }
+
+  interface JoinOnValMethod {
+    (column: ColumnRef, value: JoinValue): JoinBuilder;
+    (column: ColumnRef, operator: Operator, value: JoinValue): JoinBuilder;
+  }
+
+  interface JoinOnInMethod {
+    (column: ColumnRef, values: readonly JoinValue[] | Raw | AnyQueryBuilder): JoinBuilder;
+  }
+
+  interface JoinOnNullMethod {
+    (column: ColumnRef): JoinBuilder;
+  }
+
+  interface JoinOnExistsMethod {
+    (query: CallbackVoid<AnyQueryBuilder> | AnyQueryBuilder): JoinBuilder;
+  }
+
+  interface JoinOnBetweenMethod {
+    (column: ColumnRef, range: readonly [JoinValue, JoinValue]): JoinBuilder;
+  }
+
+  interface JoinOnJsonPathEqualsMethod {
+    (
+      columnFirst: ColumnRef,
+      jsonPathFirst: string,
+      columnSecond: ColumnRef,
+      jsonPathSecond: string,
+    ): JoinBuilder;
+  }
+
+  /**
+   * The builder passed to join callbacks. Unlike knex's `JoinClause`, every column can
+   * be a `ref()` or `Model.ref()`.
+   */
+  export interface JoinBuilder {
+    on: JoinOnMethod;
+    andOn: JoinOnMethod;
+    orOn: JoinOnMethod;
+
+    onVal: JoinOnValMethod;
+    andOnVal: JoinOnValMethod;
+    orOnVal: JoinOnValMethod;
+
+    onIn: JoinOnInMethod;
+    andOnIn: JoinOnInMethod;
+    orOnIn: JoinOnInMethod;
+    onNotIn: JoinOnInMethod;
+    andOnNotIn: JoinOnInMethod;
+    orOnNotIn: JoinOnInMethod;
+
+    onNull: JoinOnNullMethod;
+    andOnNull: JoinOnNullMethod;
+    orOnNull: JoinOnNullMethod;
+    onNotNull: JoinOnNullMethod;
+    andOnNotNull: JoinOnNullMethod;
+    orOnNotNull: JoinOnNullMethod;
+
+    onExists: JoinOnExistsMethod;
+    andOnExists: JoinOnExistsMethod;
+    orOnExists: JoinOnExistsMethod;
+    onNotExists: JoinOnExistsMethod;
+    andOnNotExists: JoinOnExistsMethod;
+    orOnNotExists: JoinOnExistsMethod;
+
+    onBetween: JoinOnBetweenMethod;
+    andOnBetween: JoinOnBetweenMethod;
+    orOnBetween: JoinOnBetweenMethod;
+    onNotBetween: JoinOnBetweenMethod;
+    andOnNotBetween: JoinOnBetweenMethod;
+    orOnNotBetween: JoinOnBetweenMethod;
+
+    onJsonPathEquals: JoinOnJsonPathEqualsMethod;
+    andOnJsonPathEquals: JoinOnJsonPathEqualsMethod;
+    orOnJsonPathEquals: JoinOnJsonPathEqualsMethod;
+
+    using(columns: string | readonly string[] | Raw | { [key: string]: string | Raw }): JoinBuilder;
+    type(type: string): JoinBuilder;
   }
 
   interface JoinRawMethod<QB extends AnyQueryBuilder> extends RawInterface<QB> {}
@@ -1223,7 +1325,7 @@ declare namespace Objection {
     rightOuterJoin: JoinMethod<this>;
     outerJoin: JoinMethod<this>;
     fullOuterJoin: JoinMethod<this>;
-    crossJoin: JoinMethod<this>;
+    crossJoin: CrossJoinMethod<this>;
 
     count: CountMethod<this>;
     countDistinct: CountMethod<this>;
