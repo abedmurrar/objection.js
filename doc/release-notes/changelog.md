@@ -1,6 +1,6 @@
 # Changelog
 
-Releases of `@amurrar/objection`, a fork of objection.js 3.1.5. The versions before 4.0 are the releases of objection.js.
+Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions before 4.0 are the releases of objection.js.
 
 ## Unreleased
 
