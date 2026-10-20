@@ -4,6 +4,8 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+## 4.0.0-alpha.0 (2026-10-20)
+
 ### Security
 
 - Require ajv 8.20 or newer, which fixes the advisories of ajv and its dependency fast-uri.

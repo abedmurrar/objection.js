@@ -1,6 +1,6 @@
 {
   "name": "@abedmurrar/objection",
-  "version": "3.1.5",
+  "version": "4.0.0-alpha.0",
   "description": "An SQL-friendly ORM for Node.js. A fork of objection.js with strict TypeScript types and MySQL support.",
   "main": "lib/objection.js",
   "license": "MIT",
