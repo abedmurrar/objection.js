@@ -15,6 +15,12 @@
 import Ajv, { Options as AjvOptions } from 'ajv';
 import * as dbErrors from 'db-errors';
 import { Knex } from 'knex';
+import {
+  GraphNode,
+  ParseError,
+  ParseRelationExpression,
+  UnknownGraph,
+} from './relation-expression';
 
 // Export the entire Objection namespace.
 export = Objection;
@@ -1166,6 +1172,73 @@ declare namespace Objection {
   type RelationExpression<M extends Model> = string | object;
 
   /**
+   * `E` if it's a valid relation expression for model `M`, otherwise a message
+   * that says what's wrong with it. Expressions that aren't known at compile time
+   * (like a `string`) aren't checked.
+   */
+  type CheckRelationExpression<M, E> =
+    ParseRelationExpression<E> extends infer G
+      ? G extends ParseError<infer Message>
+        ? Message
+        : G extends GraphNode
+          ? GraphErrors<M, G['children'], ''> extends infer Errors
+            ? [Errors] extends [never]
+              ? E
+              : Errors
+            : never
+          : E
+      : never;
+
+  // The errors of the nodes of a relation graph of model `M`. `Path` is the path
+  // of the parent node followed by a dot, or an empty string at the root.
+  type GraphErrors<M, Children, Path extends string> =
+    IsUncheckedModel<M> extends true
+      ? never
+      : {
+          [P in keyof Children & string]: Children[P] extends GraphNode
+            ? NodeErrors<M, Children[P], P, Path>
+            : never;
+        }[keyof Children & string];
+
+  type NodeErrors<M, N extends GraphNode, Prop extends string, Path extends string> =
+    N['rel'] extends RelationKeys<M>
+      ?
+          | ModifierErrors<RelatedModel<M, N['rel']>, N['mods'], `${Path}${Prop}`>
+          | GraphErrors<RelatedModel<M, N['rel']>, N['children'], `${Path}${Prop}.`>
+      : Path extends `${infer Parent}.`
+        ? `Unknown relation "${N['rel']}" at "${Parent}"`
+        : `Unknown relation "${N['rel']}"`;
+
+  // Modifier functions in object notation must be written for the related model.
+  type ModifierErrors<RM, Mods extends readonly unknown[], Path extends string> = {
+    [I in keyof Mods]: Mods[I] extends (qb: infer P, ...args: any[]) => any
+      ? IsAnyType<P> extends true
+        ? never
+        : P extends { ModelType: infer PM }
+          ? RM extends PM
+            ? never
+            : PM extends RM
+              ? never
+              : `The modifier of "${Path}" is for a different model than the relation`
+          : never
+      : never;
+  }[number];
+
+  // The related model of relation `K` of model `M`.
+  type RelatedModel<M, K extends keyof M> = ElementOrSelf<NonNullable<M[K]>>;
+
+  type ElementOrSelf<T> = T extends readonly (infer E)[] ? E : T;
+
+  // Models whose relations can't be known, like the related model of a relation
+  // whose `modelClass` is a module path.
+  type IsUncheckedModel<M> =
+    IsAnyType<M> extends true
+      ? true
+      : [Exclude<keyof M, keyof Model>] extends [never]
+        ? true
+        : false;
+
+  /**
    * If T is an array, returns the item type, otherwise returns T.
    */
   type ItemType<T> = T extends Array<unknown> ? T[number] : T;
@@ -1790,7 +1863,10 @@ declare namespace Objection {
   }
 
   interface JoinRelatedMethod<QB extends AnyQueryBuilder> {
-    (expr: RelationExpression<ModelType<QB>>, opt?: JoinRelatedOptions): QB;
+    <const E extends RelationExpression<ModelType<QB>>>(
+      expr: CheckRelationExpression<ModelType<QB>, E>,
+      opt?: JoinRelatedOptions,
+    ): QB;
   }
 
   interface JoinMethod<QB extends AnyQueryBuilder> {
@@ -1939,7 +2015,9 @@ declare namespace Objection {
   type ForIdValue = MaybeCompositeId | AnyQueryBuilder;
 
   interface AllowGraphMethod<QB extends AnyQueryBuilder> {
-    (expr: RelationExpression<ModelType<QB>>): QB;
+    <const E extends RelationExpression<ModelType<QB>>>(
+      expr: CheckRelationExpression<ModelType<QB>, E>,
+    ): QB;
   }
 
   interface IdentityMethod<QB extends AnyQueryBuilder> {
@@ -2492,8 +2570,14 @@ declare namespace Objection {
     unrelate(): this['~count'];
     for(ids: ForIdValue | ForIdValue[]): this;
 
-    withGraphFetched(expr: RelationExpression<M>, options?: GraphOptions): this;
-    withGraphJoined(expr: RelationExpression<M>, options?: GraphOptions): this;
+    withGraphFetched<const E extends RelationExpression<M>>(
+      expr: CheckRelationExpression<M, E>,
+      options?: GraphOptions,
+    ): this;
+    withGraphJoined<const E extends RelationExpression<M>>(
+      expr: CheckRelationExpression<M, E>,
+      options?: GraphOptions,
+    ): this;
 
     truncate(): Promise<void>;
     allowGraph: AllowGraphMethod<this>;

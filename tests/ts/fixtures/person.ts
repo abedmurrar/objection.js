@@ -19,7 +19,7 @@ export class Person extends objection.Model {
   comments?: Comment[];
   movies?: Movie[];
   age!: number;
-  parent?: Partial<Person> | null;
+  parent?: Person | null;
 
   oldLastName?: string;
 

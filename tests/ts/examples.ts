@@ -506,8 +506,8 @@ qb = qb.withSchema('schema_name');
 qb = qb.distinct('column1', 'column2', 'column3');
 qb = qb.join('tablename', 'column1', '=', 'column2');
 qb = qb.outerJoin('tablename', 'column1', '=', 'column2');
-qb = qb.joinRelated('table');
-qb = qb.joinRelated('table', { alias: false });
+qb = qb.joinRelated('pets');
+qb = qb.joinRelated('pets', { alias: false });
 qb = qb.where(raw('random()', 1, '2'));
 qb = qb.where(raw('random()', 1, '2'), '=', Person.knex().raw('foo'));
 qb = qb.where(Person.raw('random()', 1, '2', raw('3')));
@@ -706,7 +706,7 @@ const patchedModels: PromiseLike<Person>[] = [
   qb.patchAndFetchById(123, { firstName: qb.select('lastname') }),
 ];
 
-const rowsEager: PromiseLike<Person[]> = Person.query().withGraphFetched('foo.bar', {
+const rowsEager: PromiseLike<Person[]> = Person.query().withGraphFetched('pets.owner', {
   joinOperation: 'innerJoin',
 });
 
@@ -720,6 +720,8 @@ const rowsEager2: PromiseLike<Person[]> = Person.query().withGraphFetched({
   },
 });
 
+// Relation names are checked.
+// @ts-expect-error
 const rowsEager3: PromiseLike<Person[]> = Person.query().withGraphFetched({
   foo: {
     bar: true,
@@ -728,9 +730,9 @@ const rowsEager3: PromiseLike<Person[]> = Person.query().withGraphFetched({
 
 const children: PromiseLike<Person[]> = Person.query()
   .skipUndefined()
-  .allowGraph('[pets, parent, children.[pets, movies.actors], movies.actors.pets]')
+  .allowGraph('[pets, mom, children.[pets, movies.actors], movies.actors.pets]')
   .allowGraph({ pets: true })
-  .allowGraph({ parent: true })
+  .allowGraph({ mom: true })
   .withGraphFetched('children')
   .where('age', '>=', 42);
 
