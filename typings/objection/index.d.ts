@@ -1301,10 +1301,10 @@ declare namespace Objection {
    */
   type RelatedQueryBuilder<T> = T extends Model
     ? // A to-one relation query returns `undefined` if there is no related model.
-      MaybeSingleQueryBuilder<QueryBuilderType<T>>
+      MaybeSingleQueryBuilder<RowQueryBuilder<QueryBuilderType<T>, T>>
     : T extends Array<infer I>
       ? I extends Model
-        ? QueryBuilderType<I>
+        ? RowQueryBuilder<QueryBuilderType<I>, I>
         : never
       : never;
 
@@ -1314,10 +1314,10 @@ declare namespace Objection {
    * an array of models.
    */
   type ArrayRelatedQueryBuilder<T> = T extends Model
-    ? QueryBuilderType<T>
+    ? RowQueryBuilder<QueryBuilderType<T>, T>
     : T extends Array<infer I>
       ? I extends Model
-        ? QueryBuilderType<I>
+        ? RowQueryBuilder<QueryBuilderType<I>, I>
         : never
       : never;
 
@@ -1373,9 +1373,65 @@ declare namespace Objection {
     // The type of the result items, for example `Person` when the result is
     // `Person[]`, `Person | undefined` or `Page<Person>`.
     item: unknown;
+    // True when something ran that may have loaded relations the types can't
+    // see, like a modifier that doesn't return the query builder.
+    opaque: boolean;
   }
 
-  type QueryBuilderItemState<T> = { item: T };
+  type QueryBuilderItemState<T, O extends boolean = false> = { item: T; opaque: O };
+
+  /**
+   * A model as a query returns it: without the relations the query didn't load.
+   * Loaded relations are added by `withGraphFetched()` and the other graph methods.
+   *
+   * Models that declare a relation as required (`pets!: Pet[]` instead of
+   * `pets?: Pet[]`) keep their relations, since rows without them couldn't be
+   * used where the model is expected.
+   */
+  export type ModelRow<M> = [RequiredRelationKeys<M>] extends [never] ? Row<M> : M;
+
+  type RequiredRelationKeys<M> = {
+    [K in RelationKeys<M>]: {} extends Pick<M, K> ? never : K;
+  }[RelationKeys<M>];
+
+  type Row<M> = { [K in keyof M as K extends RelationKeys<M> ? never : K]: M[K] };
+
+  // The keys of the relation properties of `M`. Unlike `ModelRelations`, this
+  // ignores properties typed as `any`.
+  type RelationKeys<M> = {
+    [K in keyof M]-?: IsAnyType<M[K]> extends true
+      ? never
+      : NonNullable<M[K]> extends Model | readonly Model[]
+        ? K
+        : never;
+  }[keyof M];
+
+  // Adds back the relations of `M` that `I` doesn't have, as optional
+  // properties, for results that may contain relations the types can't see.
+  // A row without loaded relations becomes the model itself.
+  type MakeOpaque<I, M> = [Exclude<RelationKeys<M>, keyof I>] extends [never]
+    ? I
+    : [Exclude<keyof I, keyof M> | Extract<keyof I, RelationKeys<M>>] extends [never]
+      ? M
+      : I & { [K in Exclude<RelationKeys<M>, keyof I>]?: M[K] };
+
+  // The query builder `QB` after something ran that may have loaded relations
+  // the types can't see.
+  type OpaqueQueryBuilder<QB extends AnyQueryBuilder> = QB['~state']['opaque'] extends true
+    ? QB
+    : RebindQueryBuilder<
+        QB,
+        ModelType<QB>,
+        ReplaceResultItem<ResultType<QB>, MakeOpaque<QB['~state']['item'], ModelType<QB>>>,
+        QueryBuilderItemState<MakeOpaque<QB['~state']['item'], ModelType<QB>>, true>
+      >;
+
+  // The query builder `QB` for model `M` with rows as the result items.
+  type RowQueryBuilder<
+    QB extends AnyQueryBuilder,
+    M extends Model,
+    I = ModelRow<M>,
+  > = RebindQueryBuilder<QB, M, I[], QueryBuilderItemState<I>>;
 
   /**
    * The state of a query builder whose result type `R` was given explicitly,
@@ -1448,24 +1504,25 @@ declare namespace Objection {
    * This is based on the static `QueryBuilder` property, which decides the
    * query builder class at runtime.
    */
-  type ModelClassQueryBuilder<MC, M extends Model> = MC extends {
+  // `I` is the type of the rows.
+  type ModelClassQueryBuilder<MC, M extends Model, I = ModelRow<M>> = MC extends {
     QueryBuilder: { prototype: infer QB };
   }
     ? keyof QueryBuilderType<M> extends keyof QB
       ? // The static `QueryBuilder` creates query builders of the declared
         // `QueryBuilderType` (only the keys are compared, which is much faster).
-        QueryBuilderType<M>
+        RowQueryBuilder<QueryBuilderType<M>, M, I>
       : // `QueryBuilderType` was declared, but the static `QueryBuilder` creates
         // some other query builders. Trust the class that is used at runtime.
-        InitialQueryBuilder<QB, M>
-    : QueryBuilderType<M>;
+        InitialQueryBuilder<QB, M, I>
+    : RowQueryBuilder<QueryBuilderType<M>, M, I>;
 
-  type InitialQueryBuilder<QB, M extends Model> = QB extends { '~rebind': any }
-    ? (QB['~rebind'] & { '~args': [M, M[], { item: M }] })['~rebind']
+  type InitialQueryBuilder<QB, M extends Model, I> = QB extends { '~rebind': any }
+    ? (QB['~rebind'] & { '~args': [M, I[], QueryBuilderItemState<I>] })['~rebind']
     : QB;
 
   interface ForClassMethod {
-    <M extends Model>(modelClass: ModelConstructor<M>): QueryBuilderType<M>;
+    <M extends Model>(modelClass: ModelConstructor<M>): RowQueryBuilder<QueryBuilderType<M>, M>;
   }
 
   /**
@@ -1965,7 +2022,7 @@ declare namespace Objection {
       QB,
       ModelType<QB>,
       RunAfterResult<T>,
-      { item: ResultItemOf<RunAfterResult<T>, ModelType<QB>> }
+      QueryBuilderItemState<ResultItemOf<RunAfterResult<T>, ModelType<QB>>>
     >;
   }
 
@@ -1994,18 +2051,19 @@ declare namespace Objection {
     allowRefs?: boolean;
   }
 
+  // The result of a graph insert or upsert has the relations of the input graph.
   interface InsertGraphMethod<M extends Model> {
     <QB extends AnyQueryBuilder>(
       this: QB,
       graph: PartialModelGraph<M>,
       options?: InsertGraphOptions,
-    ): SingleQueryBuilder<QB>;
+    ): SingleQueryBuilder<OpaqueQueryBuilder<QB>>;
 
     <QB extends AnyQueryBuilder>(
       this: QB,
       graph: PartialModelGraph<M>[],
       options?: InsertGraphOptions,
-    ): ArrayQueryBuilder<QB>;
+    ): ArrayQueryBuilder<OpaqueQueryBuilder<QB>>;
   }
 
   export interface UpsertGraphOptions {
@@ -2026,13 +2084,13 @@ declare namespace Objection {
       this: QB,
       graph: PartialModelGraph<M>[],
       options?: UpsertGraphOptions,
-    ): ArrayQueryBuilder<QB>;
+    ): ArrayQueryBuilder<OpaqueQueryBuilder<QB>>;
 
     <QB extends AnyQueryBuilder>(
       this: QB,
       graph: PartialModelGraph<M>,
       options?: UpsertGraphOptions,
-    ): SingleQueryBuilder<QB>;
+    ): SingleQueryBuilder<OpaqueQueryBuilder<QB>>;
   }
 
   interface GraphExpressionObjectMethod<QB extends AnyQueryBuilder> {
@@ -2085,16 +2143,18 @@ declare namespace Objection {
       : unknown
     : unknown;
 
+  // Modifiers may load relations the types can't see, so the result may contain
+  // any relation of the model.
   interface ModifyMethod<QB extends AnyQueryBuilder> {
-    (modifier: (qb: QB) => unknown): QB;
+    (modifier: (qb: QB) => unknown): OpaqueQueryBuilder<QB>;
     <F extends (qb: any, ...args: any[]) => unknown>(
       modifier: F & CheckModifierModel<QB, F>,
       ...args: ModifierArgs<F>
-    ): QB;
+    ): OpaqueQueryBuilder<QB>;
     (
       modifier: Exclude<Modifier<QB>, ModifierFunction<any>> | Modifier<QB>[],
       ...args: unknown[]
-    ): QB;
+    ): OpaqueQueryBuilder<QB>;
   }
 
   interface ModifiersMethod<QB extends AnyQueryBuilder> {
@@ -2371,8 +2431,8 @@ declare namespace Objection {
     execute(): Promise<R>;
     castTo<MC extends Model>(
       modelClass: ModelConstructor<MC>,
-    ): RebindQueryBuilder<this, MC, ReplaceResultItem<R, MC>, { item: MC }>;
-    castTo<T>(): RebindQueryBuilder<this, M, T, { item: ResultItemOf<T, M> }>;
+    ): RebindQueryBuilder<this, MC, ReplaceResultItem<R, MC>, QueryBuilderItemState<MC>>;
+    castTo<T>(): RebindQueryBuilder<this, M, T, QueryBuilderItemState<ResultItemOf<T, M>>>;
 
     // For generic code (like custom query builder methods) where the model type
     // isn't known: `this.update<{ deletedAt: Date }>({ deletedAt: new Date() })`.
@@ -2740,6 +2800,10 @@ declare namespace Objection {
               RelationExtraProps<Mapping>
             >,
             Model
+          >,
+          WithRelationExtraProps<
+            ModelRow<ModelInstance<RelatedModelClassOf<C>>>,
+            RelationExtraProps<Mapping>
           >
         >
     : QueryBuilder<Model>;
@@ -2991,14 +3055,14 @@ declare namespace Objection {
     relatedQuery<K extends keyof M>(
       relationName: K,
       trxOrKnex?: TransactionOrKnex,
-    ): ArrayRelatedQueryBuilder<M[K]>;
+    ): NoInfer<ArrayRelatedQueryBuilder<M[K]>>;
 
     // For relation names that can't be checked. The model type of the
     // relation must be given explicitly: `relatedQuery<Pet>(relationName)`.
     relatedQuery<RM extends Model = never>(
       relationName: [RM] extends [never] ? UnknownRelationName : string,
       trxOrKnex?: TransactionOrKnex,
-    ): QueryBuilderType<RM>;
+    ): RowQueryBuilder<QueryBuilderType<RM>, RM>;
 
     fromJson(json: object, opt?: ModelOptions): M;
     fromDatabaseJson(json: object): M;
@@ -3127,14 +3191,14 @@ declare namespace Objection {
       this: ConstructorType<M>,
       relationName: K,
       trxOrKnex?: TransactionOrKnex,
-    ): ArrayRelatedQueryBuilder<M[K]>;
+    ): NoInfer<ArrayRelatedQueryBuilder<M[K]>>;
 
     // For relation names that can't be checked. The model type of the
     // relation must be given explicitly: `relatedQuery<Pet>(relationName)`.
     static relatedQuery<RM extends Model = never>(
       relationName: [RM] extends [never] ? UnknownRelationName : string,
       trxOrKnex?: TransactionOrKnex,
-    ): QueryBuilderType<RM>;
+    ): RowQueryBuilder<QueryBuilderType<RM>, RM>;
 
     static fromJson<MC extends Constructor<Model>>(
       this: MC,
@@ -3215,14 +3279,14 @@ declare namespace Objection {
     $relatedQuery<K extends keyof this>(
       relationName: K,
       trxOrKnex?: TransactionOrKnex,
-    ): RelatedQueryBuilder<this[K]>;
+    ): NoInfer<RelatedQueryBuilder<this[K]>>;
 
     // For relation names that can't be checked. The model type of the
     // relation must be given explicitly: `$relatedQuery<Pet>(relationName)`.
     $relatedQuery<RM extends Model = never>(
       relationName: [RM] extends [never] ? UnknownRelationName : string,
       trxOrKnex?: TransactionOrKnex,
-    ): QueryBuilderType<RM>;
+    ): RowQueryBuilder<QueryBuilderType<RM>, RM>;
 
     $query(trxOrKnex?: TransactionOrKnex): SingleQueryBuilder<QueryBuilderType<this>>;
 

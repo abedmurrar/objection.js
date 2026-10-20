@@ -7,6 +7,7 @@ import {
   ModelInstance,
   ModelProps,
   ModelRelations,
+  ModelRow,
   RelationsOf,
   defineRelations,
 } from '../../../';
@@ -150,65 +151,74 @@ class Course extends BaseModel {
   }));
 }
 
-type UserRow = ModelInstance<typeof User>;
-type PetRow = ModelInstance<typeof Pet>;
-type CourseRow = ModelInstance<typeof Course>;
+type UserModel = ModelInstance<typeof User>;
+type PetModel = ModelInstance<typeof Pet>;
+type CourseModel = ModelInstance<typeof Course>;
 
 async () => {
-  const user = await User.query().findById(1).throwIfNotFound();
+  // Query results only have the relations the query loaded.
+  const row = await User.query().findById(1).throwIfNotFound();
+  expectType<ModelRow<UserModel>>()(row);
+  // @ts-expect-error
+  row.pets;
+  // Rows can be used where the model is expected.
+  const asModel: UserModel = row;
 
-  expectType<UserRow>()(user);
-  expectType<PetRow[] | undefined>()(user.pets);
-  expectType<UserRow | null | undefined>()(user.mom);
-  expectType<CourseRow[] | undefined>()(user.courses);
-  expectType<CourseRow | null | undefined>()(user.firstCourse);
+  const user = User.fromJson({ name: 'Jennifer' });
+
+  expectType<UserModel>()(user);
+  expectType<PetModel[] | undefined>()(user.pets);
+  expectType<UserModel | null | undefined>()(user.mom);
+  expectType<CourseModel[] | undefined>()(user.courses);
+  expectType<CourseModel | null | undefined>()(user.firstCourse);
   expectType<Model[] | undefined>()(user.webhooks);
   expectType<Model | null | undefined>()(user.required);
 
   // The related models have their inferred relations too.
-  expectType<UserRow | null | undefined>()(user.pets?.[0].owner);
+  expectType<UserModel | null | undefined>()(user.pets?.[0].owner);
   expectType<string | undefined>()(user.pets?.[0].owner?.mom?.name);
 
   // Extra columns of many-to-many relations.
-  const course = await Course.query().findById(1).throwIfNotFound();
-  expectType<(UserRow & { role: 'admin' | 'member'; joinedAt: Date })[] | undefined>()(
+  const course = Course.fromJson({});
+  expectType<(UserModel & { role: 'admin' | 'member'; joinedAt: Date })[] | undefined>()(
     course.users,
   );
-  expectType<(UserRow & { adminSince: unknown })[] | undefined>()(course.admins);
+  expectType<(UserModel & { adminSince: unknown })[] | undefined>()(course.admins);
 
   // @ts-expect-error
   user.notARelation;
 };
 
 // Relations aren't columns.
-type _1 = Expect<Equal<ModelProps<UserRow>, 'id' | 'name' | 'momId'>>;
+type _1 = Expect<Equal<ModelProps<UserModel>, 'id' | 'name' | 'momId'>>;
 type _2 = Expect<
   Equal<
-    ModelRelations<UserRow>,
+    ModelRelations<UserModel>,
     'pets' | 'mom' | 'courses' | 'firstCourse' | 'webhooks' | 'required'
   >
 >;
 
 // `relatedQuery` uses the inferred relations and the related model's query builder.
 async () => {
-  expectType<PetRow[]>()(await User.relatedQuery('pets').for(1).active());
-  expectType<PetRow | undefined>()(await User.relatedQuery('pets').for(1).active().first());
-  expectType<UserRow[]>()(await Pet.relatedQuery('owner').for(1));
-  expectType<(UserRow & { role: 'admin' | 'member'; joinedAt: Date })[]>()(
+  expectType<ModelRow<PetModel>[]>()(await User.relatedQuery('pets').for(1).active());
+  expectType<ModelRow<PetModel> | undefined>()(
+    await User.relatedQuery('pets').for(1).active().first(),
+  );
+  expectType<ModelRow<UserModel>[]>()(await Pet.relatedQuery('owner').for(1));
+  expectType<(ModelRow<UserModel> & { role: 'admin' | 'member'; joinedAt: Date })[]>()(
     await Course.relatedQuery('users').for(1),
   );
-  expectType<Model[]>()(await User.relatedQuery('webhooks').for(1));
+  expectType<ModelRow<Model>[]>()(await User.relatedQuery('webhooks').for(1));
 
   // @ts-expect-error
   User.relatedQuery('nope');
 
-  // Models fetched from the database have the relation properties, so their
-  // `$relatedQuery()` is typed too.
+  // `$relatedQuery()` of models fetched from the database is typed too.
   const user = await User.query().findById(1).throwIfNotFound();
-  expectType<PetRow[]>()(await user.$relatedQuery('pets').active());
+  expectType<ModelRow<PetModel>[]>()(await user.$relatedQuery('pets').active());
 
   // `fromJson()` too.
-  expectType<UserRow>()(User.fromJson({ name: 'Jennifer' }));
+  expectType<UserModel>()(User.fromJson({ name: 'Jennifer' }));
 };
 
 // Models can still declare relation properties. The declared types are used.
@@ -224,8 +234,8 @@ class Owner extends BaseModel {
   });
 }
 
-async () => {
-  const owner = await Owner.query().findById(1).throwIfNotFound();
+() => {
+  const owner = Owner.fromJson({});
   expectType<Pet[] | undefined>()(owner.pets);
 };
 
@@ -244,7 +254,7 @@ class Annotated extends BaseModel {
 
 async () => {
   const annotated = await Annotated.query().findById(1).throwIfNotFound();
-  type _ = Expect<Equal<typeof annotated, Annotated>>;
+  type _ = Expect<Equal<typeof annotated, ModelRow<Annotated>>>;
 };
 
 // To get the relations for instances that aren't created by objection (like
@@ -269,6 +279,6 @@ interface Organization extends RelationsOf<typeof Organization> {}
 
 () => {
   const organization = new Organization();
-  expectType<UserRow[] | undefined>()(organization.members);
+  expectType<UserModel[] | undefined>()(organization.members);
   expectType<string[]>()(organization.memberNames());
 };

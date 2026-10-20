@@ -5,6 +5,7 @@ import {
   Page,
   QueryBuilderState,
   DefaultQueryBuilderState,
+  ModelRow,
 } from '../../../';
 import { Equal, Expect, expectType } from '../_utils/expect';
 
@@ -50,38 +51,41 @@ class Person extends BaseModel {
   mom?: Person;
 }
 
+type PersonRow = ModelRow<Person>;
+type PetRow = ModelRow<Pet>;
+
 async () => {
   // The custom query builder is kept for every result kind.
-  expectType<Person[]>()(await Person.query().active());
-  expectType<Person | undefined>()(await Person.query().active().first().active());
-  expectType<Person | undefined>()(await Person.query().findById(1).active());
-  expectType<Person | undefined>()(await Person.query().findOne({ firstName: 'a' }).active());
-  expectType<Person>()(await Person.query().findById(1).throwIfNotFound().active());
-  expectType<Person>()(await Person.query().active().first().throwIfNotFound().active());
-  expectType<Person[]>()(await Person.query().active().throwIfNotFound().active());
-  expectType<Page<Person>>()(await Person.query().active().page(0, 10).active());
-  expectType<Page<Person>>()(await Person.query().active().range(0, 10).active());
+  expectType<PersonRow[]>()(await Person.query().active());
+  expectType<PersonRow | undefined>()(await Person.query().active().first().active());
+  expectType<PersonRow | undefined>()(await Person.query().findById(1).active());
+  expectType<PersonRow | undefined>()(await Person.query().findOne({ firstName: 'a' }).active());
+  expectType<PersonRow>()(await Person.query().findById(1).throwIfNotFound().active());
+  expectType<PersonRow>()(await Person.query().active().first().throwIfNotFound().active());
+  expectType<PersonRow[]>()(await Person.query().active().throwIfNotFound().active());
+  expectType<Page<PersonRow>>()(await Person.query().active().page(0, 10).active());
+  expectType<Page<PersonRow>>()(await Person.query().active().range(0, 10).active());
   expectType<number>()(await Person.query().active().patch({ firstName: 'a' }).active());
   expectType<number>()(await Person.query().active().delete().active());
-  expectType<Person[]>()(await Person.query().patch({ firstName: 'a' }).returning('*').active());
-  expectType<Person | undefined>()(
+  expectType<PersonRow[]>()(await Person.query().patch({ firstName: 'a' }).returning('*').active());
+  expectType<PersonRow | undefined>()(
     await Person.query().patch({ firstName: 'a' }).returning('*').first().active(),
   );
-  expectType<Person>()(await Person.query().insert({ firstName: 'a' }).active());
-  expectType<Person[]>()(
+  expectType<PersonRow>()(await Person.query().insert({ firstName: 'a' }).active());
+  expectType<PersonRow[]>()(
     await Person.query()
       .insert([{ firstName: 'a' }])
       .active(),
   );
-  expectType<Person>()(await Person.query().patchAndFetchById(1, { firstName: 'a' }).active());
+  expectType<PersonRow>()(await Person.query().patchAndFetchById(1, { firstName: 'a' }).active());
   expectType<number>()(await Person.query().softDelete());
-  expectType<Person | undefined>()(await Person.query().firstActive());
+  expectType<PersonRow | undefined>()(await Person.query().firstActive());
 
   // Relation queries.
   const person = new Person();
-  expectType<Pet[]>()(await person.$relatedQuery('pets').active());
-  expectType<Pet | undefined>()(await person.$relatedQuery('pets').active().first().active());
-  expectType<Pet[]>()(await Person.relatedQuery('pets').for(1).active());
+  expectType<PetRow[]>()(await person.$relatedQuery('pets').active());
+  expectType<PetRow | undefined>()(await person.$relatedQuery('pets').active().first().active());
+  expectType<PetRow[]>()(await Person.relatedQuery('pets').for(1).active());
   expectType<Person>()(await person.$query().active());
 
   // `castTo<T>()` sets the result type, and later result kind changes use it.
@@ -134,7 +138,7 @@ async () => {
   Person.query()
     .findById(1)
     .modify((qb) => {
-      type _ = Expect<Equal<Awaited<typeof qb>, Person | undefined>>;
+      type _ = Expect<Equal<Awaited<typeof qb>, PersonRow | undefined>>;
       qb.active();
     });
   // A modifier for another model can't be used.
@@ -152,8 +156,8 @@ function paginate<QB extends AnyQueryBuilder>(query: QB, page: number) {
 }
 
 async () => {
-  expectType<Person | undefined>()(await onlyActive(Person.query().first()));
-  expectType<Pet[]>()(await paginate(Pet.query().active(), 1).active());
+  expectType<PersonRow | undefined>()(await onlyActive(Person.query().first()));
+  expectType<PetRow[]>()(await paginate(Pet.query().active(), 1).active());
 };
 
 // The type of `query()` comes from the static `QueryBuilder` property, which
