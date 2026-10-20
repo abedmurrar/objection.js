@@ -80,6 +80,46 @@ Use `AnyQueryBuilder<M>` as the parameter type of functions that take query buil
 
 Models that declare no columns accept any string.
 
+## typescript: Query results only have the relations the query loaded
+
+`await Person.query()` is `ModelRow<Person>[]`: the model without its relation properties. Relations loaded with `withGraphFetched()`, `withGraphJoined()` or `fetchGraph()` are added, with the type of the loaded graph. See the [relations guide](/guide/relations.html#loaded-relations).
+
+```ts
+// Before: compiled, and `user.organization` was `Organization | undefined`.
+const user = await User.query().findById(id).throwIfNotFound();
+user.organization?.name;
+
+// After: an error, since the query didn't load `organization`. Load it:
+const user = await User.query()
+  .findById(id)
+  .withGraphFetched('organization')
+  .throwIfNotFound();
+user.organization?.name; // `organization` is always there, but can be null
+```
+
+Rows can still be passed where `User` is expected. Code that reads relations the types can't see being loaded needs one of these changes:
+
+- **A modifier loads the relation.** Results after modifiers that don't return the query builder have all relations as optional properties, like before, so this keeps working. Returning the query builder from the modifier (`return query.withGraphFetched('organization')`) gives the exact type.
+- **The query is changed in place.** `query.withGraphFetched('organization')` as a separate statement doesn't change the type of `query`. Chain the call, or declare the variable with an explicit type: `const query: QueryBuilder<User> = User.query()`. Explicit types keep relations optional.
+- **The relation is set by hand.** `user.organization = org` is an error on rows. Use `user.$setRelated('organization', org)`, or the model type.
+- **`await row.$fetchGraph('pets')` and then `row.pets`.** Use the value that `$fetchGraph()` returns.
+
+Models with `private` or `protected` members, and models that declare a relation as required (`pets!: Pet[]`), keep all relations as optional properties on rows.
+
+## typescript: Relation expressions are checked
+
+The relation names in `withGraphFetched()`, `withGraphJoined()`, `fetchGraph()`, `modifyGraph()`, `allowGraph()` and `joinRelated()` must be relations of the model, both in strings (`'[pets.toys, mom]'`) and in object notation. A misspelled name is an error like `Unknown relation "toyz" at "pets"`.
+
+- Relations that work at runtime but aren't in the types need a property declaration: `memberships?: Membership[];`, or inferred `relationMappings`.
+- To skip the check for one call, pass the expression type explicitly: `withGraphFetched<string>(expression)`. Expressions typed `string` aren't checked.
+- After `castTo(Model)` relation names aren't checked, since the runtime model is still the original one.
+
+The callback of `modifyGraph()` now gets the query builder of the related model. Callbacks with a parameter type for another model are errors.
+
+## typescript: Named modifiers are checked
+
+When the static `modifiers` of a model is an object without a type annotation, or a getter, `modify('name')` and modifier names in relation expressions (`'pets(onlyDogs)'`) must be modifiers of the model, and the arguments of `modify()` are checked against the modifier. Annotate the property as `static modifiers: Modifiers = {...}` to opt out. Names added with `modifiers()` aren't known, so they aren't checked after it.
+
 ## Field expressions and `NULL` JSON columns
 
 `patch({ 'col:key': value })` on a row where `col` is `NULL` sets `col` to `{ "key": value }` (or an array, if the path starts with an index). Before, `col` stayed `NULL` on postgres.

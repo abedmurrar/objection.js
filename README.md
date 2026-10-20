@@ -1,5 +1,24 @@
-[![Tests](https://github.com/Vincit/objection.js/actions/workflows/test.yml/badge.svg)](https://github.com/Vincit/objection.js)
-[![Join the chat at https://gitter.im/Vincit/objection.js](https://badges.gitter.im/Vincit/objection.js.svg)](https://gitter.im/Vincit/objection.js?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+[![Tests](https://github.com/abedmurrar/objection.js/actions/workflows/test.yml/badge.svg)](https://github.com/abedmurrar/objection.js/actions/workflows/test.yml)
+[![npm](https://img.shields.io/npm/v/@amurrar/objection/next)](https://www.npmjs.com/package/@amurrar/objection)
+
+> **`@amurrar/objection`** is a fork of [objection.js](https://github.com/Vincit/objection.js) 3.1.5. It adds:
+>
+> - **Strict TypeScript types.** Query results contain exactly the relations that were loaded, relation expressions and modifier names are checked, and `Model.ref()` only accepts real columns.
+> - **MySQL support** for JSON field expressions and the `whereJson*` methods, `fn.*` helpers for every MySQL 8.4 function, and batch inserts.
+> - **Expressions without raw SQL**, like `Pet.ref('age').gte(3)` and `fn.count().filter(...)`, plus window functions.
+> - **Fixes** for JSON key escaping (SQL injection), `orWhere` escaping relation conditions, and `for()`.
+>
+> See the [changelog](doc/release-notes/changelog.md) and the [migration guide](doc/release-notes/migration.md).
+>
+> ```sh
+> npm install @amurrar/objection@next knex
+> ```
+>
+> To keep `import { Model } from 'objection'` working in existing code, install it under the name `objection`:
+>
+> ```sh
+> npm install objection@npm:@amurrar/objection@next
+> ```
 
 # [Objection.js](https://vincit.github.io/objection.js)
 

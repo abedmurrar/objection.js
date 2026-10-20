@@ -1,0 +1,59 @@
+name: release
+
+# Publishes to npm when a version tag is pushed. Tags are made by
+# `npm run release`; see RELEASING.md.
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  test:
+    uses: ./.github/workflows/test.yml
+
+  publish:
+    needs: test
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write # create the GitHub release
+      id-token: write # npm provenance
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check the tag
+        id: version
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "The tag $GITHUB_REF_NAME doesn't match the version $version in package.json."
+            exit 1
+          fi
+          case "$version" in
+            *-*) echo "dist-tag=next" >> "$GITHUB_OUTPUT"; echo "prerelease=true" >> "$GITHUB_OUTPUT" ;;
+            *) echo "dist-tag=latest" >> "$GITHUB_OUTPUT"; echo "prerelease=false" >> "$GITHUB_OUTPUT" ;;
+          esac
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Publish to npm
+        run: npm publish --provenance --access public --tag ${{ steps.version.outputs.dist-tag }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create the GitHub release
+        run: |
+          node scripts/changelog.js notes "${{ steps.version.outputs.version }}" > release-notes.md
+          flags=""
+          if [ "${{ steps.version.outputs.prerelease }}" = "true" ]; then flags="--prerelease"; fi
+          gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file release-notes.md $flags
+        env:
+          GH_TOKEN: ${{ github.token }}

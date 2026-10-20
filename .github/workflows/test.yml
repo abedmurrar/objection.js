@@ -5,6 +5,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_call:
 
 jobs:
   run-tests:
@@ -12,13 +13,14 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [14.x, 16.x, 18.x, 20.x, 22.x, 24.x]
+        # The test tools (mocha 11) need node 18 or newer.
+        node-version: [18.x, 20.x, 22.x, 24.x]
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
 
@@ -26,7 +28,7 @@ jobs:
         run: npm ci
 
       - name: Run docker compose
-        run: docker compose up -d
+        run: docker compose up -d --wait
 
       - name: Setup test db
         run: node setup-test-db.js

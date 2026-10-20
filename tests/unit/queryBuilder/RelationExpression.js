@@ -1,4 +1,5 @@
 const chai = require('chai');
+chai.use(require('chai-subset'));
 const expect = require('expect.js');
 const { RelationExpression } = require('../../../');
 
