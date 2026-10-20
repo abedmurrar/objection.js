@@ -357,7 +357,7 @@ How many queries can be run concurrently per connection.
 
 This doesn't limit the concurrency of the entire server. It only limits the number of concurrent queries that can be run on a single connection. By default knex connection pool size is 10, which means that the maximum number of concurrent queries started by objection is `Model.concurrency * 10`. You can also easily increase the knex pool size.
 
-The default concurrency is 4 except for mssql, for which the default is 1. The mssql default is needed because of the buggy driver that only allows one query at a time per connection.
+The default concurrency is 4 except for mssql and MySQL, for which the default is 1. The mssql default is needed because of the buggy driver that only allows one query at a time per connection. On MySQL, concurrent updates and deletes of graph operations like `upsertGraph()` can deadlock, since MySQL needs them wrapped in subqueries that lock the rows of the join tables they read.
 
 ## `static` jsonAttributes
 

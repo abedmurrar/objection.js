@@ -824,6 +824,39 @@ describe('Model', () => {
     });
   });
 
+  describe('getConcurrency', () => {
+    const Knex = require('knex');
+    const knexes = [];
+
+    function knexFor(client) {
+      const knex = Knex({ client });
+      knexes.push(knex);
+      return knex;
+    }
+
+    after(() => Promise.all(knexes.map((knex) => knex.destroy())));
+
+    it('should run one query at a time on MySQL and mssql', () => {
+      class Person extends Model {}
+
+      expect(Person.getConcurrency(knexFor('mysql2'))).to.equal(1);
+      expect(Person.getConcurrency(knexFor('mssql'))).to.equal(1);
+      expect(Person.getConcurrency(knexFor('pg'))).to.equal(4);
+      expect(Person.getConcurrency(knexFor('sqlite3'))).to.equal(4);
+      expect(Person.getConcurrency()).to.equal(4);
+    });
+
+    it('should use the concurrency of the model', () => {
+      class Person extends Model {
+        static get concurrency() {
+          return 4;
+        }
+      }
+
+      expect(Person.getConcurrency(knexFor('mysql2'))).to.equal(4);
+    });
+  });
+
   describe('ensureModel', () => {
     let Model1;
     let Model2;
