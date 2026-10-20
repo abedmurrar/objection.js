@@ -29,7 +29,7 @@ async function setup() {
 
   if (DATABASES.includes('mysql')) {
     const mysql = await createKnex({
-      client: 'mysql',
+      client: 'mysql2',
 
       connection: {
         user: 'root',

@@ -25,7 +25,8 @@ describe('integration tests', () => {
       },
     },
     {
-      client: 'mysql',
+      name: 'mysql',
+      client: 'mysql2',
       connection: {
         host: '127.0.0.1',
         user: 'objection',
@@ -50,7 +51,7 @@ describe('integration tests', () => {
       },
     },
   ].filter((it) => {
-    return DATABASES.length === 0 || DATABASES.includes(it.client);
+    return DATABASES.length === 0 || DATABASES.includes(it.name || it.client);
   });
 
   const sessions = testDatabaseConfigs.map((knexConfig) => {
@@ -58,7 +59,7 @@ describe('integration tests', () => {
       knexConfig,
     });
 
-    describe(knexConfig.client, () => {
+    describe(knexConfig.name || knexConfig.client, () => {
       before(() => {
         return session.createDb();
       });

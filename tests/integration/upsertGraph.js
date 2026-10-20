@@ -3505,7 +3505,8 @@ module.exports = (session) => {
             'model1Relation2[0].model2Relation1[1].model1Prop1',
           ];
 
-          return Promise.map(fails, (fail) => {
+          // One at a time: concurrent transactions on the same rows can deadlock on MySQL 8.
+          return Promise.mapSeries(fails, (fail) => {
             return transaction(session.knex, (trx) =>
               Model1.query(trx).upsertGraph(fail, { fetchStrategy }),
             ).catch((err) => createRejectionReflection(err));
