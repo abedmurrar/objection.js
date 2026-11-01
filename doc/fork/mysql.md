@@ -4,7 +4,7 @@ Objection 3.1.5 treated a lot of features as postgres-only. On MySQL 8.0.17 or n
 
 ## JSON field expressions
 
-[Field expressions](../api/types/README.md#type-fieldexpression) (`'column:path'`) now work on MySQL `json` columns: in selects, wheres, joins and orderBys, and as keys in `patch()`, `update()` and `onConflict().merge()`. The path is always sent as a binding.
+[Field expressions](../api/types/#type-fieldexpression) (`'column:path'`) now work on MySQL `json` columns: in selects, wheres, joins and orderBys, and as keys in `patch()`, `update()` and `onConflict().merge()`. The path is always sent as a binding.
 
 ```js
 await Notification.query()

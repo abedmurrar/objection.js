@@ -13,8 +13,8 @@ jobs:
 
     strategy:
       matrix:
-        # The test tools (mocha 11) need node 18 or newer.
-        node-version: [18.x, 20.x, 22.x, 24.x]
+        # The test tools (mocha 12, eslint 10, sqlite3 6, vitepress 2) need node 20.19 or newer.
+        node-version: [20.x, 22.x, 24.x]
 
     steps:
       - uses: actions/checkout@v4

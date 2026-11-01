@@ -4,6 +4,10 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+### Breaking changes
+
+- Node.js 20.19 or newer is required. Node.js 18 reached its end of life, and the tools the fork is tested with (mocha 12, sqlite3 6) no longer support it.
+
 ### What's new
 
 - The documentation has a [Fork additions](/fork/) section that covers only what the fork adds to objection.js 3.1.5.

@@ -12,8 +12,9 @@
     "bench:typings": "node scripts/typings-bench.js",
     "prettier": "prettier --write \"{examples,lib,tests,testUtils,typings,doc}/**/*.{js,ts}\"",
     "eslint": "eslint --format codeframe \"examples/**/*.js\" \"lib/**/*.js\" \"tests/**/*.js\"",
-    "docs:dev": "vuepress dev doc",
-    "docs:build": "vuepress build doc",
+    "docs:dev": "vitepress dev doc",
+    "docs:build": "vitepress build doc",
+    "docs:preview": "vitepress preview doc",
     "release": "node scripts/release.js",
     "prepublishOnly": "npm run eslint && npm run test:typings"
   },
@@ -41,7 +42,7 @@
   },
   "homepage": "https://github.com/abedmurrar/objection.js#readme",
   "engines": {
-    "node": ">=14.0.0"
+    "node": ">=20.19.0"
   },
   "keywords": [
     "orm",
@@ -70,19 +71,26 @@
   },
   "devDependencies": {
     "@types/node": "^22.15.3",
+    "bluebird": "^3.7.2",
     "chai": "^4.3.10",
     "chai-subset": "^1.6.0",
-    "eslint": "^8.54.0",
+    "eslint": "^10.14.0",
     "eslint-formatter-codeframe": "^7.32.1",
-    "eslint-plugin-prettier": "^5.3.1",
+    "eslint-plugin-prettier": "^5.5.7",
     "expect.js": "^0.3.1",
+    "globals": "^17.14.0",
     "knex": "^3.3.0",
-    "mocha": "^11.2.2",
+    "lodash": "^4.18.1",
+    "mocha": "^12.0.3",
     "mysql2": "^3.24.6",
     "pg": "^8.15.6",
     "prettier": "3.5.3",
-    "sqlite3": "^5.1.7",
+    "sqlite3": "^6.0.1",
     "typescript": "~5.8.3",
-    "vuepress": "1.9.10"
+    "vitepress": "2.0.0-alpha.21"
+  },
+  "overrides": {
+    "glob": "^14.0.3",
+    "minimatch": "^11.0.3"
   }
 }
