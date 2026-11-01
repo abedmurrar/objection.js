@@ -8,7 +8,7 @@
 > - **Expressions without raw SQL**, like `Pet.ref('age').gte(3)` and `fn.count().filter(...)`, plus window functions.
 > - **Fixes** for JSON key escaping (SQL injection), `orWhere` escaping relation conditions, and `for()`.
 >
-> See the [changelog](doc/release-notes/changelog.md) and the [migration guide](doc/release-notes/migration.md).
+> See the [fork documentation](doc/fork/README.md), which only covers what the fork adds, along with the [changelog](doc/release-notes/changelog.md) and the [migration guide](doc/release-notes/migration.md).
 >
 > ```sh
 > npm install @abedmurrar/objection@next knex

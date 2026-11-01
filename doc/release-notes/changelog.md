@@ -4,6 +4,10 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+### What's new
+
+- The documentation has a [Fork additions](/fork/) section that covers only what the fork adds to objection.js 3.1.5.
+
 ## 4.0.0-alpha.0 (2026-10-20)
 
 ### Security
