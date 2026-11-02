@@ -9,10 +9,11 @@ const {
   camelCaseKeys,
 } = require('../../lib/utils/identifierMapping');
 
-const { range } = require('lodash');
 const { compose, mixin } = require('../../lib/utils/mixin');
 const { map } = require('../../lib/utils/promiseUtils');
 const { jsonEquals, uniqBy } = require('../../lib/utils/objectUtils');
+
+const range = (n) => Array.from({ length: n }, (v, i) => i);
 
 describe('utils', () => {
   describe('mixin', () => {

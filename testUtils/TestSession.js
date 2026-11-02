@@ -1,8 +1,8 @@
-const _ = require('lodash');
 const path = require('path');
 const Promise = require('bluebird');
 const knexUtils = require('../lib/utils/knexUtils');
 const { Model, transaction, snakeCaseMappers, ref } = require('../');
+const { cloneDeep } = require('../lib/utils/cloneDeep');
 
 const chai = require('chai');
 chai.use(require('chai-subset'));
@@ -24,7 +24,9 @@ class TestSession {
     this.opt = opt;
     this.knex = this.createKnex(opt);
     this.unboundModels = this.createModels();
-    this.models = _.mapValues(this.unboundModels, (model) => model.bindKnex(this.knex));
+    this.models = Object.fromEntries(
+      Object.entries(this.unboundModels).map(([name, model]) => [name, model.bindKnex(this.knex)]),
+    );
   }
 
   createKnex() {
@@ -191,8 +193,8 @@ class TestSession {
       ['$afterInsert', 0],
       ['$beforeDelete', 1],
       ['$afterDelete', 1],
-      ['$beforeUpdate', 1, (self, args) => (self.$beforeUpdateOptions = _.cloneDeep(args[0]))],
-      ['$afterUpdate', 1, (self, args) => (self.$afterUpdateOptions = _.cloneDeep(args[0]))],
+      ['$beforeUpdate', 1, (self, args) => (self.$beforeUpdateOptions = cloneDeep(args[0]))],
+      ['$afterUpdate', 1, (self, args) => (self.$afterUpdateOptions = cloneDeep(args[0]))],
       ['$afterFind', 1],
     ].forEach((hook) => {
       Model1.prototype[hook[0]] = createHook(hook[0], hook[1], hook[2]);
@@ -342,7 +344,7 @@ class TestSession {
         .then(() => {
           return Promise.resolve(['Model1', 'model2', 'model3', 'Model1Model2']).map((table) => {
             const idCol = (
-              _.find(this.models, (it) => it.getTableName() === table) || {
+              Object.values(this.models).find((it) => it.getTableName() === table) || {
                 getIdColumn: () => 'id',
               }
             ).getIdColumn();
@@ -350,7 +352,7 @@ class TestSession {
             return trx(table)
               .max(idCol)
               .then((res) => {
-                const maxId = parseInt(res[0][_.keys(res[0])[0]], 10) || 0;
+                const maxId = parseInt(res[0][Object.keys(res[0])[0]], 10) || 0;
 
                 // Reset sequence.
                 if (knexUtils.isSqlite(trx)) {
@@ -418,7 +420,7 @@ function createHook(name, delay, extraAction) {
     inc(model, `${name}Called`);
 
     // Optionally run the extraAction function.
-    (extraAction || _.noop)(model, args);
+    (extraAction || (() => {}))(model, args);
   };
 
   return function () {
@@ -438,7 +440,7 @@ function inc(obj, key) {
 
 function registerUnhandledRejectionHandler() {
   Promise.onPossiblyUnhandledRejection((error) => {
-    if (_.isEmpty(TestSession.unhandledRejectionHandlers)) {
+    if (TestSession.unhandledRejectionHandlers.length === 0) {
       console.error(error.stack);
     }
 

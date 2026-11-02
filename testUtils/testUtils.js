@@ -1,4 +1,3 @@
-const _ = require('lodash');
 const expect = require('expect.js');
 
 /**
@@ -24,16 +23,93 @@ function expectPartialEqual(result, partial) {
       expectPartialEqual(result[idx], partial[idx]);
     });
   } else if (
-    _.isObject(result) &&
+    isObject(result) &&
     !Array.isArray(partial) &&
-    _.isObject(partial) &&
+    isObject(partial) &&
     !Array.isArray(result)
   ) {
-    var partialKeys = _.keys(partial);
-    expect(_.pick(result, partialKeys)).to.eql(partial);
+    const picked = {};
+
+    for (const key of Object.keys(partial)) {
+      if (key in result) {
+        picked[key] = result[key];
+      }
+    }
+
+    expect(picked).to.eql(partial);
   } else {
     throw new Error('result and partial must both be arrays or objects');
   }
+}
+
+function isObject(value) {
+  const type = typeof value;
+  return value !== null && (type === 'object' || type === 'function');
+}
+
+/**
+ * Sorts a copy of `list` (or of an object's values) like lodash's `sortBy`:
+ * stable, and in ascending order of each of `iteratees` in turn. An iteratee
+ * is a property name or a function, or an array of them. `null`, `undefined`
+ * and `NaN` sort after the other values, in that order.
+ */
+function sortBy(list, iteratees = (it) => it) {
+  const items = Array.isArray(list) ? list : Object.values(list || {});
+  const getters = (Array.isArray(iteratees) ? iteratees : [iteratees]).map((it) =>
+    typeof it === 'function' ? it : (value) => (value == null ? undefined : value[it]),
+  );
+
+  return items
+    .map((value, index) => ({ value, index, criteria: getters.map((get) => get(value)) }))
+    .sort((a, b) => {
+      for (let i = 0; i < getters.length; ++i) {
+        const order = compareAscending(a.criteria[i], b.criteria[i]);
+
+        if (order !== 0) {
+          return order;
+        }
+      }
+
+      return a.index - b.index;
+    })
+    .map((it) => it.value);
+}
+
+// lodash's compareAscending.
+function compareAscending(value, other) {
+  if (value !== other) {
+    const valIsDefined = value !== undefined;
+    const valIsNull = value === null;
+    const valIsReflexive = value === value;
+    const valIsSymbol = typeof value === 'symbol';
+
+    const othIsDefined = other !== undefined;
+    const othIsNull = other === null;
+    const othIsReflexive = other === other;
+    const othIsSymbol = typeof other === 'symbol';
+
+    if (
+      (!othIsNull && !othIsSymbol && !valIsSymbol && value > other) ||
+      (valIsSymbol && othIsDefined && othIsReflexive && !othIsNull && !othIsSymbol) ||
+      (valIsNull && othIsDefined && othIsReflexive) ||
+      (!valIsDefined && othIsReflexive) ||
+      !valIsReflexive
+    ) {
+      return 1;
+    }
+
+    if (
+      (!valIsNull && !valIsSymbol && !othIsSymbol && value < other) ||
+      (othIsSymbol && valIsDefined && valIsReflexive && !valIsNull && !valIsSymbol) ||
+      (othIsNull && valIsDefined && valIsReflexive) ||
+      (!othIsDefined && valIsReflexive) ||
+      !othIsReflexive
+    ) {
+      return -1;
+    }
+  }
+
+  return 0;
 }
 
 function createRejectionReflection(err) {
@@ -46,5 +122,6 @@ function createRejectionReflection(err) {
 
 module.exports = {
   expectPartialEqual,
+  sortBy,
   createRejectionReflection,
 };

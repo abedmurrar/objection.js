@@ -1,4 +1,3 @@
-const _ = require('lodash');
 const Knex = require('knex');
 const expect = require('expect.js');
 const objection = require('../../../');
@@ -514,9 +513,12 @@ describe('Relation', () => {
     });
 
     OwnerModel.prototype.$parseDatabaseJson = (json) => {
-      return _.mapKeys(json, (value, key) => {
-        return _.camelCase(key);
-      });
+      return Object.fromEntries(
+        Object.entries(json).map(([key, value]) => [
+          key.replace(/[-_]+(\w)/g, (match, char) => char.toUpperCase()),
+          value,
+        ]),
+      );
     };
 
     Object.defineProperty(RelatedModel, 'tableName', {
@@ -526,9 +528,12 @@ describe('Relation', () => {
     });
 
     RelatedModel.prototype.$parseDatabaseJson = (json) => {
-      return _.mapKeys(json, (value, key) => {
-        return _.camelCase(key);
-      });
+      return Object.fromEntries(
+        Object.entries(json).map(([key, value]) => [
+          key.replace(/[-_]+(\w)/g, (match, char) => char.toUpperCase()),
+          value,
+        ]),
+      );
     };
 
     relation.setMapping({

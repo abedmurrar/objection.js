@@ -1,4 +1,4 @@
-const _ = require('lodash');
+const { sortBy } = require('../../../testUtils/testUtils');
 const expect = require('expect.js');
 const { Model } = require('../../../');
 
@@ -131,7 +131,7 @@ module.exports = (session) => {
       return A.query(session.knex)
         .withGraphJoined('Bs.[Cs, Ds]')
         .then((results) => {
-          results[0].Bs[0].Ds = _.sortBy(results[0].Bs[0].Ds, 'id');
+          results[0].Bs[0].Ds = sortBy(results[0].Bs[0].Ds, 'id');
 
           expect(results).to.eql([
             {

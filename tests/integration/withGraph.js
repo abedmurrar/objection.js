@@ -1,9 +1,9 @@
-const _ = require('lodash');
 const chai = require('chai');
 const expect = require('expect.js');
 const Promise = require('bluebird');
 const { ValidationError, raw } = require('../..');
 const mockKnexFactory = require('../../testUtils/mockKnex');
+const { sortBy } = require('../../testUtils/testUtils');
 
 module.exports = (session) => {
   const Model1 = session.models.Model1;
@@ -887,7 +887,7 @@ module.exports = (session) => {
       Model1.query()
         .findById(1)
         .withGraphJoined('model1Relation111')
-        .then(_.noop)
+        .then(() => {})
         .catch((err) => {
           expect(err.message).to.equal(
             'unknown relation "model1Relation111" in a relation expression',
@@ -2190,8 +2190,8 @@ module.exports = (session) => {
                 builder.select('model2_prop1');
               })
               .then((models) => {
-                models[0].model1Relation2 = _.sortBy(models[0].model1Relation2, 'model2Prop1');
-                models[0].model1Relation2[1].model2Relation1 = _.sortBy(
+                models[0].model1Relation2 = sortBy(models[0].model1Relation2, 'model2Prop1');
+                models[0].model1Relation2[1].model2Relation1 = sortBy(
                   models[0].model1Relation2[1].model2Relation1,
                   'model1Prop1',
                 );
@@ -2264,8 +2264,8 @@ module.exports = (session) => {
             builder.select('model2_prop1', 'id_col as x1', 'model1_id as x2');
           })
           .then((models) => {
-            models[0].model1Relation2 = _.sortBy(models[0].model1Relation2, 'model2Prop1');
-            models[0].model1Relation2[1].model2Relation1 = _.sortBy(
+            models[0].model1Relation2 = sortBy(models[0].model1Relation2, 'model2Prop1');
+            models[0].model1Relation2[1].model2Relation1 = sortBy(
               models[0].model1Relation2[1].model2Relation1,
               'model1Prop1',
             );
@@ -2775,9 +2775,9 @@ module.exports = (session) => {
               })
               .first()
               .then((model) => {
-                model.b = _.sortBy(model.b, 'idCol');
-                model.b[1].c = _.sortBy(model.b[1].c, 'id');
-                model.b[1].d = _.sortBy(model.b[1].d, 'id');
+                model.b = sortBy(model.b, 'idCol');
+                model.b[1].c = sortBy(model.b[1].c, 'id');
+                model.b[1].d = sortBy(model.b[1].d, 'id');
 
                 expect(model).to.eql({
                   id: 1,
@@ -2849,9 +2849,9 @@ module.exports = (session) => {
           })
           .where('b:d.id', 6)
           .then((model) => {
-            model.b = _.sortBy(model.b, 'idCol');
-            model.b[0].c = _.sortBy(model.b[0].c, 'id');
-            model.b[0].d = _.sortBy(model.b[0].d, 'id');
+            model.b = sortBy(model.b, 'idCol');
+            model.b[0].c = sortBy(model.b[0].c, 'id');
+            model.b[0].d = sortBy(model.b[0].d, 'id');
 
             expect(model).to.eql({
               id: 1,
@@ -2981,7 +2981,7 @@ module.exports = (session) => {
               '[model1Relation1, model1Relation1Inverse, model1Relation2.[model2Relation1, model2Relation2], model1Relation3]',
             )
             .then(() => {
-              expect(_.last(sql).replace(/\s/g, '')).to.equal(
+              expect(sql[sql.length - 1].replace(/\s/g, '')).to.equal(
                 `
                 select
                   "Model1"."id" as "id",
@@ -3050,7 +3050,7 @@ module.exports = (session) => {
           this.timeout(30000);
           let n = 0;
 
-          graph = _.range(100).map(() => {
+          graph = Array.from({ length: 100 }, (v, i) => i).map(() => {
             return {
               model1Prop1: 'hello ' + n++,
 
@@ -3066,11 +3066,11 @@ module.exports = (session) => {
                 model1Prop1: 'quux ' + n++,
               },
 
-              model1Relation2: _.range(10).map(() => {
+              model1Relation2: Array.from({ length: 10 }, (v, i) => i).map(() => {
                 return {
                   model2Prop1: 'foo ' + n++,
 
-                  model2Relation1: _.range(10).map(() => {
+                  model2Relation1: Array.from({ length: 10 }, (v, i) => i).map(() => {
                     return {
                       model1Prop1: 'bar ' + n++,
                     };
@@ -3082,7 +3082,7 @@ module.exports = (session) => {
                 };
               }),
 
-              model1Relation3: _.range(10).map(() => {
+              model1Relation3: Array.from({ length: 10 }, (v, i) => i).map(() => {
                 return {
                   model2Prop1: 'spam ' + n++,
                 };
@@ -3115,14 +3115,14 @@ module.exports = (session) => {
                 .then((res) => {
                   console.log('query time', Date.now() - t1);
 
-                  graph = _.sortBy(graph, 'id');
-                  res = _.sortBy(res, 'id');
+                  graph = sortBy(graph, 'id');
+                  res = sortBy(res, 'id');
 
                   Model1.traverse(graph, traverser);
                   Model1.traverse(res, traverser);
 
-                  let expected = _.invokeMap(graph, 'toJSON');
-                  let got = _.invokeMap(res, 'toJSON');
+                  let expected = graph.map((it) => it.toJSON());
+                  let got = res.map((it) => it.toJSON());
 
                   expect(got).to.eql(expected);
                 });
@@ -3140,13 +3140,13 @@ module.exports = (session) => {
 
           ['model1Relation2', 'model1Relation3'].map((rel) => {
             if (model[rel]) {
-              model[rel] = _.sortBy(model[rel], 'idCol');
+              model[rel] = sortBy(model[rel], 'idCol');
             }
           });
 
           ['model2Relation1'].map((rel) => {
             if (model[rel]) {
-              model[rel] = _.sortBy(model[rel], 'id');
+              model[rel] = sortBy(model[rel], 'id');
             }
           });
         }
@@ -3163,11 +3163,12 @@ module.exports = (session) => {
       testName = expr.replace(/\s/g, '');
     }
 
-    opt = _.defaults(opt || {}, {
+    opt = {
       Model: Model1,
       filters: {},
       id: 1,
-    });
+      ...opt,
+    };
 
     let idCol = opt.Model.query().fullIdColumnFor(opt.Model);
     let testFn = opt.only ? it.only.bind(it) : it;
@@ -3217,11 +3218,11 @@ module.exports = (session) => {
     return (models) => {
       Model1.traverse(models, (model) => {
         if (model.model1Relation2) {
-          model.model1Relation2 = _.sortBy(model.model1Relation2, ['idCol', 'model2Prop1']);
+          model.model1Relation2 = sortBy(model.model1Relation2, ['idCol', 'model2Prop1']);
         }
 
         if (model.model2Relation1) {
-          model.model2Relation1 = _.sortBy(model.model2Relation1, ['id', 'model1Prop1']);
+          model.model2Relation1 = sortBy(model.model2Relation1, ['id', 'model1Prop1']);
         }
       });
 

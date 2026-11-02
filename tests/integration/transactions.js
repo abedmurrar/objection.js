@@ -1,4 +1,3 @@
-const _ = require('lodash');
 const expect = require('expect.js');
 const Promise = require('bluebird');
 const transaction = require('../../').transaction;
@@ -16,11 +15,11 @@ module.exports = (session) => {
     before(() => {
       // Disable unhandled exception logging. Some of the tests _should_ leak an exception
       // but we don't want them to appear in the log.
-      session.addUnhandledRejectionHandler(_.noop);
+      session.addUnhandledRejectionHandler(() => {});
     });
 
     after(() => {
-      session.removeUnhandledRejectionHandler(_.noop);
+      session.removeUnhandledRejectionHandler(() => {});
     });
 
     it('should resolve an empty transaction', (done) => {
@@ -89,7 +88,7 @@ module.exports = (session) => {
         })
         .then((rows) => {
           expect(rows).to.have.length(2);
-          expect(_.map(rows, 'model1Prop1').sort()).to.eql(['test 1', 'test 2']);
+          expect(rows.map((it) => it.model1Prop1).sort()).to.eql(['test 1', 'test 2']);
           return session.knex('model2');
         })
         .then((rows) => {
@@ -111,7 +110,7 @@ module.exports = (session) => {
       let rows = await session.knex('Model1');
 
       expect(rows).to.have.length(2);
-      expect(_.map(rows, 'model1Prop1').sort()).to.eql(['test 1', 'test 2']);
+      expect(rows.map((it) => it.model1Prop1).sort()).to.eql(['test 1', 'test 2']);
       rows = await session.knex('model2');
 
       expect(rows).to.have.length(1);
@@ -129,7 +128,7 @@ module.exports = (session) => {
       let rows = await session.knex('Model1');
 
       expect(rows).to.have.length(2);
-      expect(_.map(rows, 'model1Prop1').sort()).to.eql(['test 1', 'test 2']);
+      expect(rows.map((it) => it.model1Prop1).sort()).to.eql(['test 1', 'test 2']);
       rows = await session.knex('model2');
 
       expect(rows).to.have.length(1);
@@ -166,7 +165,7 @@ module.exports = (session) => {
         })
         .then(([rows1, rows2, rows3]) => {
           expect(rows1).to.have.length(3);
-          expect(_.map(rows1, 'model1Prop1')).to.eql(['a', 'b', 'd']);
+          expect(rows1.map((it) => it.model1Prop1)).to.eql(['a', 'b', 'd']);
           expect(rows2).to.have.length(1);
           expect(rows2[0].model2_prop1).to.equal('c');
           expect(rows3).to.have.length(1);
@@ -206,7 +205,7 @@ module.exports = (session) => {
         })
         .then(([rows1, rows2, rows3]) => {
           expect(rows1).to.have.length(3);
-          expect(_.map(rows1, 'model1Prop1')).to.eql(['a', 'b', 'd']);
+          expect(rows1.map((it) => it.model1Prop1)).to.eql(['a', 'b', 'd']);
           expect(rows2).to.have.length(1);
           expect(rows2[0].model2_prop1).to.equal('c');
           expect(rows3).to.have.length(1);
@@ -579,7 +578,7 @@ module.exports = (session) => {
           .insert({ model1Prop1: '123' })
           .then(() => {
             return Promise.all(
-              _.map(_.range(2), (i) => {
+              Array.from({ length: 2 }, (v, i) => i).map((i) => {
                 if (i === 1) {
                   throw new Error();
                 }
@@ -671,7 +670,7 @@ module.exports = (session) => {
           })
           .then((rows) => {
             expect(rows).to.have.length(2);
-            expect(_.map(rows, 'model1Prop1').sort()).to.eql(['test 1', 'test 2']);
+            expect(rows.map((it) => it.model1Prop1).sort()).to.eql(['test 1', 'test 2']);
             return session.knex('model2');
           })
           .then((rows) => {
@@ -704,7 +703,7 @@ module.exports = (session) => {
           })
           .then((rows) => {
             expect(rows).to.have.length(2);
-            expect(_.map(rows, 'model1Prop1').sort()).to.eql(['test 1', 'test 2']);
+            expect(rows.map((it) => it.model1Prop1).sort()).to.eql(['test 1', 'test 2']);
             return session.knex('model2');
           })
           .then((rows) => {
@@ -729,7 +728,7 @@ module.exports = (session) => {
           const model2Rows = yield session.knex('model2');
 
           expect(model1Rows).to.have.length(2);
-          expect(_.map(model1Rows, 'model1Prop1').sort()).to.eql(['test 1', 'test 2']);
+          expect(model1Rows.map((it) => it.model1Prop1).sort()).to.eql(['test 1', 'test 2']);
 
           expect(model2Rows).to.have.length(1);
           expect(model2Rows[0].model2_prop1).to.equal('test 3');
@@ -750,7 +749,7 @@ module.exports = (session) => {
           const model2Rows = yield session.knex('model2');
 
           expect(model1Rows).to.have.length(2);
-          expect(_.map(model1Rows, 'model1Prop1').sort()).to.eql(['test 1', 'test 2']);
+          expect(model1Rows.map((it) => it.model1Prop1).sort()).to.eql(['test 1', 'test 2']);
 
           expect(model2Rows).to.have.length(1);
           expect(model2Rows[0].model2_prop1).to.equal('test 3');
@@ -797,7 +796,7 @@ module.exports = (session) => {
           })
           .then((rows) => {
             expect(rows).to.have.length(2);
-            expect(_.map(rows, 'model1Prop1').sort()).to.eql(['test 1', 'test 2']);
+            expect(rows.map((it) => it.model1Prop1).sort()).to.eql(['test 1', 'test 2']);
             return session.knex('model2');
           })
           .then((rows) => {
