@@ -4,6 +4,8 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+## 4.0.3 (2026-11-02)
+
 ### What's new
 
 - The documentation site has a sitemap, canonical URLs, a description and Open Graph and Twitter tags on every page, structured data on the home page, a social card image, a favicon and the date each page last changed. The pages are served without `.html`.
