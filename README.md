@@ -88,7 +88,7 @@ Then read the [breaking changes](doc/fork/breaking-changes.md) and the [migratio
 ## Documentation
 
 - [What this package adds](doc/fork/README.md) to objection.js, page by page.
-- [The objection.js guide and API reference](https://vincit.github.io/objection.js) still apply to everything else: models, relations, queries, eager loading, graphs, transactions and validation.
+- **[The documentation site](https://abedmurrar.github.io/objection.js/)**: the guide and the API reference for everything else (models, relations, queries, eager loading, graphs, transactions and validation), which come from objection.js.
 - [Changelog](doc/release-notes/changelog.md) and [migration guide](doc/release-notes/migration.md).
 - [Contributing](doc/guide/contributing.md) and [releasing](RELEASING.md).
 

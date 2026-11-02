@@ -3,8 +3,8 @@ import { defineConfig } from 'vitepress';
 const repo = 'https://github.com/abedmurrar/objection.js';
 
 export default defineConfig({
-  title: 'Objection.js',
-  description: 'An SQL friendly ORM for node.js',
+  title: '@abedmurrar/objection',
+  description: 'A fast, strictly typed SQL ORM for Node.js, built on knex. A fork of objection.js.',
   base: '/objection.js/',
 
   // The pages are README.md files, as on GitHub.
@@ -19,6 +19,11 @@ export default defineConfig({
     search: { provider: 'local' },
 
     socialLinks: [{ icon: 'github', link: repo }],
+
+    editLink: {
+      pattern: `${repo}/edit/main/doc/:path`,
+      text: 'Edit this page on GitHub',
+    },
 
     nav: [
       { text: 'Guide', link: '/guide/' },
@@ -126,8 +131,9 @@ export default defineConfig({
     outline: { level: [2, 3] },
 
     footer: {
-      message: 'MIT Licensed',
-      copyright: 'Copyright © 2015-present Sami Koskimäki',
+      message:
+        'MIT Licensed. Built on <a href="https://github.com/Vincit/objection.js">objection.js</a> by Sami Koskimäki and its contributors.',
+      copyright: 'Copyright © 2015-present Sami Koskimäki, © 2026-present Abed Murrar',
     },
   },
 });

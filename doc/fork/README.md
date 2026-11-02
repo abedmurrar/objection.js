@@ -1,6 +1,6 @@
 # Fork additions
 
-`@abedmurrar/objection` is a fork of [objection.js](https://github.com/Vincit/objection.js) 3.1.5. This section only documents what the fork adds or changes. For everything else, the [objection.js documentation](https://vincit.github.io/objection.js) still applies.
+`@abedmurrar/objection` is a fork of [objection.js](https://github.com/Vincit/objection.js) 3.1.5. This section only documents what the fork adds or changes. For everything else, the [guide](/guide/) and the [API reference](/api/objection/) of this site, which come from objection.js, still apply.
 
 ## Installation
 
