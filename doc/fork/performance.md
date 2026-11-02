@@ -43,6 +43,20 @@ Models whose JSON attributes hold only plain objects, arrays and dates are clone
 
 These measure objection's own work, against a mocked database. With a real database, the database's time comes on top: reading 1000 rows from SQLite, for example, is mostly SQLite's time and the `JSON.parse()` of the JSON columns, and is about 6% faster. The full results, including the end-to-end runs on SQLite, are in [bench/README.md](https://github.com/abedmurrar/objection.js/blob/main/bench/README.md).
 
+## The TypeScript build
+
+The source is TypeScript, compiled to CommonJS by `tsc`. The compiled code does the same work as the JavaScript it replaced, and it's as fast. Against the last JavaScript build, 7 rounds of every benchmark scenario, the largest differences were within noise:
+
+| Operation                                   | JavaScript | TypeScript |  Change |
+| ------------------------------------------- | ---------: | ---------: | ------: |
+| A batch `insert()` of 100 rows              |   118.9 µs |   118.7 µs |  −0.2%  |
+| `toJSON()` of 1000 models                   |   979.6 µs |   969.4 µs |  −1.0%  |
+| Validating 1000 models with default values  |   919.3 µs |   919.7 µs |  +0.0%  |
+| `withGraphJoined('pets.toys')` of 100 persons |   821.5 µs |   815.0 µs |  −0.8%  |
+| Reading 1000 rows                           |    1.25 ms |    1.27 ms |  +1.2%  |
+
+4.0.0-beta.6 to beta.8 were up to 20% slower, because two modules exported getters (see [Contributing](/guide/contributing) for why that matters); beta.9 fixed it.
+
 ## Eager loading on MySQL
 
 4.0.0-alpha.0 ran every query of `withGraphFetched()` and `fetchGraph()` one at a time on MySQL, along with the graph writes, which deadlocked when they ran concurrently. Reads don't deadlock, so eager loading runs its queries 4 at a time again, as in objection.js 3.1.5. Graph writes still run one at a time on MySQL. With 1 ms per query, `withGraphFetched('[pets.toys, movies]')` takes 23.5% less time than in 4.0.0-alpha.0.

@@ -59,4 +59,9 @@ DATABASES=sqlite3 npm test
 
 The code runs on Node.js 24 and newer, so it can use everything Node.js 24 supports.
 
+Two rules keep the compiled code as fast as the JavaScript it replaced:
+
+- **Don't re-export an imported binding** (`export { x } from './x'`, or importing `x` and listing it in `export { ... }`). tsc compiles it to a getter on `exports`, which puts the whole exports object of the module in V8's slow dictionary mode, and every call through it gets several times slower. Export a local constant instead: `const x = importedX; export { x };`. `tests/unit/moduleExports.js` fails if a compiled module exports a getter.
+- **Import JavaScript modules by name** (`import { parse } from './parser'`), not with `import * as`, which wraps them in an object of getters.
+
 [Biome](https://biomejs.dev/) lints and formats the code. `npm run lint` checks both, and `npm run format` fixes what can be fixed automatically. Run it before committing; CI runs `biome ci`.
