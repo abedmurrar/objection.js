@@ -10,6 +10,7 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ### What's new
 
+- Faster queries: objection's own work for a small query takes 13% to 19% less time, `toJSON()` 44% less, validating models 55% less, and a class bound to a transaction with `bindKnex()` no longer creates and compiles a validator of its own (91% less for a validated insert in a new transaction). `withGraphJoined()` parses the joined rows 20% faster and graph inserts and upserts take 12% to 15% less time. The generated SQL and the results are the same. See `bench/README.md` in the repository
 - On MySQL, `withGraphFetched()` and `fetchGraph()` run their queries 4 at a time again, like on the other databases. 4.0.0-alpha.0 ran every query of graph operations one at a time to stop the deadlocks of concurrent `upsertGraph()` updates, which only writes need. A concurrency set on the model still applies to all queries
 - The documentation has a [Fork additions](/fork/) section that covers only what the fork adds to objection.js 3.1.5.
 
