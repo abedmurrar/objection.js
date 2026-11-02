@@ -125,6 +125,7 @@ export default defineConfig({
         expressions: 'Expressions',
         joins: 'Joins and model classes',
         typescript: 'TypeScript',
+        performance: 'Performance',
       }),
     },
 

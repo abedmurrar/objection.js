@@ -6,6 +6,7 @@
 > - **Strict TypeScript types.** Query results contain exactly the relations that were loaded, relation expressions and modifier names are checked, and `Model.ref()` only accepts real columns.
 > - **MySQL support** for JSON field expressions and the `whereJson*` methods, `fn.*` helpers for every MySQL 8.4 function, and batch inserts.
 > - **Expressions without raw SQL**, like `Pet.ref('age').gte(3)` and `fn.count().filter(...)`, plus window functions.
+> - **Faster.** objection's own work for a query takes 13% to 19% less time, `toJSON()` 44% less, validation 55% less, and a validated insert in a new transaction 91% less, with the same SQL and results. See [Performance](doc/fork/performance.md).
 > - **Fixes** for JSON key escaping (SQL injection), `orWhere` escaping relation conditions, and `for()`.
 >
 > See the [fork documentation](doc/fork/README.md), which only covers what the fork adds, along with the [changelog](doc/release-notes/changelog.md) and the [migration guide](doc/release-notes/migration.md).
