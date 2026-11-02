@@ -4,6 +4,10 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+### What's new
+
+- The fork documentation has many more examples, each with comments, the real SQL it produces and checked types, and fixes for seven mistakes in the existing pages.
+
 ## 4.0.0-beta.2 (2026-11-02)
 
 ### What's new
