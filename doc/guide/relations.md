@@ -191,11 +191,24 @@ await Person.relatedQuery('pets').for(1); // ModelRow<Animal>[]
 - `defineRelations` is optional, it returns the mappings as is. Without it the names of `extra` columns are inferred as `string[]` and the extra columns are left out of the types. The types of the extra columns come from `through.modelClass`, or are `unknown` without one.
 - Relation properties that are declared in the class are used as is.
 
-The relation properties are added to the models objection creates (the results of queries, `fromJson()`, ...). To also get them for `new Person()` and for `this` in the model's methods, add this line after the class:
+The relation properties are added to the models objection creates (the results of queries, `fromJson()`, ...). To get them for `new Person()` too, or in a type annotation, use `ModelInstance`, the instance type with the inferred relations:
 
 ```ts
-interface Person extends RelationsOf<typeof Person> {}
+import { ModelInstance } from 'objection';
+
+type PersonModel = ModelInstance<typeof Person>;
+
+const person: PersonModel = new Person();
+person.pets; // Animal[] | undefined
 ```
+
+For a model whose relations never lead back to it, there's also a shortcut that adds the relations to the class itself, so they're there for `new Person()` and for `this` in the model's methods:
+
+```ts
+interface Pet extends RelationsOf<typeof Pet> {}
+```
+
+It doesn't work for `Person` above: `mom` refers to `Person` itself, and `pets` leads to `Animal`, whose owner is a `Person`. TypeScript reports a circularity error for models like that (`Type 'Person' recursively references itself as a base type`). Use `ModelInstance<typeof Person>` instead, or declare the relation properties in the class. See [TypeScript](/fork/typescript) for more.
 
 ### Loaded relations
 
