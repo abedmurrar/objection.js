@@ -109,6 +109,23 @@ update "notifications" set "payload" = jsonb_set(COALESCE("payload", '[]'::jsonb
 where "notifications"."id" = 3
 ```
 
+## The exported classes are real classes
+
+Before, `Model`, `QueryBuilder`, `Validator` and `AjvValidator` were exported as ES5 constructor functions that inherited from the classes, so that code transpiled to ES5 could extend them. They are now exported as the classes themselves, so `class Person extends Model` and `require(...).Model` are the same class objection uses internally.
+
+Classes can't be called without `new`, so ES5-style subclasses that call the constructor as a function now throw `TypeError: Class constructor Model cannot be invoked without 'new'`:
+
+```js
+// Throws now.
+function Person() {
+  Model.call(this);
+}
+```
+
+The same goes for `QueryBuilder.call(this, modelClass)`, and for code compiled to that form: TypeScript with `target: "es5"` and Babel 6 (`babel-plugin-transform-es2015-classes`). Use native `class ... extends`, or compile to ES2015 or newer. Current Babel output, which constructs the parent with `Reflect.construct`, keeps working.
+
+A `static init(self, ...args)` method of a `QueryBuilder`, `Validator` or `AjvValidator` subclass is now called when the class is constructed. The wrappers called the `init` of objection's own class and skipped the override. Call `super.init(self, ...args)` in it if you have one.
+
 ## Only the package entry can be imported
 
 package.json has an `exports` map, so `require('@abedmurrar/objection')` and `import ... from '@abedmurrar/objection'` are the only entry points. Imports of files inside the package, like `@abedmurrar/objection/lib/utils/...`, which were never documented, now throw `ERR_PACKAGE_PATH_NOT_EXPORTED`. Everything public is exported from the entry.

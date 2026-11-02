@@ -4,6 +4,10 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+### Breaking changes
+
+- `Model`, `QueryBuilder`, `Validator` and `AjvValidator` are exported as the classes themselves instead of ES5 constructor functions that inherited from them. ES5-style subclasses that call `Model.call(this)` or `QueryBuilder.call(this)` throw, as does code compiled to that form by TypeScript with `target: "es5"` or by Babel 6. A `static init()` override of a `QueryBuilder`, `Validator` or `AjvValidator` subclass is now called when the class is constructed. See [Breaking changes](/fork/breaking-changes#the-exported-classes-are-real-classes)
+
 ## 4.0.0-beta.9 (2026-11-02)
 
 ### Bug fixes

@@ -40,14 +40,10 @@ describe('main module', () => {
     expect(objection.val).to.equal(require('../lib/queryBuilder/ValueBuilder').val);
     expect(objection.mixin).to.equal(require('../lib/utils/mixin').mixin);
     expect(objection.compose).to.equal(require('../lib/utils/mixin').compose);
-    expect(Object.getPrototypeOf(objection.Validator)).to.equal(
-      require('../lib/model/Validator').Validator,
-    );
-    expect(Object.getPrototypeOf(objection.AjvValidator)).to.equal(
-      require('../lib/model/AjvValidator').AjvValidator,
-    );
-    expect(Object.getPrototypeOf(objection.Model)).to.equal(require('../lib/model/Model').Model);
-    expect(Object.getPrototypeOf(objection.QueryBuilder)).to.equal(
+    expect(objection.Validator).to.equal(require('../lib/model/Validator').Validator);
+    expect(objection.AjvValidator).to.equal(require('../lib/model/AjvValidator').AjvValidator);
+    expect(objection.Model).to.equal(require('../lib/model/Model').Model);
+    expect(objection.QueryBuilder).to.equal(
       require('../lib/queryBuilder/QueryBuilder').QueryBuilder,
     );
     expect(objection.DBError).to.equal(require('db-errors').DBError);
