@@ -123,6 +123,29 @@ module.exports = {
     return () => people.map((person) => person.toJSON());
   },
 
+  // JSON attributes that hold values other than plain objects, arrays and
+  // dates take the slower clone path.
+  'rows: toJSON 1000 models (class instance, Map and Set attributes)': async (objection) => {
+    const { Person } = defineModels(objection);
+
+    class Point {
+      constructor(x, y) {
+        this.x = x;
+        this.y = y;
+      }
+    }
+
+    const people = personRows(1000).map((row) => {
+      const person = Person.fromDatabaseJson(row);
+      person.settings.location = new Point(row.id, row.id * 2);
+      person.settings.visits = new Map([['home', { count: row.id }]]);
+      person.settings.labels = new Set(['a', 'b']);
+      return person;
+    });
+
+    return () => people.map((person) => person.toJSON());
+  },
+
   // Eager loading.
 
   'graph: withGraphFetched [pets.toys, movies] x100': async (objection) => {
