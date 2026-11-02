@@ -4,6 +4,8 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+## 4.0.0-beta.1 (2026-11-02)
+
 ### What's new
 
 - `src/relations` is TypeScript now. The compiled code and its behaviour are the same.
