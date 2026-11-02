@@ -214,15 +214,13 @@ type AddChild<Children extends Graph, Prop extends string, Child extends GraphNo
 // Object notation.
 
 type ObjectChildren<E> = {
-  [
-    K in keyof E as K extends `$${string}`
-      ? never
-      : K extends string
-        ? [E[K]] extends [false]
-          ? never
-          : K
-        : never
-  ]: ObjectNode<K & string, E[K]>;
+  [K in keyof E as K extends `$${string}`
+    ? never
+    : K extends string
+      ? [E[K]] extends [false]
+        ? never
+        : K
+      : never]: ObjectNode<K & string, E[K]>;
 };
 
 type ObjectNode<K extends string, V> = [V] extends [true]

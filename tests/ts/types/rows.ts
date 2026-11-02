@@ -1,5 +1,5 @@
-import { Model, ModelRow, Page, QueryBuilder } from '../../../';
-import { Equal, Expect, expectType } from '../_utils/expect';
+import { Model, type ModelRow, type Page, type QueryBuilder } from '../../../';
+import { type Equal, type Expect, expectType } from '../_utils/expect';
 
 // Query results only have the relations the query loaded. The relations are
 // declared as optional properties, like most models do.
@@ -115,6 +115,7 @@ class WithPrivate extends Model {
   id!: number;
   pets?: Pet[];
 
+  // biome-ignore lint/correctness/noUnusedPrivateClassMembers: private members must not show up in rows.
   private secret() {
     return 1;
   }

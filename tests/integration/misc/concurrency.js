@@ -6,7 +6,7 @@ module.exports = (session) => {
   // TODO: Skipped for now for because a change in knex broke mockKnexFactory.
   describe.skip('Model.concurrency', () => {
     let knex;
-    let models = {};
+    const models = {};
     let runningQueries = [];
 
     beforeEach(() => {

@@ -11,9 +11,9 @@
 // use the `alpha` id unless the current version has another one, and are
 // published with the `next` dist-tag. See RELEASING.md.
 
-const { execFileSync } = require('child_process');
-const fs = require('fs');
-const path = require('path');
+const { execFileSync } = require('node:child_process');
+const fs = require('node:fs');
+const path = require('node:path');
 const changelog = require('./changelog');
 
 const rootDir = path.join(__dirname, '..');

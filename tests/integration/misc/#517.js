@@ -3,7 +3,7 @@ const { Model } = require('../../../');
 
 module.exports = (session) => {
   describe('upsertGraph with compound key in relation #517', () => {
-    let knex = session.knex;
+    const knex = session.knex;
     let Users;
     let Preferences;
 

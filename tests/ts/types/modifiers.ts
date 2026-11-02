@@ -1,4 +1,10 @@
-import { Model, ModelInstance, ModelRow, Modifiers, QueryBuilder } from '../../../';
+import {
+  Model,
+  type ModelInstance,
+  type ModelRow,
+  type Modifiers,
+  type QueryBuilder,
+} from '../../../';
 import { expectType } from '../_utils/expect';
 
 // Named modifiers are checked against the static `modifiers` of the model, when

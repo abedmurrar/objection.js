@@ -1,20 +1,20 @@
-import { Model, Modifiers } from 'objection'
-import Movie from './Movie'
-import Animal from './Animal'
+import { Model, type Modifiers } from 'objection';
+import Movie from './Movie';
+import Animal from './Animal';
 
 export default class Person extends Model {
-  id!: number
-  firstName!: string
-  lastName!: string
-  age!: number
+  id!: number;
+  firstName!: string;
+  lastName!: string;
+  age!: number;
 
-  pets?: Animal[]
-  movies?: Movie[]
-  children?: Person[]
-  parent?: Person
+  pets?: Animal[];
+  movies?: Movie[];
+  children?: Person[];
+  parent?: Person;
 
   // Table name is the only required property.
-  static tableName = 'persons'
+  static tableName = 'persons';
 
   // Optional JSON schema. This is not the database schema! Nothing is generated
   // based on this. This is only used for validation. Whenever a model instance
@@ -39,7 +39,7 @@ export default class Person extends Model {
         },
       },
     },
-  }
+  };
 
   // Modifiers are reusable query snippets that can be used in various places.
   static modifiers: Modifiers = {
@@ -53,12 +53,12 @@ export default class Person extends Model {
       query.where((query) => {
         for (const namePart of name.trim().split(/\s+/)) {
           for (const column of ['firstName', 'lastName']) {
-            query.orWhereRaw('lower(??) like ?', [column, namePart.toLowerCase() + '%'])
+            query.orWhereRaw('lower(??) like ?', [column, namePart.toLowerCase() + '%']);
           }
         }
-      })
+      });
     },
-  }
+  };
 
   // This object defines the relations to other models. The relationMappings
   // property can be a thunk to prevent circular dependencies.
@@ -105,5 +105,5 @@ export default class Person extends Model {
         to: 'persons.id',
       },
     },
-  })
+  });
 }

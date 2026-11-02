@@ -120,7 +120,7 @@ import { Person } from '../fixtures/person';
   await Person.query().deleteById([10, '20', 46]);
 
   let actor = await Person.query().findById(100);
-  let movie = await Movie.query().findById(200);
+  const movie = await Movie.query().findById(200);
   await actor!.$relatedQuery('movies').relate(movie!);
 
   await Person.relatedQuery('movies').for(100).relate(200);

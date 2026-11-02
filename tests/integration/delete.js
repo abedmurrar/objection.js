@@ -168,7 +168,7 @@ module.exports = (session) => {
       });
 
       it('should delete a model', () => {
-        let model = Model1.fromJson({ id: 1 });
+        const model = Model1.fromJson({ id: 1 });
 
         return model
           .$query()
@@ -187,7 +187,7 @@ module.exports = (session) => {
 
       if (isPostgres(session.knex)) {
         it('should work with returning', () => {
-          let model = Model1.fromJson({ id: 1 });
+          const model = Model1.fromJson({ id: 1 });
 
           return model
             .$query()
@@ -206,7 +206,7 @@ module.exports = (session) => {
         });
 
         it('should work with returning *', () => {
-          let model = Model1.fromJson({ id: 2 });
+          const model = Model1.fromJson({ id: 2 });
 
           return model
             .$query()
@@ -231,10 +231,10 @@ module.exports = (session) => {
       }
 
       it('should should call $beforeDelete and $afterDelete hooks', () => {
-        let model = Model1.fromJson({ id: 1 });
+        const model = Model1.fromJson({ id: 1 });
 
         model.$beforeDelete = function () {
-          let self = this;
+          const self = this;
           return Model1.query()
             .findById(this.id)
             .then((model) => {
@@ -243,7 +243,7 @@ module.exports = (session) => {
         };
 
         model.$afterDelete = function () {
-          let self = this;
+          const self = this;
           return Model1.query()
             .findById(this.id)
             .then((model) => {
@@ -266,7 +266,7 @@ module.exports = (session) => {
       });
 
       it('should throw if the id is undefiend', (done) => {
-        let model = Model1.fromJson({ model1Prop2: 1 });
+        const model = Model1.fromJson({ model1Prop2: 1 });
 
         model
           .$query()
@@ -284,7 +284,7 @@ module.exports = (session) => {
       });
 
       it('should throw if the id is null', (done) => {
-        let model = Model1.fromJson({ id: null });
+        const model = Model1.fromJson({ id: null });
 
         model
           .$query()

@@ -3094,7 +3094,7 @@ module.exports = (session) => {
           this.timeout(30000);
 
           return mapSeries(['withGraphFecthed', 'withGraphJoined'], (method) => {
-            let t1 = Date.now();
+            const t1 = Date.now();
             return Model1.query()
               .where('Model1.model1Prop1', 'like', 'hello%')
               [method](
@@ -3109,8 +3109,8 @@ module.exports = (session) => {
                 Model1.traverse(graph, traverser);
                 Model1.traverse(res, traverser);
 
-                let expected = graph.map((it) => it.toJSON());
-                let got = res.map((it) => it.toJSON());
+                const expected = graph.map((it) => it.toJSON());
+                const got = res.map((it) => it.toJSON());
 
                 expect(got).to.eql(expected);
               });
@@ -3156,8 +3156,8 @@ module.exports = (session) => {
       ...opt,
     };
 
-    let idCol = opt.Model.query().fullIdColumnFor(opt.Model);
-    let testFn = opt.only ? it.only.bind(it) : it;
+    const idCol = opt.Model.query().fullIdColumnFor(opt.Model);
+    const testFn = opt.only ? it.only.bind(it) : it;
 
     if (!opt.disableWhereIn) {
       testFn(testName + ' (QueryBuilder.withGraphFetched)', () => {

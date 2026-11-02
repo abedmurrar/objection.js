@@ -109,7 +109,7 @@ describe('jsonFieldExpressionParser', () => {
     });
 
     it('should be able to give start rule as parameter', () => {
-      let result = parser.parse('col', { startRule: 'start' });
+      const result = parser.parse('col', { startRule: 'start' });
       expect(result.columnName).to.be('col');
     });
   });
@@ -117,8 +117,8 @@ describe('jsonFieldExpressionParser', () => {
 
 function testParsing(expr, expected) {
   it(expr, () => {
-    let result = parser.parse(expr);
-    let resultArray = [result.columnName].concat(result.access.map((it) => it.ref));
+    const result = parser.parse(expr);
+    const resultArray = [result.columnName].concat(result.access.map((it) => it.ref));
     expect(JSON.stringify(resultArray)).to.eql(JSON.stringify(expected));
   });
 }

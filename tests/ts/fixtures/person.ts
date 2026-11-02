@@ -1,7 +1,7 @@
-import Ajv from 'ajv';
+import type Ajv from 'ajv';
 import * as objection from '../../../';
-import { Animal } from './animal';
-import { Movie } from './movie';
+import type { Animal } from './animal';
+import type { Movie } from './movie';
 
 class CustomValidationError extends Error {}
 
@@ -74,7 +74,7 @@ export class Person extends objection.Model {
 
   static createValidationError(args: objection.CreateValidationErrorArgs) {
     const { message, type, data } = args;
-    const errorItem: objection.ValidationErrorItem = data['someProp'];
+    const errorItem: objection.ValidationErrorItem = data.someProp;
     const itemMessage: string = errorItem.message;
     return new CustomValidationError('my custom error: ' + message + ' ' + itemMessage);
   }

@@ -3,7 +3,7 @@ const { Model } = require('../../../');
 
 module.exports = (session) => {
   describe('model relatedQueries fail when they lack a proper target', () => {
-    let knex = session.knex;
+    const knex = session.knex;
 
     class Post extends Model {
       static get tableName() {

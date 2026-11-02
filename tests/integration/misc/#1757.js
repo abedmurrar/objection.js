@@ -3,7 +3,7 @@ const { Model } = require('../../../');
 
 module.exports = (session) => {
   describe('skipFetched not working for nested relation #1757', () => {
-    let knex = session.knex;
+    const knex = session.knex;
 
     class Person extends Model {
       static get tableName() {

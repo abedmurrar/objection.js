@@ -1,14 +1,14 @@
-import { Model } from 'objection'
-import Person from './Person'
+import { Model } from 'objection';
+import Person from './Person';
 
 export default class Movie extends Model {
-  id!: number
-  name!: string
+  id!: number;
+  name!: string;
 
-  actors!: Person[]
+  actors!: Person[];
 
   // Table name is the only required property.
-  static tableName = 'movies'
+  static tableName = 'movies';
 
   // Optional JSON schema. This is not the database schema! Nothing is generated
   // based on this. This is only used for validation. Whenever a model instance
@@ -21,7 +21,7 @@ export default class Movie extends Model {
       id: { type: 'integer' },
       name: { type: 'string', minLength: 1, maxLength: 255 },
     },
-  }
+  };
 
   // This object defines the relations to other models. The relationMappings
   // property can be a thunk to prevent circular dependencies.
@@ -44,5 +44,5 @@ export default class Movie extends Model {
         to: 'persons.id',
       },
     },
-  })
+  });
 }

@@ -1,4 +1,4 @@
-const crypto = require('crypto');
+const crypto = require('node:crypto');
 const { expect } = require('chai');
 const { Model, snakeCaseMappers } = require('../../../');
 
@@ -8,7 +8,7 @@ module.exports = (session) => {
   }
 
   describe('withGraphFetched and binary relation column #1627', () => {
-    let knex = session.knex;
+    const knex = session.knex;
     let User;
     let Role;
 

@@ -1,4 +1,4 @@
-const { randomUUID } = require('crypto');
+const { randomUUID } = require('node:crypto');
 const { expect } = require('chai');
 const { Model, val, raw } = require('../../../');
 
@@ -8,7 +8,7 @@ module.exports = (session) => {
   }
 
   describe(`Insert an array of UUIDS #909`, () => {
-    let knex = session.knex;
+    const knex = session.knex;
     let Person;
 
     before(() => {

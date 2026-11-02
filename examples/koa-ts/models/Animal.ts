@@ -1,14 +1,14 @@
-import { Model } from 'objection'
-import Person from './Person'
+import { Model } from 'objection';
+import Person from './Person';
 
 export default class Animal extends Model {
-  id!: number
-  name!: string
+  id!: number;
+  name!: string;
 
-  owner?: Person
+  owner?: Person;
 
   // Table name is the only required property.
-  static tableName = 'animals'
+  static tableName = 'animals';
 
   // Optional JSON schema. This is not the database schema! Nothing is generated
   // based on this. This is only used for validation. Whenever a model instance
@@ -23,7 +23,7 @@ export default class Animal extends Model {
       name: { type: 'string', minLength: 1, maxLength: 255 },
       species: { type: 'string', minLength: 1, maxLength: 255 },
     },
-  }
+  };
 
   // This object defines the relations to other models. The relationMappings
   // property can be a thunk to prevent circular dependencies.
@@ -38,5 +38,5 @@ export default class Animal extends Model {
         to: 'persons.id',
       },
     },
-  })
+  });
 }

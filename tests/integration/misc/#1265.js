@@ -3,7 +3,7 @@ const { expect } = require('chai');
 
 module.exports = (session) => {
   describe(`upsertGraph with composite key relation doesn't copy foreign keys #1265`, () => {
-    let knex = session.knex;
+    const knex = session.knex;
     let Person, Animal;
 
     before(() => {

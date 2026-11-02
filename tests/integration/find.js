@@ -6,8 +6,8 @@ const { KnexTimeoutError } = require('knex');
 const { raw, ref, val, fn, Model, QueryBuilderOperation } = require('../..');
 
 module.exports = (session) => {
-  let Model1 = session.models.Model1;
-  let Model2 = session.models.Model2;
+  const Model1 = session.models.Model1;
+  const Model2 = session.models.Model2;
 
   describe('Model find queries', () => {
     describe('.query()', () => {
@@ -1072,7 +1072,7 @@ module.exports = (session) => {
         });
 
         it('.modify()', () => {
-          let builder = Model2.query();
+          const builder = Model2.query();
 
           return builder
             .modify(
@@ -2241,7 +2241,7 @@ module.exports = (session) => {
           .orderBy('id')
           .then((result) => {
             return result.map((it) => {
-              it.relCount = parseInt(it.relCount);
+              it.relCount = parseInt(it.relCount, 10);
               return it;
             });
           })

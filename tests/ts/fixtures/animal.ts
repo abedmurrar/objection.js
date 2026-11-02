@@ -1,5 +1,5 @@
 import * as objection from '../../../';
-import { Person } from './person';
+import type { Person } from './person';
 
 export class Animal extends objection.Model {
   id!: number;

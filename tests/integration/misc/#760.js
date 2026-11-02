@@ -3,7 +3,7 @@ const { Model } = require('../../../');
 
 module.exports = (session) => {
   describe(`orderBy extra property in relation modify #760`, () => {
-    let knex = session.knex;
+    const knex = session.knex;
     let Person;
 
     before(() => {

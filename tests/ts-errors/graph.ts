@@ -1,5 +1,5 @@
 // Error message tests. See scripts/typings-errors.js.
-import { Model, QueryBuilder } from '../../';
+import { Model, type QueryBuilder } from '../../';
 
 class Toy extends Model {
   id!: number;

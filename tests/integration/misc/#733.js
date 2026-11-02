@@ -3,7 +3,7 @@ const { Model } = require('../../../');
 
 module.exports = (session) => {
   describe(`select in modifier + joinEager #733`, () => {
-    let knex = session.knex;
+    const knex = session.knex;
     let Person;
 
     before(() => {

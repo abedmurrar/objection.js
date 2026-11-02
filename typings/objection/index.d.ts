@@ -15,12 +15,7 @@
 import Ajv, { Options as AjvOptions } from 'ajv';
 import * as dbErrors from 'db-errors';
 import { Knex } from 'knex';
-import {
-  GraphNode,
-  ParseError,
-  ParseRelationExpression,
-  UnknownGraph,
-} from './relation-expression';
+import { GraphNode, ParseError, ParseRelationExpression } from './relation-expression';
 
 // Export the entire Objection namespace.
 export = Objection;
@@ -140,14 +135,15 @@ declare namespace Objection {
    */
   type RefExpression<M> = [RefColumnName<M>] extends [never]
     ? string
-    : | RefColumnName<M>
-      | `${string}.${RefColumnName<M>}`
-      | '*'
-      | {
-          [K in JsonColumnName<M>]: `${K | `${string}.${K}`}:${JsonFieldPath<
-            Exclude<M[K & keyof M], null | undefined>
-          >}`;
-        }[JsonColumnName<M>];
+    :
+        | RefColumnName<M>
+        | `${string}.${RefColumnName<M>}`
+        | '*'
+        | {
+            [K in JsonColumnName<M>]: `${K | `${string}.${K}`}:${JsonFieldPath<
+              Exclude<M[K & keyof M], null | undefined>
+            >}`;
+          }[JsonColumnName<M>];
 
   type RefValue<M, E> = E extends `${string}:${string}`
     ? unknown
@@ -305,7 +301,12 @@ declare namespace Objection {
    * An argument of an `fn` helper. Strings are values; use `ref()` for columns.
    */
   type FnArg =
-    ReferenceBuilder | Raw | FunctionBuilder<any> | ValueBuilder | AnyQueryBuilder | PrimitiveValue;
+    | ReferenceBuilder
+    | Raw
+    | FunctionBuilder<any>
+    | ValueBuilder
+    | AnyQueryBuilder
+    | PrimitiveValue;
   /**
    * A JSON document argument. Objects and arrays are cast to JSON.
    */
@@ -1152,7 +1153,10 @@ declare namespace Objection {
   type AnyModelConstructor = ModelConstructor<Model>;
   type ModifierFunction<QB extends AnyQueryBuilder> = (qb: QB, ...args: any[]) => void;
   type Modifier<QB extends AnyQueryBuilder = AnyQueryBuilder> =
-    ModifierFunction<QB> | string | string[] | Record<string, Expression<PrimitiveValue>>;
+    | ModifierFunction<QB>
+    | string
+    | string[]
+    | Record<string, Expression<PrimitiveValue>>;
   type OrderByDirection = 'asc' | 'desc' | 'ASC' | 'DESC';
   type OrderByNulls = 'first' | 'last';
 
@@ -1199,10 +1203,11 @@ declare namespace Objection {
     CheckModifiers extends boolean,
   > =
     N['rel'] extends RelationNameKeys<M>
-      ? | (CheckModifiers extends true
-            ? ModifierNameErrors<RelatedModel<M, N['rel']>, N['mods'], `${Path}${Prop}`>
-            : never)
-        | GraphErrors<RelatedModel<M, N['rel']>, N['children'], `${Path}${Prop}.`, CheckModifiers>
+      ?
+          | (CheckModifiers extends true
+              ? ModifierNameErrors<RelatedModel<M, N['rel']>, N['mods'], `${Path}${Prop}`>
+              : never)
+          | GraphErrors<RelatedModel<M, N['rel']>, N['children'], `${Path}${Prop}.`, CheckModifiers>
       : Path extends `${infer Parent}.`
         ? `Unknown relation "${N['rel']}" at "${Parent}"`
         : `Unknown relation "${N['rel']}"`;
@@ -1285,9 +1290,9 @@ declare namespace Objection {
   type Without<I, K> = { [P in keyof I as P extends K ? never : P]: I[P] };
 
   type LoadedRelations<I, M, Children> = {
-    -readonly [
-      P in keyof Children as Children[P] extends { maybe: true } ? never : P
-    ]: LoadedRelation<I, M, P, Children[P]>;
+    -readonly [P in keyof Children as Children[P] extends { maybe: true }
+      ? never
+      : P]: LoadedRelation<I, M, P, Children[P]>;
   } & MaybeLoadedRelations<I, M, Children>;
 
   // Relations with a `boolean` in object notation, which may not be loaded.
@@ -1296,9 +1301,9 @@ declare namespace Objection {
   ] extends [never]
     ? unknown
     : {
-        -readonly [
-          P in keyof Children as Children[P] extends { maybe: true } ? P : never
-        ]?: LoadedRelation<I, M, P, Children[P]>;
+        -readonly [P in keyof Children as Children[P] extends { maybe: true }
+          ? P
+          : never]?: LoadedRelation<I, M, P, Children[P]>;
       };
 
   // The type of the relation property `P` loaded by node `N`.
@@ -2648,7 +2653,8 @@ declare namespace Objection {
     M extends Model,
     R = M[],
     S extends QueryBuilderState = DefaultQueryBuilderState<M, R>,
-  > implements CatchablePromiseLike<R> {
+  > implements CatchablePromiseLike<R>
+  {
     static forClass: ForClassMethod;
 
     /**
@@ -3159,9 +3165,8 @@ declare namespace Objection {
 
   type RelationCardinality = 'one' | 'many';
 
-  export interface RelationType<
-    C extends RelationCardinality = RelationCardinality,
-  > extends Constructor<Relation> {
+  export interface RelationType<C extends RelationCardinality = RelationCardinality>
+    extends Constructor<Relation> {
     // Type-only: whether the relation is to one model or to many models.
     '~cardinality'?: C;
   }
@@ -3185,10 +3190,14 @@ declare namespace Objection {
   type RelatedModelClassOf<C> =
     IsAnyType<C> extends true
       ? never
-      : C extends abstract new (...args: any[]) => Model
+      : C extends abstract new (
+            ...args: any[]
+          ) => Model
         ? C
         : C extends () => infer K
-          ? K extends abstract new (...args: any[]) => Model
+          ? K extends abstract new (
+              ...args: any[]
+            ) => Model
             ? K
             : never
           : never;
@@ -3273,7 +3282,9 @@ declare namespace Objection {
    * The instance type of model class `MC`, including the relation properties
    * inferred from its `relationMappings` that the class doesn't declare.
    */
-  export type ModelInstance<MC> = MC extends abstract new (...args: any[]) => infer I
+  export type ModelInstance<MC> = MC extends abstract new (
+    ...args: any[]
+  ) => infer I
     ? WithModelModifiers<
         MC,
         [Exclude<keyof RelationMappingsOf<MC>, keyof I>] extends [never]
@@ -3459,7 +3470,10 @@ declare namespace Objection {
   }
 
   export type ValidationErrorType =
-    'ModelValidation' | 'RelationExpression' | 'UnallowedRelation' | 'InvalidGraph';
+    | 'ModelValidation'
+    | 'RelationExpression'
+    | 'UnallowedRelation'
+    | 'InvalidGraph';
 
   export class ValidationError extends Error {
     constructor(args: CreateValidationErrorArgs & { modelClass?: ModelClass<Model> });
@@ -3534,7 +3548,8 @@ declare namespace Objection {
 
   // for internal use on generic static this deduction, copied from https://github.com/microsoft/TypeScript/issues/5863#issuecomment-1483978415
   type ConstructorType<T = unknown, Static extends Record<string, any> = PrototypeType<T>> = (
-    ConstructorFunctionType<T> | PrototypeType<T>
+    | ConstructorFunctionType<T>
+    | PrototypeType<T>
   ) & {
     [Key in keyof Static]: Static[Key];
   };
@@ -3980,7 +3995,14 @@ declare namespace Objection {
    * @see https://tools.ietf.org/html/draft-handrews-json-schema-validation-01#section-6.1.1
    */
   export type JSONSchemaTypeName =
-    'string' | 'number' | 'integer' | 'boolean' | 'object' | 'array' | 'null' | string;
+    | 'string'
+    | 'number'
+    | 'integer'
+    | 'boolean'
+    | 'object'
+    | 'array'
+    | 'null'
+    | string;
 
   export type JSONSchemaType = JSONSchemaArray[] | boolean | number | null | object | string;
 

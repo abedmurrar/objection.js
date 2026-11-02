@@ -3,7 +3,7 @@ const { Model } = require('../../../');
 
 module.exports = (session) => {
   describe('relation $beforeInsert not called when insertGraph is used #1627', () => {
-    let knex = session.knex;
+    const knex = session.knex;
     let User;
     let Role;
 

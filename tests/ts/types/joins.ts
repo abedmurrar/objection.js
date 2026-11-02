@@ -1,4 +1,4 @@
-import { Model, ref, raw, JoinBuilder } from '../../../';
+import { Model, ref, raw, type JoinBuilder } from '../../../';
 import { expectType } from '../_utils/expect';
 
 class Person extends Model {

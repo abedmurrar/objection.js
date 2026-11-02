@@ -23,7 +23,7 @@ async () => {
 };
 
 // The documented way to combine plugins with a custom query builder.
-import { QueryBuilder, QueryBuilderState, DefaultQueryBuilderState } from '../../../';
+import { QueryBuilder, type QueryBuilderState, type DefaultQueryBuilderState } from '../../../';
 
 class CustomQueryBuilder<
   M extends Model,

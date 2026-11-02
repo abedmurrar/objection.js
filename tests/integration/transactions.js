@@ -4,8 +4,8 @@ const transaction = require('../../').transaction;
 const knexUtils = require('../../lib/utils/knexUtils');
 
 module.exports = (session) => {
-  let Model1 = session.models.Model1;
-  let Model2 = session.models.Model2;
+  const Model1 = session.models.Model1;
+  const Model2 = session.models.Model2;
 
   describe('transaction', () => {
     beforeEach(() => {
@@ -604,7 +604,7 @@ module.exports = (session) => {
     });
 
     it('bound model class should accept unbound model instances', (done) => {
-      let unboundModel = Model1.fromJson({ model1Prop1: '123' });
+      const unboundModel = Model1.fromJson({ model1Prop1: '123' });
 
       transaction(Model1, (Model1) => {
         return Model1.query().insert(unboundModel);

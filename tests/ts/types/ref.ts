@@ -1,4 +1,4 @@
-import { Model, ReferenceBuilder } from '../../../';
+import { Model, type ReferenceBuilder } from '../../../';
 import { expectType } from '../_utils/expect';
 
 interface Address {

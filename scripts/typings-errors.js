@@ -10,9 +10,9 @@
 // TypeScript 7 has no stable JavaScript API, so this runs `tsc` and reads its
 // diagnostics from the output.
 
-const fs = require('fs');
-const path = require('path');
-const { spawnSync } = require('child_process');
+const fs = require('node:fs');
+const path = require('node:path');
+const { spawnSync } = require('node:child_process');
 
 const rootDir = path.join(__dirname, '..');
 const testDir = path.join(rootDir, 'tests', 'ts-errors');
@@ -82,7 +82,9 @@ function main() {
 
   for (const diagnostic of diagnostics) {
     if (!fileNames.includes(diagnostic.file)) {
-      failures.push(`${path.relative(rootDir, diagnostic.file)}: unexpected error:\n  ${diagnostic.message}`);
+      failures.push(
+        `${path.relative(rootDir, diagnostic.file)}: unexpected error:\n  ${diagnostic.message}`,
+      );
     }
   }
 
@@ -96,7 +98,9 @@ function main() {
       if (expectation && diagnostic.message.includes(expectation.text)) {
         expectation.found = true;
       } else if (!expectation || !expectation.found) {
-        failures.push(`${relativeName}:${diagnostic.line}: unexpected error:\n  ${diagnostic.message}`);
+        failures.push(
+          `${relativeName}:${diagnostic.line}: unexpected error:\n  ${diagnostic.message}`,
+        );
       }
     }
 

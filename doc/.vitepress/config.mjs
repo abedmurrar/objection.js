@@ -77,18 +77,14 @@ export default defineConfig({
         '': 'module objection',
       }),
 
-      '/api/query-builder/': section(
-        'Query Builder API Reference',
-        '/api/query-builder/',
-        {
-          'find-methods': 'Find Methods',
-          'mutate-methods': 'Mutating Methods',
-          'eager-methods': 'Eager Loading Methods',
-          'join-methods': 'Join Methods',
-          'other-methods': 'Other Methods',
-          'static-methods': 'Static Methods',
-        },
-      ),
+      '/api/query-builder/': section('Query Builder API Reference', '/api/query-builder/', {
+        'find-methods': 'Find Methods',
+        'mutate-methods': 'Mutating Methods',
+        'eager-methods': 'Eager Loading Methods',
+        'join-methods': 'Join Methods',
+        'other-methods': 'Other Methods',
+        'static-methods': 'Static Methods',
+      }),
 
       '/recipes/': section('Recipes', '/recipes/', {
         'raw-queries': 'Raw queries',
@@ -103,19 +99,16 @@ export default defineConfig({
         'custom-id-column': 'Custom id column',
         'extra-properties': 'Join table extra properties',
         'custom-validation': 'Custom validation',
-        'snake-case-to-camel-case-conversion':
-          'Snake case to camel case conversion',
+        'snake-case-to-camel-case-conversion': 'Snake case to camel case conversion',
         paging: 'Paging',
         'returning-tricks': 'PostgreSQL "returning" tricks',
         timestamps: 'Timestamps',
         'custom-query-builder': 'Custom query builder',
-        'multitenancy-using-multiple-databases':
-          'Multitenancy using multiple databases',
+        'multitenancy-using-multiple-databases': 'Multitenancy using multiple databases',
         'default-values': 'Default values',
         'error-handling': 'Error handling',
         'ternary-relationships': 'Ternary relationships',
-        'indexing-postgresql-jsonb-columns':
-          'Indexing PostgreSQL JSONB columns',
+        'indexing-postgresql-jsonb-columns': 'Indexing PostgreSQL JSONB columns',
       }),
 
       '/fork/': section('Fork Additions', '/fork/', {

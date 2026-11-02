@@ -212,7 +212,7 @@ describe('utils', () => {
         const numItems = 20;
         let running = 0;
         let maxRunning = 0;
-        let startOrder = [];
+        const startOrder = [];
 
         return map(range(numItems), (item, index) => {
           startOrder.push(item);
@@ -268,7 +268,7 @@ describe('utils', () => {
         const numItems = 20;
 
         let running = 0;
-        let startOrder = [];
+        const startOrder = [];
 
         return map(
           range(numItems),
@@ -294,7 +294,7 @@ describe('utils', () => {
       it('should work with synchronous callbacks', () => {
         const concurrency = 4;
         const numItems = 20;
-        let startOrder = [];
+        const startOrder = [];
 
         return map(
           range(numItems),

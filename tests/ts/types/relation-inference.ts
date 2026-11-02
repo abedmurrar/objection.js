@@ -1,17 +1,17 @@
 import {
   Model,
   QueryBuilder,
-  QueryBuilderState,
-  DefaultQueryBuilderState,
-  RelationMappingsThunk,
-  ModelInstance,
-  ModelProps,
-  ModelRelations,
-  ModelRow,
-  RelationsOf,
+  type QueryBuilderState,
+  type DefaultQueryBuilderState,
+  type RelationMappingsThunk,
+  type ModelInstance,
+  type ModelProps,
+  type ModelRelations,
+  type ModelRow,
+  type RelationsOf,
   defineRelations,
 } from '../../../';
-import { Equal, Expect, expectType } from '../_utils/expect';
+import { type Equal, type Expect, expectType } from '../_utils/expect';
 
 // Relation types are inferred from `relationMappings`. The relation properties
 // don't need to be declared in the model.

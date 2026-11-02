@@ -3,7 +3,7 @@ const { expect } = require('chai');
 
 module.exports = (session) => {
   describe(`Recursive eagering with an alias doesn't work with 1-m or m-m relations #1223`, () => {
-    let knex = session.knex;
+    const knex = session.knex;
     let Person;
 
     before(() => {

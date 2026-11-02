@@ -5,7 +5,7 @@ const { Model, ref } = require('../../../');
 module.exports = (session) => {
   if (utils.isPostgres(session.knex)) {
     describe('Eagered grandparents disappear when selecting the pkey as an alias on eagered parents #403', () => {
-      let knex = session.knex;
+      const knex = session.knex;
       let Page;
 
       before(() => {

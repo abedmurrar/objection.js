@@ -3,7 +3,7 @@ const { expect } = require('chai');
 
 module.exports = (session) => {
   describe(`selects in relationMapping filters don't work #1074`, () => {
-    let knex = session.knex;
+    const knex = session.knex;
     let Person;
 
     before(() => {

@@ -2,8 +2,8 @@ const expect = require('expect.js');
 const chai = require('chai');
 
 module.exports = (session) => {
-  let Model1 = session.models.Model1;
-  let Model2 = session.models.Model2;
+  const Model1 = session.models.Model1;
+  const Model2 = session.models.Model2;
 
   describe('Model relate queries', () => {
     describe('.$query()', () => {

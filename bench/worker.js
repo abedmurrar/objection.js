@@ -3,7 +3,7 @@
 // Runs one scenario in this process and prints the result as JSON.
 // Started by run.js and compare.js with `node --expose-gc`.
 
-const path = require('path');
+const path = require('node:path');
 
 async function main() {
   const [scenarioFile, caseName, lib, samples, sampleMs, warmupMs] = process.argv.slice(2);
@@ -16,7 +16,7 @@ async function main() {
 
   // Warm up, and find a batch size that takes about `sampleMs`.
   let batch = 1;
-  let warmupStart = now();
+  const warmupStart = now();
 
   while (now() - warmupStart < Number(warmupMs) * 1e6) {
     const start = now();

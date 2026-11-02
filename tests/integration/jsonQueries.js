@@ -34,7 +34,7 @@ module.exports = (session) => {
       }
     }
 
-    let BoundModel = ModelJson.bindKnex(session.knex);
+    const BoundModel = ModelJson.bindKnex(session.knex);
 
     before(() => {
       return session.knex.schema
@@ -880,7 +880,7 @@ module.exports = (session) => {
         );
 
         it('should not find results jsonObject.objectField @> complexJsonObj.jsonObject.objectField that has additional key', () => {
-          let obj = cloneDeep(complexJsonObj.jsonObject.objectField);
+          const obj = cloneDeep(complexJsonObj.jsonObject.objectField);
           obj.otherKey = 'Im here too!';
 
           return BoundModel.query()
@@ -893,7 +893,7 @@ module.exports = (session) => {
         itPostgres(
           'should not find results jsonObject.objectField @> complexJsonObj.jsonObject.objectField that has additional key',
           () => {
-            let obj = cloneDeep(complexJsonObj.jsonObject.objectField);
+            const obj = cloneDeep(complexJsonObj.jsonObject.objectField);
             obj.otherKey = 'Im here too!';
 
             return BoundModel.query()
@@ -1149,7 +1149,7 @@ module.exports = (session) => {
         );
 
         it('should find results jsonObject.objectField <@ complexJsonObj.jsonObject.objectField that has additional key', () => {
-          let obj = cloneDeep(complexJsonObj.jsonObject.objectField);
+          const obj = cloneDeep(complexJsonObj.jsonObject.objectField);
           obj.otherKey = 'Im here too!';
 
           return BoundModel.query()
@@ -1162,7 +1162,7 @@ module.exports = (session) => {
         itPostgres(
           'should find results jsonObject.objectField <@ complexJsonObj.jsonObject.objectField that has additional key',
           () => {
-            let obj = cloneDeep(complexJsonObj.jsonObject.objectField);
+            const obj = cloneDeep(complexJsonObj.jsonObject.objectField);
             obj.otherKey = 'Im here too!';
 
             return BoundModel.query()
@@ -1508,7 +1508,7 @@ module.exports = (session) => {
             });
         });
 
-        it('should be able to find numbers with >', () => {
+        it('should be able to find numbers with > (with casts)', () => {
           return BoundModel.query()
             .where(ref('jsonObject:numberField').castFloat(), '>', val(1.4).castFloat())
             .then((results) => {
@@ -1536,7 +1536,7 @@ module.exports = (session) => {
             });
         });
 
-        it('should be able to find strings with =', () => {
+        it('should be able to find strings with = (with casts)', () => {
           return BoundModel.query()
             .where(
               ref('jsonObject:stringField').castText(),
@@ -1557,7 +1557,7 @@ module.exports = (session) => {
             });
         });
 
-        it('should be able to find every but first row where booleanField equals true or is NULL', () => {
+        it('should be able to find every but first row where booleanField equals true or is NULL (with casts)', () => {
           return BoundModel.query()
             .where(ref('jsonObject:booleanField').castBool(), '=', val(true).castBool())
             .orWhere(ref('jsonObject:booleanField'), 'IS', null)

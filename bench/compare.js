@@ -6,8 +6,8 @@
 //   npm run bench:compare -- --baseline ../objection-main
 //   npm run bench:compare -- --baseline ../objection-main --filter graph --rounds 7
 
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 const { listCases, runCase, median, mad, parseArgs, formatTime, table } = require('./harness');
 
 const opt = parseArgs(process.argv.slice(2), {

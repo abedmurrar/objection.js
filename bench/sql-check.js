@@ -6,8 +6,8 @@
 //
 //   node bench/sql-check.js --baseline ../objection-main
 
-const path = require('path');
-const { execFileSync } = require('child_process');
+const path = require('node:path');
+const { execFileSync } = require('node:child_process');
 const { parseArgs } = require('./harness');
 
 const opt = parseArgs(process.argv.slice(2), {

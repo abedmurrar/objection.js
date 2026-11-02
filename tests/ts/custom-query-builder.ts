@@ -1,9 +1,9 @@
 import {
   Model,
   QueryBuilder,
-  TransactionOrKnex,
-  QueryBuilderState,
-  DefaultQueryBuilderState,
+  type TransactionOrKnex,
+  type QueryBuilderState,
+  type DefaultQueryBuilderState,
 } from '../../';
 
 class CustomQueryBuilder<

@@ -1,5 +1,5 @@
 const { setTimeout: sleep } = require('node:timers/promises');
-const path = require('path');
+const path = require('node:path');
 const knexUtils = require('../lib/utils/knexUtils');
 const { Model, transaction, snakeCaseMappers, ref } = require('../');
 const { cloneDeep } = require('../lib/utils/cloneDeep');

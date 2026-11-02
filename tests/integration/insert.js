@@ -5,8 +5,8 @@ const { inheritModel } = require('../../lib/model/inheritModel');
 const { ValidationError, UniqueViolationError } = require('../../');
 
 module.exports = (session) => {
-  let Model1 = session.models.Model1;
-  let Model2 = session.models.Model2;
+  const Model1 = session.models.Model1;
+  const Model2 = session.models.Model2;
 
   describe('Model insert queries', () => {
     describe('.query().insert()', () => {
@@ -34,7 +34,7 @@ module.exports = (session) => {
       });
 
       it('should insert new model', () => {
-        let model = Model1.fromJson({ model1Prop1: 'hello 3' });
+        const model = Model1.fromJson({ model1Prop1: 'hello 3' });
 
         return Model1.query()
           .insert(model)
@@ -65,7 +65,7 @@ module.exports = (session) => {
       });
 
       it('should insert new model (additionalProperties = false)', () => {
-        let Mod = inheritModel(Model1);
+        const Mod = inheritModel(Model1);
 
         Mod.jsonSchema = {
           type: 'object',
@@ -96,7 +96,7 @@ module.exports = (session) => {
       });
 
       it('should work with relations', () => {
-        let model = {
+        const model = {
           model1Prop1: 'hello 3',
           model1Relation1: { model1Prop1: 'hello 4' },
           model1Relation2: [{ model2Prop1: 'moro 1' }],
@@ -122,9 +122,9 @@ module.exports = (session) => {
       });
 
       it('should work with relations and additionalProperties = false', () => {
-        let Mod = inheritModel(Model1);
+        const Mod = inheritModel(Model1);
 
-        let model = {
+        const model = {
           model1Prop1: 'hello 3',
           model1Relation1: { model1Prop1: 'hello 4' },
           model1Relation2: [{ model2Prop1: 'moro 1' }],
@@ -160,7 +160,7 @@ module.exports = (session) => {
       });
 
       it('should ignore non-objects in relation properties', () => {
-        let model = {
+        const model = {
           model1Prop1: 'hello 3',
           model1Relation1: 1,
           model1Relation2: [1, 2, null, 4, undefined],
@@ -186,7 +186,7 @@ module.exports = (session) => {
       });
 
       it('should insert new model with identifier', () => {
-        let model = Model1.fromJson({ id: 1000, model1Prop1: 'hello 3' });
+        const model = Model1.fromJson({ id: 1000, model1Prop1: 'hello 3' });
 
         return Model1.query()
           .insert(model)
@@ -211,7 +211,7 @@ module.exports = (session) => {
       });
 
       it('should accept an array', () => {
-        let models = [
+        const models = [
           Model1.fromJson({ model1Prop1: 'hello 3' }),
           Model1.fromJson({ model1Prop1: 'hello 4' }),
         ];
@@ -348,7 +348,7 @@ module.exports = (session) => {
       }
 
       it('should validate', (done) => {
-        let ModelWithSchema = subClassWithSchema(Model1, {
+        const ModelWithSchema = subClassWithSchema(Model1, {
           type: 'object',
           properties: {
             id: { type: ['number', 'null'] },
@@ -383,7 +383,7 @@ module.exports = (session) => {
           }
         }
 
-        let ModelWithSchema = subClassWithSchema(Model1, {
+        const ModelWithSchema = subClassWithSchema(Model1, {
           type: 'object',
           properties: {
             id: { type: ['number', 'null'] },
@@ -468,7 +468,7 @@ module.exports = (session) => {
       });
 
       it('should insert and fetch new model', () => {
-        let model = Model1.fromJson({ model1Prop1: 'hello 3' });
+        const model = Model1.fromJson({ model1Prop1: 'hello 3' });
 
         return Model1.query()
           .insertAndFetch(model)
@@ -495,8 +495,8 @@ module.exports = (session) => {
       });
 
       it('should insert and fetch an array of new models', () => {
-        let model1 = Model1.fromJson({ model1Prop1: 'hello 3' });
-        let model2 = Model1.fromJson({ model1Prop1: 'hello 4', model1Prop2: 10 });
+        const model1 = Model1.fromJson({ model1Prop1: 'hello 3' });
+        const model2 = Model1.fromJson({ model1Prop1: 'hello 4', model1Prop2: 10 });
 
         return Model1.query()
           .insertAndFetch([model1, model2])
@@ -574,10 +574,10 @@ module.exports = (session) => {
       });
 
       it('model edits in $beforeInsert should get into database query', () => {
-        let model = Model1.fromJson({});
+        const model = Model1.fromJson({});
 
         model.$beforeInsert = function () {
-          let self = this;
+          const self = this;
           return sleep(1).then(() => {
             self.model1Prop1 = 'hello 3';
           });
@@ -1807,7 +1807,7 @@ module.exports = (session) => {
     });
 
     function subClassWithSchema(Model, schema) {
-      let SubModel = inheritModel(Model);
+      const SubModel = inheritModel(Model);
       SubModel.jsonSchema = schema;
       return SubModel;
     }

@@ -27,7 +27,7 @@ describe('RelationExpression', () => {
     });
 
     it('non-string', () => {
-      let expectedResult = {
+      const expectedResult = {
         $name: null,
         $relation: null,
         $modify: [],

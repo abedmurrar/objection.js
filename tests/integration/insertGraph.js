@@ -6,8 +6,8 @@ const expect = require('expect.js');
 const { transaction, ValidationError, Model } = require('../../');
 
 module.exports = (session) => {
-  let Model1 = session.models.Model1;
-  let Model2 = session.models.Model2;
+  const Model1 = session.models.Model1;
+  const Model2 = session.models.Model2;
 
   describe('Model insertGraph queries', () => {
     const eagerExpr = `[
@@ -763,11 +763,11 @@ module.exports = (session) => {
               return parent.$relatedQuery('model1Relation3');
             })
             .then((models) => {
-              let insertion = models.find((it) => it.model2Prop1 === 'howdy');
+              const insertion = models.find((it) => it.model2Prop1 === 'howdy');
               return insertion.$relatedQuery('model2Relation1').withGraphFetched(eagerExpr);
             })
             .then((models) => {
-              let model = models.find((it) => it.model1Prop1 === 'root');
+              const model = models.find((it) => it.model1Prop1 === 'root');
               return check(model);
             });
         });
@@ -776,7 +776,7 @@ module.exports = (session) => {
 
     function check(model, shouldCheckHooks) {
       model = model.$clone();
-      let knex = model.constructor.knex();
+      const knex = model.constructor.knex();
 
       expect(model).to.have.property('model1Relation1');
       expect(model.model1Relation1).to.have.property('model1Relation3');

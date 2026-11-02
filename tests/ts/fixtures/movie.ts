@@ -1,7 +1,7 @@
 import * as objection from '../../../';
-import { ref, RelationMappings } from '../../../';
+import { ref, type RelationMappings } from '../../../';
 import { Person } from './person';
-import { Review } from './review';
+import type { Review } from './review';
 
 export class Movie extends objection.Model {
   id!: number;

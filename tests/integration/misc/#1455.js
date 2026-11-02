@@ -3,7 +3,7 @@ const { expect } = require('chai');
 
 module.exports = (session) => {
   describe('UpsertGraph deletes rows for relation which is not mentioned in graph #1455', () => {
-    let knex = session.knex;
+    const knex = session.knex;
     let Role;
 
     beforeEach(() => {

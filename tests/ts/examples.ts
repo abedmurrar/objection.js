@@ -1,16 +1,16 @@
-import { Equal, expectType } from './_utils/expect';
-import Ajv from 'ajv';
-import { Knex, knex } from 'knex';
+import { type Equal, expectType } from './_utils/expect';
+import type Ajv from 'ajv';
+import { type Knex, knex } from 'knex';
 import * as objection from '../../';
 import {
   DBError,
   fn,
-  QueryBuilder,
+  type QueryBuilder,
   raw,
   ref,
-  RelationMapping,
-  RelationMappings,
-  StaticHookArguments,
+  type RelationMapping,
+  type RelationMappings,
+  type StaticHookArguments,
   val,
 } from '../../';
 
@@ -49,12 +49,10 @@ class Person extends objection.Model {
   // With TypeScript 2.7, fields in models need either optionality:
   firstName?: string;
   // Or for not-null fields that are always initialized, you can use the new ! syntax:
-  // prettier-ignore
   lastName!: string;
   mom?: Person;
   children?: Person[];
   // Note that $relatedQuery won't work for optional fields (at least until TS 2.8), so this gets a !:
-  // prettier-ignore
   pets!: Animal[];
   comments?: Comment[];
   movies?: Movie[];
@@ -136,7 +134,7 @@ class Person extends objection.Model {
 
   static createValidationError(args: objection.CreateValidationErrorArgs) {
     const { message, type, data } = args;
-    const errorItem: objection.ValidationErrorItem = data['someProp'];
+    const errorItem: objection.ValidationErrorItem = data.someProp;
     const itemMessage: string = errorItem.message;
     return new CustomValidationError('my custom error: ' + message + ' ' + itemMessage);
   }
@@ -308,11 +306,8 @@ async () => {
 };
 
 class Movie extends objection.Model {
-  // prettier-ignore
   title!: string;
-  // prettier-ignore
   actors!: Person[];
-  // prettier-ignore
   director!: Person;
 
   // To-one relation queries return `undefined` if there's no related model.
@@ -371,7 +366,6 @@ const relatedPersons: PromiseLike<Person[]> = new Person().$relatedQuery('childr
 const relatedMovies: PromiseLike<Person[]> = new Movie().$relatedQuery('actors');
 
 class Animal extends objection.Model {
-  // prettier-ignore
   species!: string;
   name?: string;
   owner?: Person | null;
@@ -395,7 +389,6 @@ const takesMaybeAnimal = (_: Animal | undefined) => 1;
 const takesAnimals = (_: Animal[]) => 1;
 
 class Comment extends objection.Model {
-  // prettier-ignore
   comment!: string;
 }
 
@@ -1163,7 +1156,7 @@ const orderByColumns: PromiseLike<Person[]> = qb.orderBy([
   { column: 'lastName' },
 ]);
 
-const someModel1: typeof objection.Model = Person.getRelations()['pets'].joinModelClass;
+const someModel1: typeof objection.Model = Person.getRelations().pets.joinModelClass;
 const someModel2: typeof objection.Model = Person.getRelation('pets').ownerModelClass;
 
 // Verify that Model.query() and model.$query() return the same type of query builder.

@@ -3,7 +3,7 @@ const { expect } = require('chai');
 
 module.exports = (session) => {
   describe(`primary key to primary key relations with upsertGraph #1227`, () => {
-    let knex = session.knex;
+    const knex = session.knex;
     let Person, Animal;
 
     before(() => {

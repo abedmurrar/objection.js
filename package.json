@@ -5,19 +5,19 @@
   "main": "lib/objection.js",
   "license": "MIT",
   "scripts": {
-    "test": "npm run eslint && mocha --slow 10 --timeout 15000 --reporter spec --recursive tests --exclude \"tests/unit/relations/files/**\" && npm run test:typings",
+    "test": "npm run lint && mocha --slow 10 --timeout 15000 --reporter spec --recursive tests --exclude \"tests/unit/relations/files/**\" && npm run test:typings",
     "test:fast": "mocha --slow 10 --timeout 15000 --reporter spec --recursive tests --bail --exclude \"tests/unit/relations/files/**\"",
     "test:typings": "node scripts/generate-fn-typings.js --check && tsc && tsc -p tests/ts/tsconfig.loose.json && node scripts/typings-errors.js",
     "bench:typings": "node scripts/typings-bench.js",
     "bench": "node bench/run.js",
     "bench:compare": "node bench/compare.js",
-    "prettier": "prettier --write \"{examples,lib,tests,testUtils,typings,doc}/**/*.{js,ts}\"",
-    "eslint": "eslint --format codeframe \"examples/**/*.js\" \"lib/**/*.js\" \"tests/**/*.js\" \"bench/**/*.js\"",
+    "format": "biome check --write",
+    "lint": "biome check",
     "docs:dev": "vitepress dev doc",
     "docs:build": "vitepress build doc",
     "docs:preview": "vitepress preview doc",
     "release": "node scripts/release.js",
-    "prepublishOnly": "npm run eslint && npm run test:typings"
+    "prepublishOnly": "npm run lint && npm run test:typings"
   },
   "publishConfig": {
     "access": "public",
@@ -72,20 +72,16 @@
     "knex": ">=3.3.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.6.4",
     "@types/node": "^24.19.2",
     "chai": "^6.3.0",
     "chai-subset": "^1.6.0",
-    "eslint": "^10.14.0",
-    "eslint-formatter-codeframe": "^7.32.1",
-    "eslint-plugin-prettier": "^5.5.7",
     "expect.js": "^0.3.1",
-    "globals": "^17.14.0",
     "knex": "^3.3.0",
     "mariadb": "^3.5.4",
     "mocha": "^12.0.3",
     "mysql2": "^3.24.6",
     "pg": "^8.15.6",
-    "prettier": "^3.9.10",
     "sqlite3": "^6.0.1",
     "typescript": "^7.0.2",
     "vitepress": "2.0.0-alpha.21"

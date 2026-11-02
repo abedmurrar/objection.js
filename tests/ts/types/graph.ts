@@ -1,5 +1,11 @@
-import { Loaded, Model, ModelRow, QueryBuilder, RelationExpression } from '../../../';
-import { Equal, Expect, Flatten, expectType } from '../_utils/expect';
+import {
+  type Loaded,
+  Model,
+  type ModelRow,
+  type QueryBuilder,
+  type RelationExpression,
+} from '../../../';
+import { type Equal, type Expect, type Flatten, expectType } from '../_utils/expect';
 
 // The graph methods add the relations they load to the result type.
 

@@ -3,7 +3,7 @@ const { Model } = require('../../../');
 
 module.exports = (session) => {
   describe(`Ambiguous column mapping for RelationJoinBuilder (no table ref) #844`, () => {
-    let knex = session.knex;
+    const knex = session.knex;
     let Person;
     let Movie;
 

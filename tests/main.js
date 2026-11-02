@@ -2,7 +2,7 @@ const expect = require('expect.js');
 
 describe('main module', () => {
   it('should be able to load using require', () => {
-    let objection = require('../');
+    const objection = require('../');
 
     expect(objection.QueryBuilderBase).to.equal(
       require('../lib/queryBuilder/QueryBuilderBase').QueryBuilderBase,

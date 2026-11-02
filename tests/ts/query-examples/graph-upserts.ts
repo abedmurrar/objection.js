@@ -1,4 +1,4 @@
-import { UpsertGraphOptions } from '../../../typings/objection';
+import type { UpsertGraphOptions } from '../../../typings/objection';
 import { Person } from '../fixtures/person';
 import { Animal } from '../fixtures/animal';
 

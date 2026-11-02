@@ -4,11 +4,11 @@ import {
   ref,
   val,
   raw,
-  FunctionBuilder,
-  AggregateFunctionBuilder,
-  CaseBuilder,
+  type FunctionBuilder,
+  type AggregateFunctionBuilder,
+  type CaseBuilder,
 } from '../../../';
-import { expectType, Expect, Equal } from '../_utils/expect';
+import { expectType, type Expect, type Equal } from '../_utils/expect';
 
 type SqlBoolean = boolean | 0 | 1 | null;
 

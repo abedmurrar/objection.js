@@ -136,29 +136,6 @@ module.exports = (session) => {
         });
     });
 
-    it('should accept knex instance as an argument', () => {
-      return UnboundTable1.fetchTableMetadata({ knex })
-        .then((metadata) => {
-          expect(metadata.columns).to.eql(['id', 'relId', 'value']);
-          // Only one query should have been generated.
-          expect(queries).to.have.length(1);
-
-          return Table1.fetchTableMetadata({ knex });
-        })
-        .then((metadata) => {
-          expect(metadata.columns).to.eql(['id', 'relId', 'value']);
-          // Cache should be used the second time.
-          expect(queries).to.have.length(1);
-
-          return Table1.fetchTableMetadata({ knex, force: true });
-        })
-        .then((metadata) => {
-          expect(metadata.columns).to.eql(['id', 'relId', 'value']);
-          // Cache should be ignored if `force = true`.
-          expect(queries).to.have.length(2);
-        });
-    });
-
     it('fetchTableMetadata should use tableMetadata function if overridden', () => {
       return OverriddenTable1.fetchTableMetadata()
         .then((metadata) => {

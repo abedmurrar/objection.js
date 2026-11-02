@@ -44,7 +44,7 @@ module.exports = (session) => {
       });
 
       it('should patch a model (1)', () => {
-        let model = Model1.fromJson({ model1Prop1: 'updated text' });
+        const model = Model1.fromJson({ model1Prop1: 'updated text' });
 
         return Model1.query()
           .patch(model)
@@ -70,7 +70,7 @@ module.exports = (session) => {
       });
 
       it('should patch a model (2)', () => {
-        let model = Model2.fromJson({ model2Prop1: 'updated text' });
+        const model = Model2.fromJson({ model2Prop1: 'updated text' });
 
         return Model2.query()
           .patch(model)
@@ -241,7 +241,7 @@ module.exports = (session) => {
       });
 
       it('should validate (1)', (done) => {
-        let ModelWithSchema = subClassWithSchema(Model1, {
+        const ModelWithSchema = subClassWithSchema(Model1, {
           type: 'object',
           required: ['model1Prop2'],
           properties: {
@@ -284,7 +284,7 @@ module.exports = (session) => {
       });
 
       it('should skip requirement validation', (done) => {
-        let ModelWithSchema = subClassWithSchema(Model1, {
+        const ModelWithSchema = subClassWithSchema(Model1, {
           type: 'object',
           required: ['model1Prop2'],
           properties: {
@@ -393,7 +393,7 @@ module.exports = (session) => {
       });
 
       it('should patch and fetch a model', () => {
-        let model = Model1.fromJson({ model1Prop1: 'updated text' });
+        const model = Model1.fromJson({ model1Prop1: 'updated text' });
 
         return Model1.query()
           .patchAndFetchById(2, model)
@@ -428,7 +428,7 @@ module.exports = (session) => {
       });
 
       it('should work with `eager` method', () => {
-        let model = Model1.fromJson({ model1Prop1: 'updated text' });
+        const model = Model1.fromJson({ model1Prop1: 'updated text' });
 
         return Model1.query()
           .patchAndFetchById(1, model)
@@ -505,7 +505,7 @@ module.exports = (session) => {
       });
 
       it('should patch a model (1)', () => {
-        let model = Model1.fromJson({ id: 1 });
+        const model = Model1.fromJson({ id: 1 });
 
         return model
           .$query()
@@ -524,7 +524,7 @@ module.exports = (session) => {
 
       if (isPostgres(session.knex)) {
         it('should work with returning', () => {
-          let model = Model1.fromJson({ id: 1 });
+          const model = Model1.fromJson({ id: 1 });
 
           return model
             .$query()
@@ -587,7 +587,7 @@ module.exports = (session) => {
       });
 
       it('should pass the old values to $beforeUpdate and $afterUpdate hooks in options.old', () => {
-        let patch = Model1.fromJson({ model1Prop1: 'updated text' });
+        const patch = Model1.fromJson({ model1Prop1: 'updated text' });
 
         return Model1.fromJson({ id: 1 })
           .$query()
@@ -611,10 +611,10 @@ module.exports = (session) => {
       });
 
       it('model edits in $beforeUpdate should get into database query', () => {
-        let model = Model1.fromJson({ id: 1 });
+        const model = Model1.fromJson({ id: 1 });
 
         model.$beforeUpdate = function () {
-          let self = this;
+          const self = this;
           return sleep(1).then(() => {
             self.model1Prop1 = 'updated text';
           });
@@ -635,7 +635,7 @@ module.exports = (session) => {
       });
 
       it('should throw if the id is undefined', (done) => {
-        let model = Model1.fromJson({ model1Prop2: 1 });
+        const model = Model1.fromJson({ model1Prop2: 1 });
 
         model
           .$query()
@@ -653,7 +653,7 @@ module.exports = (session) => {
       });
 
       it('should throw if the id is null', (done) => {
-        let model = Model1.fromJson({ id: null });
+        const model = Model1.fromJson({ id: null });
 
         model
           .$query()
@@ -700,7 +700,7 @@ module.exports = (session) => {
       });
 
       it('should patch and fetch a model', () => {
-        let model = ModelOne.fromJson({ id: 1 });
+        const model = ModelOne.fromJson({ id: 1 });
 
         return model
           .$query()
@@ -2341,7 +2341,7 @@ module.exports = (session) => {
     });
 
     function subClassWithSchema(Model, schema) {
-      let SubModel = inheritModel(Model);
+      const SubModel = inheritModel(Model);
       SubModel.jsonSchema = schema;
       return SubModel;
     }

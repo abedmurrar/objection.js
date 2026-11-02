@@ -12,12 +12,12 @@ describe('JoinBuilder', () => {
       }
     }
 
-    let ignore = [];
+    const ignore = [];
 
-    let knexJoinClause = new JoinClause();
-    let builder = JoinBuilder.forClass(TestModel);
-    for (let name in knexJoinClause) {
-      let func = knexJoinClause[name];
+    const knexJoinClause = new JoinClause();
+    const builder = JoinBuilder.forClass(TestModel);
+    for (const name in knexJoinClause) {
+      const func = knexJoinClause[name];
       console.log('checking', name, typeof func);
       if (typeof func === 'function' && ignore.indexOf(name) === -1) {
         if (typeof builder[name] !== 'function') {

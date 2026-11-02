@@ -1,6 +1,6 @@
 import { Person } from './fixtures/person';
-import { Animal } from './fixtures/animal';
-import { ModelClass } from '../../';
+import type { Animal } from './fixtures/animal';
+import type { ModelClass } from '../../';
 
 (async () => {
   const query = Person.query();

@@ -7,8 +7,8 @@
 // The notes of the next release are collected under `## Unreleased`.
 // `scripts/release.js` turns that heading into `## <version> (<date>)`.
 
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const changelogPath = path.join(__dirname, '..', 'doc', 'release-notes', 'changelog.md');
 const UNRELEASED = '## Unreleased';

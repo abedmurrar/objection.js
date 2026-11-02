@@ -3,7 +3,7 @@ const { expect } = require('chai');
 
 module.exports = (session) => {
   describe(`relations should be loaded lazily #1202`, () => {
-    let knex = session.knex;
+    const knex = session.knex;
     let Person;
     let loadedRelations = [];
 

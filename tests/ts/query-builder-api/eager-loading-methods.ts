@@ -28,16 +28,18 @@ import { Person } from '../fixtures/person';
       },
     });
 
-  await Person.query().modifiers({
-    // You can bind arguments to Model modifiers like this
-    filterFemale(builder) {
-      builder.modify('filterGender', 'female');
-    },
+  await Person.query()
+    .modifiers({
+      // You can bind arguments to Model modifiers like this
+      filterFemale(builder) {
+        builder.modify('filterGender', 'female');
+      },
 
-    filterDogs(builder) {
-      builder.modify('filterSpecies', 'dog');
-    },
-  }).withGraphFetched(`
+      filterDogs(builder) {
+        builder.modify('filterSpecies', 'dog');
+      },
+    })
+    .withGraphFetched(`
     children(defaultSelects, orderByAge, filterFemale).[
       pets(filterDogs, orderByName),
       movies

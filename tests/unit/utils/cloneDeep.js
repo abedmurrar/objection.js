@@ -42,7 +42,8 @@ describe('cloneDeep', () => {
     });
 
     it('should turn holes of arrays into undefined', () => {
-      const clone = cloneDeep([1, , 3]); // eslint-disable-line no-sparse-arrays
+      // biome-ignore lint/suspicious/noSparseArray: the test is about the hole.
+      const clone = cloneDeep([1, , 3]);
 
       expect(clone).to.have.length(3);
       expect(Object.keys(clone)).to.eql(['0', '1', '2']);

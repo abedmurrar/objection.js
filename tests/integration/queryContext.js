@@ -19,8 +19,8 @@ module.exports = (session) => {
         mock.executedQueries.push(this.toString());
 
         if (mock.results.length) {
-          let result = mock.results.shift() || [];
-          let promise = Promise.resolve(result);
+          const result = mock.results.shift() || [];
+          const promise = Promise.resolve(result);
           return promise.then.apply(promise, args);
         } else {
           return origImpl.apply(this, args);
@@ -78,8 +78,8 @@ module.exports = (session) => {
     });
 
     it('should get passed to the $afterFind method', () => {
-      let Model = inheritModel(Model1);
-      let context = { a: 1, b: '2' };
+      const Model = inheritModel(Model1);
+      const context = { a: 1, b: '2' };
       let called = false;
 
       Model.prototype.$afterFind = (queryContext) => {
@@ -99,8 +99,8 @@ module.exports = (session) => {
     });
 
     it('should get passed to the $beforeUpdate method', () => {
-      let Model = inheritModel(Model1);
-      let context = { a: 1, b: '2' };
+      const Model = inheritModel(Model1);
+      const context = { a: 1, b: '2' };
       let called = false;
 
       Model.prototype.$beforeUpdate = function (opt, queryContext) {
@@ -121,8 +121,8 @@ module.exports = (session) => {
     });
 
     it('should get passed to the $afterUpdate method', () => {
-      let Model = inheritModel(Model1);
-      let context = { a: 1, b: '2' };
+      const Model = inheritModel(Model1);
+      const context = { a: 1, b: '2' };
       let called = false;
 
       Model.prototype.$afterUpdate = function (opt, queryContext) {
@@ -143,8 +143,8 @@ module.exports = (session) => {
     });
 
     it('should get passed to the $beforeInsert method', () => {
-      let Model = inheritModel(Model1);
-      let context = { a: 1, b: '2' };
+      const Model = inheritModel(Model1);
+      const context = { a: 1, b: '2' };
       let called = false;
 
       Model.prototype.$beforeInsert = (queryContext) => {
@@ -164,8 +164,8 @@ module.exports = (session) => {
     });
 
     it('should get passed to the $afterInsert method', () => {
-      let Model = inheritModel(Model1);
-      let context = { a: 1, b: '2' };
+      const Model = inheritModel(Model1);
+      const context = { a: 1, b: '2' };
       let called = false;
 
       Model.prototype.$afterInsert = (queryContext) => {
@@ -185,8 +185,8 @@ module.exports = (session) => {
     });
 
     it('should get passed to the $beforeDelete method', () => {
-      let Model = inheritModel(Model1);
-      let context = { a: 1, b: '2' };
+      const Model = inheritModel(Model1);
+      const context = { a: 1, b: '2' };
       let called = false;
 
       Model.prototype.$beforeDelete = (queryContext) => {
@@ -207,8 +207,8 @@ module.exports = (session) => {
     });
 
     it('should get passed to the $afterDelete method', () => {
-      let Model = inheritModel(Model1);
-      let context = { a: 1, b: '2' };
+      const Model = inheritModel(Model1);
+      const context = { a: 1, b: '2' };
       let called = false;
 
       Model.prototype.$afterDelete = (queryContext) => {
@@ -229,10 +229,10 @@ module.exports = (session) => {
     });
 
     it('mergeContex should merge values into the context', () => {
-      let Model = inheritModel(Model1);
-      let context = { a: 1, b: '2' };
-      let merge1 = { c: [10, 11] };
-      let merge2 = { d: false };
+      const Model = inheritModel(Model1);
+      const context = { a: 1, b: '2' };
+      const merge1 = { c: [10, 11] };
+      const merge2 = { d: false };
       let called = false;
 
       Model.prototype.$afterDelete = (queryContext) => {
@@ -259,7 +259,7 @@ module.exports = (session) => {
       // so that we can use postgres specific SQL to make the tests simpler.
 
       it('both queries started by `insertAndFetch` should share the same context', () => {
-        let queries = [];
+        const queries = [];
 
         return (
           Model1.query()
@@ -294,7 +294,7 @@ module.exports = (session) => {
       });
 
       it('both queries started by `updateAndFetchById` should share the same context', () => {
-        let queries = [];
+        const queries = [];
 
         return (
           Model1.query()
@@ -329,7 +329,7 @@ module.exports = (session) => {
       });
 
       it('all queries created by insertWithRelated should share the same context', () => {
-        let queries = [];
+        const queries = [];
 
         // We create a query with `insertWithRelated` method that causes multiple queries to be executed.
         // We install hooks using for the context object and check that the modifications made in those
@@ -444,7 +444,7 @@ module.exports = (session) => {
       });
 
       it('all queries created by a eager query should share the same context', () => {
-        let queries = [];
+        const queries = [];
 
         // We create a query with `eager` method that causes multiple queries to be executed.
         // We install hooks using for the context object and check that the modifications made in those
@@ -560,7 +560,7 @@ module.exports = (session) => {
       it('subquery should be able to override the context (1)', () => {
         // Disable the actual database query because we use a schema that doesn't exists.
         mockKnex.results.push([]);
-        let queries = [];
+        const queries = [];
 
         return Model1.query()
           .withSchema('public')
@@ -583,7 +583,7 @@ module.exports = (session) => {
       it('subquery should be able to override the context (2)', () => {
         // Disable the actual database query because we use a schema that doesn't exists.
         mockKnex.results.push([]);
-        let queries = [];
+        const queries = [];
 
         return Model1.query()
           .select(Model2.query().withSchema('someSchema').avg('model2Prop1').as('avg'))
@@ -606,7 +606,7 @@ module.exports = (session) => {
       it('subquery should be able to override the context (3)', () => {
         // Disable the actual database query because we use a schema that doesn't exists.
         mockKnex.results.push([]);
-        let queries = [];
+        const queries = [];
 
         return Model1.query()
           .withSchema('public')
@@ -631,7 +631,7 @@ module.exports = (session) => {
       it('subquery should be able to override the context (4)', () => {
         // Disable the actual database query because we use a schema that doesn't exists.
         mockKnex.results.push([]);
-        let queries = [];
+        const queries = [];
 
         return Model1.query()
           .select((builder) => {
@@ -669,7 +669,7 @@ module.exports = (session) => {
           });
 
           it('both queries created by an `insert` should share the same context', () => {
-            let queries = [];
+            const queries = [];
 
             return (
               model4
@@ -716,7 +716,7 @@ module.exports = (session) => {
           });
 
           it('the query created by `relate` should share the same context', () => {
-            let queries = [];
+            const queries = [];
 
             return (
               model4
@@ -749,7 +749,7 @@ module.exports = (session) => {
           });
 
           it('the query created by `unrelate` should share the same context', () => {
-            let queries = [];
+            const queries = [];
 
             return (
               model2
@@ -801,7 +801,7 @@ module.exports = (session) => {
           });
 
           it('the query created by `relate` should share the same context', () => {
-            let queries = [];
+            const queries = [];
 
             return (
               model
@@ -834,7 +834,7 @@ module.exports = (session) => {
           });
 
           it('the query created by `unrelate` should share the same context', () => {
-            let queries = [];
+            const queries = [];
 
             return (
               model
@@ -883,7 +883,7 @@ module.exports = (session) => {
           });
 
           it('both queries created by an insert should share the same context', () => {
-            let queries = [];
+            const queries = [];
 
             return (
               model
@@ -923,7 +923,7 @@ module.exports = (session) => {
           });
 
           it('the query created by `relate` should share the same context', () => {
-            let queries = [];
+            const queries = [];
 
             return (
               model
@@ -958,7 +958,7 @@ module.exports = (session) => {
           });
 
           it('the query created by `unrelate` should share the same context', () => {
-            let queries = [];
+            const queries = [];
 
             return (
               model
@@ -977,7 +977,7 @@ module.exports = (session) => {
                 .then(() => {
                   expect(mockKnex.executedQueries).to.eql(queries);
                   expect(mockKnex.executedQueries).to.eql([
-                    `delete from \"public\".\"Model1Model2\" where \"Model1Model2\".\"model1Id\" in (select \"Model1\".\"id\" from \"public\".\"Model1\" inner join \"public\".\"Model1Model2\" on \"Model1\".\"id\" = \"Model1Model2\".\"model1Id\" where \"Model1Model2\".\"model2Id\" in (1) and \"Model1\".\"id\" = 4) and \"Model1Model2\".\"model2Id\" in (1)`,
+                    `delete from "public"."Model1Model2" where "Model1Model2"."model1Id" in (select "Model1"."id" from "public"."Model1" inner join "public"."Model1Model2" on "Model1"."id" = "Model1Model2"."model1Id" where "Model1Model2"."model2Id" in (1) and "Model1"."id" = 4) and "Model1Model2"."model2Id" in (1)`,
                   ]);
 
                   return session.knex('Model1Model2');

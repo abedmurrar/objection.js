@@ -1,7 +1,7 @@
-import { transaction, Transaction } from '../../../';
+import { transaction, type Transaction } from '../../../';
 import { Animal } from '../fixtures/animal';
 import { Person } from '../fixtures/person';
-import { Knex } from 'knex';
+import type { Knex } from 'knex';
 
 (async () => {
   const knex = Person.knex();
@@ -18,6 +18,7 @@ import { Knex } from 'knex';
       return scrappy;
     });
   } catch (err) {
+    // biome-ignore lint/complexity/noUselessCatch: the example from the transactions guide.
     throw err;
   }
 

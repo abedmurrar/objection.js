@@ -9,9 +9,9 @@
 // Instantiation and type counts are deterministic for a given TypeScript
 // version, so they are compared instead of the (noisy) check time.
 
-const fs = require('fs');
-const path = require('path');
-const { execFileSync } = require('child_process');
+const fs = require('node:fs');
+const path = require('node:path');
+const { execFileSync } = require('node:child_process');
 
 const rootDir = path.join(__dirname, '..');
 const baselinePath = path.join(rootDir, 'tests', 'ts-bench-baseline.json');

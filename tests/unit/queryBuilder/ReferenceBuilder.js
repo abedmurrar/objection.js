@@ -17,28 +17,28 @@ describe('ReferenceBuilder', () => {
   });
 
   it('should create ReferenceBuilder', () => {
-    let reference = ref('Awwww.ItWorks');
+    const reference = ref('Awwww.ItWorks');
     expect(reference instanceof ReferenceBuilder).to.be.ok();
     expect(toRawArgs(reference)).to.eql(['??', ['Awwww.ItWorks']]);
   });
 
   it('table method should replace table', () => {
-    let reference = ref('Table.Column').table('Foo');
+    const reference = ref('Table.Column').table('Foo');
     expect(toRawArgs(reference)).to.eql(['??', ['Foo.Column']]);
   });
 
   it('should allow plain knex reference + casting', () => {
-    let reference = ref('Table.Column').castBigInt();
+    const reference = ref('Table.Column').castBigInt();
     expect(toRawArgs(reference)).to.eql(['CAST(?? AS bigint)', ['Table.Column']]);
   });
 
   it('should allow field expression + casting', () => {
-    let reference = ref('Table.Column:jsonAttr').castBool();
+    const reference = ref('Table.Column:jsonAttr').castBool();
     expect(toRawArgs(reference)).to.eql(["CAST(??#>>'{jsonAttr}' AS boolean)", ['Table.Column']]);
   });
 
   it('should allow field expression + no casting', () => {
-    let reference = ref('Table.Column:jsonAttr');
+    const reference = ref('Table.Column:jsonAttr');
     expect(toRawArgs(reference)).to.eql(["??#>'{jsonAttr}'", ['Table.Column']]);
   });
 

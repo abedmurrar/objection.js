@@ -6,9 +6,9 @@
 //   node scripts/generate-fn-typings.js           write the typings
 //   node scripts/generate-fn-typings.js --check   fail if they are out of date
 
-const fs = require('fs');
-const path = require('path');
-const prettier = require('prettier');
+const fs = require('node:fs');
+const path = require('node:path');
+const { execFileSync } = require('node:child_process');
 const {
   FUNCTIONS,
   INTERVAL_UNITS,
@@ -66,13 +66,22 @@ function replaceRegion(source, region, lines) {
   );
 }
 
-async function main() {
+// Formats the typings with Biome, as `npm run format` would.
+function format(source) {
+  const biome = path.join(__dirname, '..', 'node_modules', '.bin', 'biome');
+  return execFileSync(biome, ['format', `--stdin-file-path=${typingsPath}`], {
+    input: source,
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
+  });
+}
+
+function main() {
   const source = fs.readFileSync(typingsPath, 'utf8');
   let generated = replaceRegion(source, 'mysql-function-types', functionTypes());
   generated = replaceRegion(generated, 'mysql-functions', functionMembers());
 
-  const options = await prettier.resolveConfig(typingsPath);
-  generated = await prettier.format(generated, { ...options, filepath: typingsPath });
+  generated = format(generated);
 
   if (process.argv.includes('--check')) {
     if (generated !== source) {

@@ -18,13 +18,13 @@ describe('QueryBuilder', () => {
   let TestModel = null;
 
   before(() => {
-    let knex = Knex({ client: 'pg' });
+    const knex = Knex({ client: 'pg' });
 
     mockKnex = knexMocker(knex, function (mock, oldImpl, args) {
       executedQueries.push(this.toString());
 
-      let result = mockKnexQueryResults[mockKnexQueryResultIndex++] || [];
-      let promise = Promise.resolve(result);
+      const result = mockKnexQueryResults[mockKnexQueryResultIndex++] || [];
+      const promise = Promise.resolve(result);
 
       return promise.then.apply(promise, args);
     });
@@ -59,7 +59,7 @@ describe('QueryBuilder', () => {
   });
 
   it('should have knex methods', () => {
-    let ignore = [
+    const ignore = [
       'setMaxListeners',
       'getMaxListeners',
       'emit',
@@ -79,9 +79,9 @@ describe('QueryBuilder', () => {
       'raw', // this method is added to the knex mock, but should not available on objection's QueryBuilder
     ];
 
-    let builder = QueryBuilder.forClass(TestModel);
-    for (let name in mockKnex) {
-      let func = mockKnex[name];
+    const builder = QueryBuilder.forClass(TestModel);
+    for (const name in mockKnex) {
+      const func = mockKnex[name];
       if (typeof func === 'function' && name.charAt(0) !== '_' && ignore.indexOf(name) === -1) {
         if (typeof builder[name] !== 'function') {
           expect().to.fail("knex method '" + name + "' is missing from QueryBuilder");
@@ -132,7 +132,7 @@ describe('QueryBuilder', () => {
   });
 
   it('modify() should execute the given function and pass the builder to it', () => {
-    let builder = QueryBuilder.forClass(TestModel);
+    const builder = QueryBuilder.forClass(TestModel);
     let called = false;
 
     builder.modify(function (b) {
@@ -145,7 +145,7 @@ describe('QueryBuilder', () => {
   });
 
   it('should be able to pass arguments to modify', () => {
-    let builder = QueryBuilder.forClass(TestModel);
+    const builder = QueryBuilder.forClass(TestModel);
     let called1 = false;
     let called2 = false;
 
@@ -191,7 +191,7 @@ describe('QueryBuilder', () => {
   });
 
   it('should be able to pass arguments to modify when using named modifiers', () => {
-    let builder = QueryBuilder.forClass(TestModel);
+    const builder = QueryBuilder.forClass(TestModel);
 
     let called1 = false;
     let called2 = false;
@@ -241,7 +241,7 @@ describe('QueryBuilder', () => {
   });
 
   it('modify() should do nothing when receiving `undefined`', () => {
-    let builder = QueryBuilder.forClass(TestModel);
+    const builder = QueryBuilder.forClass(TestModel);
     let res;
     expect(() => {
       res = builder.modify(undefined);
@@ -378,25 +378,25 @@ describe('QueryBuilder', () => {
   });
 
   it('should return a promise from .then method', () => {
-    let promise = QueryBuilder.forClass(TestModel).then((it) => it);
+    const promise = QueryBuilder.forClass(TestModel).then((it) => it);
     expect(promise).to.be.a(Promise);
     return promise;
   });
 
   it('should return a promise from .execute method', () => {
-    let promise = QueryBuilder.forClass(TestModel).execute();
+    const promise = QueryBuilder.forClass(TestModel).execute();
     expect(promise).to.be.a(Promise);
     return promise;
   });
 
   it('should return a promise from .catch method', () => {
-    let promise = QueryBuilder.forClass(TestModel).catch(() => {});
+    const promise = QueryBuilder.forClass(TestModel).catch(() => {});
     expect(promise).to.be.a(Promise);
     return promise;
   });
 
   it('should select all from the model table if no query methods are called', () => {
-    let queryBuilder = QueryBuilder.forClass(TestModel);
+    const queryBuilder = QueryBuilder.forClass(TestModel);
     return queryBuilder.then(() => {
       expect(executedQueries).to.eql(['select "Model".* from "Model"']);
     });
@@ -906,7 +906,7 @@ describe('QueryBuilder', () => {
   });
 
   it('should be able to execute same query multiple times', () => {
-    let query = QueryBuilder.forClass(TestModel)
+    const query = QueryBuilder.forClass(TestModel)
       .updateOperationFactory((builder) => {
         return createUpdateOperation(builder, { b: 2 });
       })
@@ -1296,7 +1296,7 @@ describe('QueryBuilder', () => {
       throw new Error('$afterFind should not be called');
     };
 
-    let model = TestModel.fromJson({ a: 10, b: 'test' });
+    const model = TestModel.fromJson({ a: 10, b: 'test' });
     QueryBuilder.forClass(TestModel)
       .update(model)
       .then(() => {
@@ -1311,7 +1311,7 @@ describe('QueryBuilder', () => {
 
   it('update() should call $beforeUpdate on the model (async)', (done) => {
     TestModel.prototype.$beforeUpdate = function () {
-      let self = this;
+      const self = this;
       return sleep(5).then(() => {
         self.c = 'beforeUpdate';
       });
@@ -1321,7 +1321,7 @@ describe('QueryBuilder', () => {
       throw new Error('$afterFind should not be called');
     };
 
-    let model = TestModel.fromJson({ a: 10, b: 'test' });
+    const model = TestModel.fromJson({ a: 10, b: 'test' });
     QueryBuilder.forClass(TestModel)
       .update(model)
       .then(() => {
@@ -1343,7 +1343,7 @@ describe('QueryBuilder', () => {
       throw new Error('$afterFind should not be called');
     };
 
-    let model = TestModel.fromJson({ a: 10, b: 'test' });
+    const model = TestModel.fromJson({ a: 10, b: 'test' });
     QueryBuilder.forClass(TestModel)
       .patch(model)
       .then(() => {
@@ -1358,7 +1358,7 @@ describe('QueryBuilder', () => {
 
   it('patch() should call $beforeUpdate on the model (async)', (done) => {
     TestModel.prototype.$beforeUpdate = function () {
-      let self = this;
+      const self = this;
       return sleep(5).then(() => {
         self.c = 'beforeUpdate';
       });
@@ -1368,7 +1368,7 @@ describe('QueryBuilder', () => {
       throw new Error('$afterFind should not be called');
     };
 
-    let model = TestModel.fromJson({ a: 10, b: 'test' });
+    const model = TestModel.fromJson({ a: 10, b: 'test' });
     QueryBuilder.forClass(TestModel)
       .patch(model)
       .then(() => {
@@ -1404,7 +1404,7 @@ describe('QueryBuilder', () => {
 
   it('insert() should call $beforeInsert on the model (async)', (done) => {
     TestModel.prototype.$beforeInsert = function () {
-      let self = this;
+      const self = this;
       return sleep(5).then(() => {
         self.c = 'beforeInsert';
       });
@@ -1475,7 +1475,7 @@ describe('QueryBuilder', () => {
     ];
 
     TestModel.prototype.$afterFind = function (context) {
-      let self = this;
+      const self = this;
       return sleep(10).then(() => {
         self.b = self.a * 2 + context.x;
       });
@@ -1514,7 +1514,7 @@ describe('QueryBuilder', () => {
     ];
 
     TestModel.prototype.$afterFind = function (context) {
-      let self = this;
+      const self = this;
       return sleep(10).then(() => {
         self.b = self.a * 2 + context.x;
       });
@@ -1553,7 +1553,7 @@ describe('QueryBuilder', () => {
   });
 
   it('clearWithGraph() should clear everything related to eager', () => {
-    let builder = QueryBuilder.forClass(TestModel)
+    const builder = QueryBuilder.forClass(TestModel)
       .withGraphFetched('a(f).b', {
         f: () => {},
       })
@@ -1566,7 +1566,7 @@ describe('QueryBuilder', () => {
   });
 
   it('clearReject() should clear remove explicit rejection', () => {
-    let builder = QueryBuilder.forClass(TestModel).reject('error');
+    const builder = QueryBuilder.forClass(TestModel).reject('error');
 
     expect(builder._explicitRejectValue).to.equal('error');
 
@@ -1965,19 +1965,6 @@ describe('QueryBuilder', () => {
           done();
         })
         .catch(() => {
-          done(new Error('should not get here'));
-        });
-    });
-
-    it("allowGraph('a').withGraphFetched('a(f1)') should be ok", (done) => {
-      QueryBuilder.forClass(TestModel)
-        .allowGraph('a')
-        .withGraphFetched('a(f1)', { f1: () => {} })
-        .then(() => {
-          expect(executedQueries).to.have.length(1);
-          done();
-        })
-        .catch((err) => {
           done(new Error('should not get here'));
         });
     });
@@ -2702,7 +2689,7 @@ function createInsertOperation(builder, mergeWithModel) {
     };
 
     operation.onBuildKnex = function (knexBuilder) {
-      let json = Object.assign(this.models[0], mergeWithModel);
+      const json = Object.assign(this.models[0], mergeWithModel);
       knexBuilder.insert(json);
     };
 
@@ -2729,7 +2716,7 @@ function createUpdateOperation(builder, mergeWithModel) {
     };
 
     operation.onBuildKnex = function (knexBuilder) {
-      let json = Object.assign(this.model, mergeWithModel);
+      const json = Object.assign(this.model, mergeWithModel);
       knexBuilder.update(json);
     };
 

@@ -1,13 +1,13 @@
 import {
   Model,
   QueryBuilder,
-  AnyQueryBuilder,
-  Page,
-  QueryBuilderState,
-  DefaultQueryBuilderState,
-  ModelRow,
+  type AnyQueryBuilder,
+  type Page,
+  type QueryBuilderState,
+  type DefaultQueryBuilderState,
+  type ModelRow,
 } from '../../../';
-import { Equal, Expect, expectType } from '../_utils/expect';
+import { type Equal, type Expect, expectType } from '../_utils/expect';
 
 // A custom query builder needs one line to keep its type through every method
 // that changes the result kind.

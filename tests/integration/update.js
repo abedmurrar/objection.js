@@ -5,8 +5,8 @@ const { expectPartialEqual: expectPartEql } = require('./../../testUtils/testUti
 const { ValidationError, raw } = require('../../');
 
 module.exports = (session) => {
-  let Model1 = session.models.Model1;
-  let Model2 = session.models.Model2;
+  const Model1 = session.models.Model1;
+  const Model2 = session.models.Model2;
 
   describe('Model update queries', () => {
     describe('.query().update()', () => {
@@ -40,7 +40,7 @@ module.exports = (session) => {
       });
 
       it('should update a model (1)', () => {
-        let model = Model1.fromJson({ model1Prop1: 'updated text' });
+        const model = Model1.fromJson({ model1Prop1: 'updated text' });
 
         return Model1.query()
           .update(model)
@@ -108,7 +108,7 @@ module.exports = (session) => {
       });
 
       it('should update a model (2)', () => {
-        let model = Model2.fromJson({ model2Prop1: 'updated text' });
+        const model = Model2.fromJson({ model2Prop1: 'updated text' });
 
         return Model2.query()
           .update(model)
@@ -141,7 +141,7 @@ module.exports = (session) => {
       });
 
       it('should validate', (done) => {
-        let ModelWithSchema = subClassWithSchema(Model1, {
+        const ModelWithSchema = subClassWithSchema(Model1, {
           type: 'object',
           properties: {
             id: { type: ['number', 'null'] },
@@ -183,7 +183,7 @@ module.exports = (session) => {
       });
 
       it('should validate required properties', (done) => {
-        let ModelWithSchema = subClassWithSchema(Model1, {
+        const ModelWithSchema = subClassWithSchema(Model1, {
           type: 'object',
           required: ['model1Prop2'],
           properties: {
@@ -247,7 +247,7 @@ module.exports = (session) => {
           }
         }
 
-        let ModelWithSchema = subClassWithSchema(Model1, {
+        const ModelWithSchema = subClassWithSchema(Model1, {
           type: 'object',
           properties: {
             id: { type: ['number', 'null'] },
@@ -324,7 +324,7 @@ module.exports = (session) => {
       });
 
       it('should update and fetch a model', () => {
-        let model = Model1.fromJson({ model1Prop1: 'updated text' });
+        const model = Model1.fromJson({ model1Prop1: 'updated text' });
 
         return Model1.query()
           .updateAndFetchById(2, model)
@@ -403,7 +403,7 @@ module.exports = (session) => {
       });
 
       it('should pass the old values to $beforeUpdate and $afterUpdate hooks in options.old', () => {
-        let model = Model1.fromJson({ id: 1, model1Prop1: 'updated text' });
+        const model = Model1.fromJson({ id: 1, model1Prop1: 'updated text' });
 
         return Model1.fromJson({ id: 1 })
           .$query()
@@ -423,7 +423,7 @@ module.exports = (session) => {
       });
 
       it('should pass the old values to $beforeValidate and $afterValidate hooks in options.old', () => {
-        let TestModel = inheritModel(Model1);
+        const TestModel = inheritModel(Model1);
 
         TestModel.pickJsonSchemaProperties = false;
         TestModel.jsonSchema = {
@@ -436,7 +436,7 @@ module.exports = (session) => {
         let before;
         let after;
 
-        let model = TestModel.fromJson({ id: 1, model1Prop1: 'text' });
+        const model = TestModel.fromJson({ id: 1, model1Prop1: 'text' });
 
         TestModel.prototype.$beforeValidate = (schema, json, options) => {
           before = options.old.toJSON();
@@ -464,10 +464,10 @@ module.exports = (session) => {
       });
 
       it('model edits in $beforeUpdate should get into database query', () => {
-        let model = Model1.fromJson({ id: 1 });
+        const model = Model1.fromJson({ id: 1 });
 
         model.$beforeUpdate = function () {
-          let self = this;
+          const self = this;
           return sleep(1).then(() => {
             self.model1Prop1 = 'updated text';
           });
@@ -503,7 +503,7 @@ module.exports = (session) => {
       });
 
       it('should update and fetch a model', () => {
-        let model = Model1.fromJson({ id: 1 });
+        const model = Model1.fromJson({ id: 1 });
 
         return model
           .$query()
@@ -913,7 +913,7 @@ module.exports = (session) => {
     });
 
     function subClassWithSchema(Model, schema) {
-      let SubModel = inheritModel(Model);
+      const SubModel = inheritModel(Model);
       SubModel.jsonSchema = schema;
       return SubModel;
     }

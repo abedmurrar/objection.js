@@ -1,4 +1,4 @@
-import { Model, QueryBuilder, RelationExpression } from '../../../';
+import { Model, type QueryBuilder, type RelationExpression } from '../../../';
 
 // Relation expressions are checked against the relations of the models, in
 // string and in object notation.

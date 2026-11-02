@@ -4,8 +4,8 @@ const { createRejectionReflection } = require('../../../testUtils/testUtils');
 
 module.exports = (session) => {
   describe('using unbound models by passing a knex to query', () => {
-    let Model1 = session.unboundModels.Model1;
-    let Model2 = session.unboundModels.Model2;
+    const Model1 = session.unboundModels.Model1;
+    const Model2 = session.unboundModels.Model2;
 
     beforeEach(() => {
       // This tests insertGraph.

@@ -57,6 +57,6 @@ You can run the tests on a subset of databases by setting the `DATABASES` env va
 DATABASES=sqlite3 npm test
 ```
 
-Code and tests need to be written in ES2015 subset supported by node 8.0.0. The best way to make sure of this is to develop with the correct node version. [nvm](https://github.com/creationix/nvm) is a great tool for swapping between node versions.
+The code runs on Node.js 24 and newer, so it can use everything Node.js 24 supports.
 
-[prettier](https://prettier.io/) is used to format the code. Remember to run `npm run prettier` before committing code.
+[Biome](https://biomejs.dev/) lints and formats the code. `npm run lint` checks both, and `npm run format` fixes what can be fixed automatically. Run it before committing; CI runs `biome ci`.

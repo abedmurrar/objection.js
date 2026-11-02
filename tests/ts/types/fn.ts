@@ -1,4 +1,4 @@
-import { Model, fn, ref, FunctionBuilder, AggregateFunctionBuilder } from '../../../';
+import { Model, fn, ref, type FunctionBuilder, type AggregateFunctionBuilder } from '../../../';
 import { expectType } from '../_utils/expect';
 
 class Event extends Model {

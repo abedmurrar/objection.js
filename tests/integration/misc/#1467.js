@@ -3,7 +3,7 @@ const chai = require('chai');
 
 module.exports = (session) => {
   describe('Not CamelCasing ref.column #1467', () => {
-    let knex = session.knex;
+    const knex = session.knex;
     let Campaign, Deliverable;
 
     beforeEach(() => {
