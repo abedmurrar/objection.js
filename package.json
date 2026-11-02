@@ -1,7 +1,7 @@
 {
   "name": "@abedmurrar/objection",
   "version": "4.0.2",
-  "description": "An SQL-friendly ORM for Node.js. A fork of objection.js with strict TypeScript types and MySQL support.",
+  "description": "A fast, strictly typed SQL ORM for Node.js and TypeScript, built on knex: models, relations, eager loading, graph upserts and transactions on Postgres, MySQL, MariaDB and SQLite. A maintained fork of objection.js.",
   "main": "lib/objection.js",
   "type": "commonjs",
   "types": "./typings/objection/index.d.ts",
@@ -63,19 +63,39 @@
   "bugs": {
     "url": "https://github.com/abedmurrar/objection.js/issues"
   },
-  "homepage": "https://github.com/abedmurrar/objection.js#readme",
+  "homepage": "https://abedmurrar.github.io/objection.js/",
   "engines": {
     "node": ">=24"
   },
   "keywords": [
     "orm",
-    "knex",
+    "typescript",
+    "typescript-orm",
     "sql",
-    "query",
-    "query builder",
+    "sql-orm",
+    "nodejs",
+    "node-orm",
+    "knex",
+    "knex-orm",
+    "query-builder",
+    "objection",
+    "objection.js",
+    "objectionjs",
+    "postgres",
     "postgresql",
     "mysql",
-    "sqlite3"
+    "mariadb",
+    "sqlite",
+    "sqlite3",
+    "database",
+    "model",
+    "relations",
+    "eager-loading",
+    "graph",
+    "upsert",
+    "transactions",
+    "json-schema",
+    "esm"
   ],
   "files": [
     "README.md",
