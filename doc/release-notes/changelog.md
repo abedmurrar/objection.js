@@ -4,6 +4,8 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+## 4.0.0-beta.11 (2026-11-02)
+
 ### What's new
 
 - The performance page shows that the TypeScript build is as fast as the JavaScript one, and the contributing guide explains the rules that keep it that way.
