@@ -4,6 +4,8 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+## 4.0.0-beta.7 (2026-11-02)
+
 ### What's new
 
 - The model (`Model`, the validators, the errors and the model graph), `transaction()` and `initialize()` are TypeScript now. With that, the whole source is TypeScript, apart from the small package entry and the generated parsers. The compiled code and its behaviour are the same.
