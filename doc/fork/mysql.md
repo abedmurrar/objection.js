@@ -172,3 +172,56 @@ Some functions have keywords in their syntax. Their helpers take the keyword as 
 Helpers for functions that only exist on MySQL throw when used with another database. Standard functions like `fn.round()`, `fn.length()` and `fn.trim()` work everywhere.
 
 In TypeScript, the helpers check the number of arguments and type the result as `FunctionBuilder<T>`. `select(fn.x().as('alias'))` uses that type. See [TypeScript](./typescript.md#typed-fn-and-ref).
+
+## MariaDB
+
+The MySQL features work on MariaDB too. They are tested on MariaDB 10.6 and 11.4.
+
+### Connecting
+
+objection recognizes MariaDB in two ways:
+
+- knex's `mariadb` client, which needs knex 3.3 and the `mariadb` driver. This is the recommended way.
+- With the `mysql2` driver, a `version` that contains `MariaDB` in the knex config. Without it, objection treats the server as MySQL and generates SQL that MariaDB rejects in places.
+
+```js
+const knex = Knex({
+  client: 'mariadb',
+  // Optional with the mariadb client. objection uses it for the features
+  // that need a newer MariaDB.
+  version: '11.4-MariaDB',
+  connection: {
+    host: '127.0.0.1',
+    user: 'app',
+    database: 'app',
+    // The mariadb driver returns BIGINT values and insert ids as BigInt by
+    // default, which JSON.stringify() can't handle.
+    insertIdAsNumber: true,
+    bigIntAsNumber: true,
+    // Queries like `select t.*, t.a + 1 as a` return two columns with the same
+    // name, which the driver rejects by default.
+    checkDuplicate: false,
+  },
+});
+```
+
+### What is different
+
+MariaDB has no JSON data type: its JSON columns are text. objection generates different SQL for it:
+
+- `CAST(... AS JSON)` is `JSON_COMPACT(...)`, in `val()` of objects and arrays, `castJson()`, patches of JSON fields, the `whereJson*` methods and the arguments of the `fn` JSON helpers.
+- Field expressions compared with values, like `where(ref('data:a'), val({ b: 1 }))`, are wrapped in `JSON_COMPACT()`, since MariaDB's `JSON_EXTRACT()` returns the JSON with spaces.
+- `whereJsonHasAny()` checks arrays with `JSON_CONTAINS()`, so it also works before 10.9.
+
+Comparisons of JSON objects compare the text. Objects with the same keys in a different order aren't equal on MariaDB, unlike on MySQL.
+
+### What doesn't work
+
+These throw an error that says so, instead of sending SQL that MariaDB rejects:
+
+- `fn.regexpLike()`, `fn.memberOf()`, `fn.anyValue()`, `fn.grouping()`, `fn.uuidToBin()`, `fn.binToUuid()`, `fn.isUuid()`, `fn.icuVersion()`, `fn.rolesGraphml()`, `fn.statementDigest()`, `fn.statementDigestText()`, `fn.formatBytes()`, `fn.psCurrentThreadId()`, `fn.psThreadId()`, `fn.gtidSubset()`, `fn.gtidSubtract()`, `fn.waitForExecutedGtidSet()`, `fn.sourcePosWait()`, `fn.jsonSchemaValidationReport()`, `fn.jsonStorageFree()` and `fn.jsonStorageSize()`, which MariaDB doesn't have.
+- More than 2 arguments to `fn.regexpInstr()` and `fn.regexpSubstr()`, and more than 3 to `fn.regexpReplace()`.
+- The `returning` option of `fn.jsonValue()`.
+- `whereJsonOverlaps()` and `whereJsonNotOverlaps()` when the `version` in the knex config is older than 10.9, which added `JSON_OVERLAPS()`.
+
+`fn.jsonOverlaps()`, `fn.jsonSchemaValid()`, `fn.randomBytes()`, `fn.formatPicoTime()` and the extra arguments of `fn.aesEncrypt()` and `fn.aesDecrypt()` work on MariaDB 11.4, but not on 10.6. Ranking window functions like `fn.rank()` need an `orderBy` in `over()` on MariaDB.

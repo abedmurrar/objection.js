@@ -18,20 +18,21 @@ Until 4.0 is final, releases are prereleases (`4.0.0-alpha.0`, ...) and are publ
 
 ## Requirements
 
-| Dependency | Requirement                                                                    |
-| ---------- | ------------------------------------------------------------------------------ |
-| knex       | 3.3 or newer                                                                   |
-| ajv        | 8.20 or newer (comes as a dependency)                                          |
-| MySQL      | 8.0.17 or newer for the JSON features (tested on 8.4 with the `mysql2` driver) |
-| SQLite     | 3.35 or newer for batch inserts, 3.25 or newer for window functions            |
-| Node.js    | 20.19 or newer (20, 22 and 24 are tested)                                      |
+| Dependency | Requirement                                                                                          |
+| ---------- | ---------------------------------------------------------------------------------------------------- |
+| knex       | 3.3 or newer                                                                                         |
+| ajv        | 8.20 or newer (comes as a dependency)                                                                |
+| MySQL      | 8.0.17 or newer for the JSON features (tested on 8.4 with the `mysql2` driver)                       |
+| MariaDB    | 10.6 or newer (tested on 10.6 and 11.4 with the `mariadb` driver). See [MariaDB](./mysql.md#mariadb) |
+| SQLite     | 3.35 or newer for batch inserts, 3.25 or newer for window functions                                  |
+| Node.js    | 20.19 or newer (20, 22 and 24 are tested)                                                            |
 
 ## What the fork adds
 
 | Page                                      | Summary                                                                                                                                                                                                                        |
 | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | [Breaking changes](./breaking-changes.md) | Security and behaviour fixes that change what queries do: escaped JSON keys, `orWhere` grouping, `for()` checks, unsupported dialects, `NULL` JSON columns, knex 3.3, MySQL graph concurrency.                                 |
-| [MySQL](./mysql.md)                       | JSON field expressions, the `whereJson*` methods, `whereJsonOverlaps()`, MySQL casts, batch inserts (also on SQLite), and an `fn.*` helper for every MySQL 8.4 built-in function.                                              |
+| [MySQL](./mysql.md)                       | MySQL and MariaDB. JSON field expressions, the `whereJson*` methods, `whereJsonOverlaps()`, MySQL casts, batch inserts (also on SQLite), and an `fn.*` helper for every MySQL 8.4 built-in function.                           |
 | [Expressions](./expressions.md)           | `eq()`, `gt()`, `and()`, `plus()`, ... on `ref()`, `val()`, `fn()` and `raw()`. Also `fn.case()`, `fn.exists()`, `fn.excluded()`, filtered aggregates, window functions and `none()`.                                          |
 | [Joins and model classes](./joins.md)     | Model classes in place of table names, `Model.ref()` in join callbacks, `onJsonPathEquals()`, and fixes for raw columns in `whereIn()` and subqueries in joins.                                                                |
 | [Performance](./performance.md)           | Less work per query than objection.js 3.1.5: shared validators for bound classes, a faster deep clone, cached schema checks, and faster parsing of joined rows. With benchmarks.                                               |
