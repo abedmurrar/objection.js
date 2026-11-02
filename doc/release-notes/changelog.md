@@ -18,6 +18,7 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 - Add the knex methods objection didn't have: `andHaving()` (which was typed but threw), `andHavingIn()`, `andHavingNotIn()`, `andHavingNull()`, `andHavingNotNull()`, `andHavingExists()`, `andHavingNotExists()`, `andHavingBetween()` and `andHavingNotBetween()`, `comment()`, `hintComment()`, `using()` for postgres `delete ... using`, `finally()`, and `or` in join callbacks: `join.on(a, b).or.on(c, d)`
 - Types: `updateFrom()`, `clearGroup()`, `clearHaving()` and `options()`, which worked but weren't typed
 - `clearGroup()` and `clearHaving()` remove the operations, like `clearSelect()` and `clearWhere()`, so `has()` sees them as cleared
+- No more lodash: the package shipped a copy of lodash's `cloneDeep`, which is replaced by a native clone with the same results, and the tests no longer use lodash. The package is 59 kB smaller, and `toJSON()` of models whose JSON attributes hold class instances, Maps or Sets takes 87% less time
 
 ### Bug fixes
 

@@ -7,7 +7,7 @@ The fork does less work per query than objection.js 3.1.5. The generated SQL and
 | Change                                 | What it affects                                                                                                                                                                                                                                                                   |
 | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Bound classes share their validator    | A class bound to a knex instance with `bindKnex()` or `bindTransaction()`, which happens for every transaction that uses them, used to create a validator of its own: two Ajv instances and a new compile of the schema. It now uses the validator of the class it is bound from. |
-| Faster deep clone                      | `toJSON()` clones the object and array attributes of every model, and validation clones the input when the schema has default values. JSON-like values (plain objects, arrays, dates, buffers) are cloned without lodash, with the same result.                                   |
+| Faster deep clone                      | `toJSON()` clones the object and array attributes of every model, and validation clones the input when the schema has default values. Every value is now cloned without lodash, with the same result as lodash's `cloneDeep`, and the package no longer ships a copy of it.       |
 | Schema defaults checked once           | Validation used to walk the whole schema on every validate to find out whether it has default values. The answer is now cached per schema.                                                                                                                                        |
 | No relation parsing without relations  | `fromJson()` and the other methods that turn JSON into models skip the relation parsing, and its allocations, when the JSON has no relations.                                                                                                                                     |
 | Joined rows parsed without string keys | `withGraphJoined()` used to build and hash a key like `/1/pets/3/toys/7` for every table of every row. Models are now looked up by id in a map per parent and relation.                                                                                                           |
@@ -32,6 +32,14 @@ Measured with the [benchmarks in the repository](https://github.com/abedmurrar/o
 | `insertGraph()` of 50 persons with pets, validated     |  1.17 ms |  1.02 ms | **−12.6%** |
 | A batch `insert()` of 100 rows                         | 181.9 µs | 161.2 µs | **−11.4%** |
 | Building a query with expressions                      |  56.9 µs |  52.1 µs |  **−8.4%** |
+
+Cloning without lodash was measured separately, against the fork just before the change:
+
+| Operation                                                                          |   Before |   After |     Change |
+| ---------------------------------------------------------------------------------- | -------: | ------: | ---------: |
+| `toJSON()` of 1000 models whose JSON attributes hold a class instance, Map and Set | 24.91 ms | 3.19 ms | **−87.2%** |
+
+Models whose JSON attributes hold only plain objects, arrays and dates are cloned as before.
 
 These measure objection's own work, against a mocked database. With a real database, the database's time comes on top: reading 1000 rows from SQLite, for example, is mostly SQLite's time and the `JSON.parse()` of the JSON columns, and is about 6% faster. The full results, including the end-to-end runs on SQLite, are in [bench/README.md](https://github.com/abedmurrar/objection.js/blob/main/bench/README.md).
 
