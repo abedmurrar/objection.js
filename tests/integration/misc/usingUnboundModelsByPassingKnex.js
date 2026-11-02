@@ -1,6 +1,5 @@
 const { sortBy } = require('../../../testUtils/testUtils');
 const expect = require('expect.js');
-const Promise = require('bluebird');
 const { createRejectionReflection } = require('../../../testUtils/testUtils');
 
 module.exports = (session) => {

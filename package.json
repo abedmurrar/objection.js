@@ -44,7 +44,7 @@
   },
   "homepage": "https://github.com/abedmurrar/objection.js#readme",
   "engines": {
-    "node": ">=20.19.0"
+    "node": ">=24"
   },
   "keywords": [
     "orm",
@@ -73,8 +73,7 @@
     "knex": ">=3.3.0"
   },
   "devDependencies": {
-    "@types/node": "^22.15.3",
-    "bluebird": "^3.7.2",
+    "@types/node": "^24.19.2",
     "chai": "^4.3.10",
     "chai-subset": "^1.6.0",
     "eslint": "^10.14.0",

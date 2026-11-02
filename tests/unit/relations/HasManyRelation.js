@@ -1,6 +1,5 @@
 const Knex = require('knex'),
   expect = require('expect.js'),
-  Promise = require('bluebird'),
   objection = require('../../../'),
   knexMocker = require('../../../testUtils/mockKnex'),
   RelationOwner = require('../../../lib/relations/RelationOwner').RelationOwner,

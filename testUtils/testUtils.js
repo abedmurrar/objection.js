@@ -112,6 +112,17 @@ function compareAscending(value, other) {
   return 0;
 }
 
+// Calls `fn` for each item, one after the other, and resolves with the results.
+async function mapSeries(items, fn) {
+  const results = [];
+
+  for (let i = 0; i < items.length; ++i) {
+    results.push(await fn(items[i], i, items.length));
+  }
+
+  return results;
+}
+
 function createRejectionReflection(err) {
   return {
     isRejected: () => true,
@@ -123,5 +134,6 @@ function createRejectionReflection(err) {
 module.exports = {
   expectPartialEqual,
   sortBy,
+  mapSeries,
   createRejectionReflection,
 };

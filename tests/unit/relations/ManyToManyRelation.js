@@ -1,7 +1,6 @@
 const { sortBy } = require('../../../testUtils/testUtils');
 const Knex = require('knex');
 const expect = require('expect.js');
-const Promise = require('bluebird');
 const objection = require('../../../');
 const { isFunction } = require('../../../lib/utils/objectUtils');
 const knexMocker = require('../../../testUtils/mockKnex');

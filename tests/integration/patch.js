@@ -1,7 +1,7 @@
+const { setTimeout: sleep } = require('node:timers/promises');
 const { cloneDeep } = require('../../lib/utils/cloneDeep');
 const chai = require('chai');
 const expect = require('expect.js');
-const Promise = require('bluebird');
 const { inheritModel } = require('../../lib/model/inheritModel');
 const { expectPartialEqual: expectPartEql } = require('./../../testUtils/testUtils');
 const { Model, QueryBuilder, ValidationError, raw } = require('../../');
@@ -615,7 +615,7 @@ module.exports = (session) => {
 
         model.$beforeUpdate = function () {
           let self = this;
-          return Promise.delay(1).then(() => {
+          return sleep(1).then(() => {
             self.model1Prop1 = 'updated text';
           });
         };

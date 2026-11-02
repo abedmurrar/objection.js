@@ -1,5 +1,5 @@
+const { setTimeout: sleep } = require('node:timers/promises');
 const path = require('path');
-const Promise = require('bluebird');
 const knexUtils = require('../lib/utils/knexUtils');
 const { Model, transaction, snakeCaseMappers, ref } = require('../');
 const { cloneDeep } = require('../lib/utils/cloneDeep');
@@ -342,34 +342,41 @@ class TestSession {
         .then(() => trx('model3').delete())
         .then(() => this.models.Model1.query(trx).insertGraph(data))
         .then(() => {
-          return Promise.resolve(['Model1', 'model2', 'model3', 'Model1Model2']).map((table) => {
-            const idCol = (
-              Object.values(this.models).find((it) => it.getTableName() === table) || {
-                getIdColumn: () => 'id',
-              }
-            ).getIdColumn();
-
-            return trx(table)
-              .max(idCol)
-              .then((res) => {
-                const maxId = parseInt(res[0][Object.keys(res[0])[0]], 10) || 0;
-
-                // Reset sequence.
-                if (knexUtils.isSqlite(trx)) {
-                  return trx.raw(
-                    'UPDATE sqlite_sequence SET seq = ' + maxId + ' WHERE name = "' + table + '"',
-                  );
-                } else if (knexUtils.isPostgres(trx)) {
-                  return trx.raw(
-                    'ALTER SEQUENCE "' + table + '_' + idCol + '_seq" RESTART WITH ' + (maxId + 1),
-                  );
-                } else if (knexUtils.isMySql(trx)) {
-                  return trx.raw('ALTER TABLE ' + table + ' AUTO_INCREMENT = ' + (maxId + 1));
-                } else {
-                  throw new Error('sequence truncate not implemented for the given database');
+          return Promise.all(
+            ['Model1', 'model2', 'model3', 'Model1Model2'].map((table) => {
+              const idCol = (
+                Object.values(this.models).find((it) => it.getTableName() === table) || {
+                  getIdColumn: () => 'id',
                 }
-              });
-          });
+              ).getIdColumn();
+
+              return trx(table)
+                .max(idCol)
+                .then((res) => {
+                  const maxId = parseInt(res[0][Object.keys(res[0])[0]], 10) || 0;
+
+                  // Reset sequence.
+                  if (knexUtils.isSqlite(trx)) {
+                    return trx.raw(
+                      'UPDATE sqlite_sequence SET seq = ' + maxId + ' WHERE name = "' + table + '"',
+                    );
+                  } else if (knexUtils.isPostgres(trx)) {
+                    return trx.raw(
+                      'ALTER SEQUENCE "' +
+                        table +
+                        '_' +
+                        idCol +
+                        '_seq" RESTART WITH ' +
+                        (maxId + 1),
+                    );
+                  } else if (knexUtils.isMySql(trx)) {
+                    return trx.raw('ALTER TABLE ' + table + ' AUTO_INCREMENT = ' + (maxId + 1));
+                  } else {
+                    throw new Error('sequence truncate not implemented for the given database');
+                  }
+                });
+            }),
+          );
         })
         .then(() => data);
     });
@@ -429,7 +436,7 @@ function createHook(name, delay, extraAction) {
     if (TestSession.hookCounter++ % 2 === 0) {
       return hook(this, args);
     } else {
-      return Promise.delay(delay).then(() => hook(this, args));
+      return sleep(delay).then(() => hook(this, args));
     }
   };
 }
@@ -439,7 +446,7 @@ function inc(obj, key) {
 }
 
 function registerUnhandledRejectionHandler() {
-  Promise.onPossiblyUnhandledRejection((error) => {
+  process.on('unhandledRejection', (error) => {
     if (TestSession.unhandledRejectionHandlers.length === 0) {
       console.error(error.stack);
     }

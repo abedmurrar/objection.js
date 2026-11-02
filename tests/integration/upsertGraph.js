@@ -1,6 +1,6 @@
+const { mapSeries } = require('../../testUtils/testUtils');
 const expect = require('expect.js');
 const chai = require('chai');
-const Promise = require('bluebird');
 const { raw, transaction, ValidationError } = require('../../');
 const { createRejectionReflection } = require('../../testUtils/testUtils');
 const { FetchStrategy } = require('../../lib/queryBuilder/graph/GraphOptions');
@@ -3506,7 +3506,7 @@ module.exports = (session) => {
           ];
 
           // One at a time: concurrent transactions on the same rows can deadlock on MySQL 8.
-          return Promise.mapSeries(fails, (fail) => {
+          return mapSeries(fails, (fail) => {
             return transaction(session.knex, (trx) =>
               Model1.query(trx).upsertGraph(fail, { fetchStrategy }),
             ).catch((err) => createRejectionReflection(err));
@@ -3867,11 +3867,13 @@ module.exports = (session) => {
 
           const errorKeys = ['model1Prop2', 'model1Relation1.model1Prop2'];
 
-          return Promise.map(fails, (fail) => {
-            return transaction(session.knex, (trx) =>
-              Model1.query(trx).upsertGraph(fail, { update: true, fetchStrategy }),
-            ).catch((err) => createRejectionReflection(err));
-          })
+          return Promise.all(
+            fails.map((fail) => {
+              return transaction(session.knex, (trx) =>
+                Model1.query(trx).upsertGraph(fail, { update: true, fetchStrategy }),
+              ).catch((err) => createRejectionReflection(err));
+            }),
+          )
             .then((results) => {
               // Check that all transactions have failed because of a validation error.
               results.forEach((res, index) => {

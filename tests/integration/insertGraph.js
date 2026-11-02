@@ -3,7 +3,6 @@ const { cloneDeep } = require('../../lib/utils/cloneDeep');
 const chai = require('chai');
 const utils = require('../../lib/utils/knexUtils');
 const expect = require('expect.js');
-const Promise = require('bluebird');
 const { transaction, ValidationError, Model } = require('../../');
 
 module.exports = (session) => {

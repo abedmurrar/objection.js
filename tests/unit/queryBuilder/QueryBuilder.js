@@ -1,7 +1,7 @@
+const { setTimeout: sleep } = require('node:timers/promises');
 const Knex = require('knex'),
   expect = require('expect.js'),
   chai = require('chai'),
-  Bluebird = require('bluebird'),
   objection = require('../../../'),
   knexUtils = require('../../../lib/utils/knexUtils'),
   knexMocker = require('../../../testUtils/mockKnex'),
@@ -727,7 +727,7 @@ describe('QueryBuilder', () => {
       })
       .runBefore(() => {
         expect(mockKnexQueryResults[0]).to.equal(1);
-        return Bluebird.delay(1).then(() => ++mockKnexQueryResults[0]);
+        return sleep(1).then(() => ++mockKnexQueryResults[0]);
       })
       .runBefore(() => {
         expect(mockKnexQueryResults[0]).to.equal(2);
@@ -735,7 +735,7 @@ describe('QueryBuilder', () => {
       })
       .runAfter((res) => {
         expect(res).to.equal(3);
-        return Bluebird.delay(1).then(() => {
+        return sleep(1).then(() => {
           return ++res;
         });
       })
@@ -1312,7 +1312,7 @@ describe('QueryBuilder', () => {
   it('update() should call $beforeUpdate on the model (async)', (done) => {
     TestModel.prototype.$beforeUpdate = function () {
       let self = this;
-      return Bluebird.delay(5).then(() => {
+      return sleep(5).then(() => {
         self.c = 'beforeUpdate';
       });
     };
@@ -1359,7 +1359,7 @@ describe('QueryBuilder', () => {
   it('patch() should call $beforeUpdate on the model (async)', (done) => {
     TestModel.prototype.$beforeUpdate = function () {
       let self = this;
-      return Bluebird.delay(5).then(() => {
+      return sleep(5).then(() => {
         self.c = 'beforeUpdate';
       });
     };
@@ -1405,7 +1405,7 @@ describe('QueryBuilder', () => {
   it('insert() should call $beforeInsert on the model (async)', (done) => {
     TestModel.prototype.$beforeInsert = function () {
       let self = this;
-      return Bluebird.delay(5).then(() => {
+      return sleep(5).then(() => {
         self.c = 'beforeInsert';
       });
     };
@@ -1476,7 +1476,7 @@ describe('QueryBuilder', () => {
 
     TestModel.prototype.$afterFind = function (context) {
       let self = this;
-      return Bluebird.delay(10).then(() => {
+      return sleep(10).then(() => {
         self.b = self.a * 2 + context.x;
       });
     };
@@ -1515,7 +1515,7 @@ describe('QueryBuilder', () => {
 
     TestModel.prototype.$afterFind = function (context) {
       let self = this;
-      return Bluebird.delay(10).then(() => {
+      return sleep(10).then(() => {
         self.b = self.a * 2 + context.x;
       });
     };

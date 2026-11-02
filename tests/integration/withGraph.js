@@ -1,6 +1,6 @@
+const { mapSeries } = require('../../testUtils/testUtils');
 const chai = require('chai');
 const expect = require('expect.js');
-const Promise = require('bluebird');
 const { ValidationError, raw } = require('../..');
 const mockKnexFactory = require('../../testUtils/mockKnex');
 const { sortBy } = require('../../testUtils/testUtils');
@@ -960,83 +960,79 @@ module.exports = (session) => {
     });
 
     it('should work with zero id', () => {
-      return Promise.map(
-        ['withGraphFetched', 'withGraphJoined'],
-        (method) => {
-          return session
-            .populate([
+      return mapSeries(['withGraphFetched', 'withGraphJoined'], (method) => {
+        return session
+          .populate([
+            {
+              id: 0,
+              model1Prop1: 'hello 0',
+
+              model1Relation1: {
+                id: 1,
+                model1Prop1: 'hello 1',
+              },
+
+              model1Relation2: [
+                {
+                  idCol: 0,
+                  model2Prop1: 'hejsan 1',
+
+                  model2Relation1: [
+                    {
+                      id: 2,
+                      model1Prop1: 'hello 2',
+                    },
+                  ],
+                },
+              ],
+            },
+          ])
+          .then(() => {
+            return Model1.query()
+              .where('Model1.id', 0)
+              [method]('[model1Relation1, model1Relation2.model2Relation1]');
+          })
+          .then((models) => {
+            expect(models).to.eql([
               {
                 id: 0,
                 model1Prop1: 'hello 0',
+                model1Prop2: null,
+                model1Id: 1,
+                $afterFindCalled: 1,
 
                 model1Relation1: {
                   id: 1,
                   model1Prop1: 'hello 1',
+                  model1Prop2: null,
+                  model1Id: null,
+                  $afterFindCalled: 1,
                 },
 
                 model1Relation2: [
                   {
                     idCol: 0,
                     model2Prop1: 'hejsan 1',
+                    model2Prop2: null,
+                    model1Id: 0,
+                    $afterFindCalled: 1,
 
                     model2Relation1: [
                       {
                         id: 2,
                         model1Prop1: 'hello 2',
+                        model1Prop2: null,
+                        aliasedExtra: null,
+                        model1Id: null,
+                        $afterFindCalled: 1,
                       },
                     ],
                   },
                 ],
               },
-            ])
-            .then(() => {
-              return Model1.query()
-                .where('Model1.id', 0)
-                [method]('[model1Relation1, model1Relation2.model2Relation1]');
-            })
-            .then((models) => {
-              expect(models).to.eql([
-                {
-                  id: 0,
-                  model1Prop1: 'hello 0',
-                  model1Prop2: null,
-                  model1Id: 1,
-                  $afterFindCalled: 1,
-
-                  model1Relation1: {
-                    id: 1,
-                    model1Prop1: 'hello 1',
-                    model1Prop2: null,
-                    model1Id: null,
-                    $afterFindCalled: 1,
-                  },
-
-                  model1Relation2: [
-                    {
-                      idCol: 0,
-                      model2Prop1: 'hejsan 1',
-                      model2Prop2: null,
-                      model1Id: 0,
-                      $afterFindCalled: 1,
-
-                      model2Relation1: [
-                        {
-                          id: 2,
-                          model1Prop1: 'hello 2',
-                          model1Prop2: null,
-                          aliasedExtra: null,
-                          model1Id: null,
-                          $afterFindCalled: 1,
-                        },
-                      ],
-                    },
-                  ],
-                },
-              ]);
-            });
-        },
-        { concurrency: 1 },
-      );
+            ]);
+          });
+      });
     });
 
     it('keepImplicitJoinProps', () => {
@@ -2496,45 +2492,47 @@ module.exports = (session) => {
 
     describe('QueryBuilder.orderBy', () => {
       it('orderBy should work for the root query', () => {
-        return Promise.map(['withGraphFetched', 'withGraphJoined'], (method) => {
-          return Model1.query()
-            .select('Model1.model1Prop1')
-            .modifyGraph('model1Relation1', (builder) => {
-              builder.select('model1Prop1');
-            })
-            [method]('model1Relation1')
-            .orderBy('Model1.model1Prop1', 'DESC')
-            .whereNotNull('Model1.model1Id')
-            .then((models) => {
-              expect(models).to.eql([
-                {
-                  model1Prop1: 'hello 8',
-                  model1Relation1: { model1Prop1: 'hello 9', $afterFindCalled: 1 },
-                  $afterFindCalled: 1,
-                },
-                {
-                  model1Prop1: 'hello 6',
-                  model1Relation1: { model1Prop1: 'hello 7', $afterFindCalled: 1 },
-                  $afterFindCalled: 1,
-                },
-                {
-                  model1Prop1: 'hello 3',
-                  model1Relation1: { model1Prop1: 'hello 4', $afterFindCalled: 1 },
-                  $afterFindCalled: 1,
-                },
-                {
-                  model1Prop1: 'hello 2',
-                  model1Relation1: { model1Prop1: 'hello 3', $afterFindCalled: 1 },
-                  $afterFindCalled: 1,
-                },
-                {
-                  model1Prop1: 'hello 1',
-                  model1Relation1: { model1Prop1: 'hello 2', $afterFindCalled: 1 },
-                  $afterFindCalled: 1,
-                },
-              ]);
-            });
-        });
+        return Promise.all(
+          ['withGraphFetched', 'withGraphJoined'].map((method) => {
+            return Model1.query()
+              .select('Model1.model1Prop1')
+              .modifyGraph('model1Relation1', (builder) => {
+                builder.select('model1Prop1');
+              })
+              [method]('model1Relation1')
+              .orderBy('Model1.model1Prop1', 'DESC')
+              .whereNotNull('Model1.model1Id')
+              .then((models) => {
+                expect(models).to.eql([
+                  {
+                    model1Prop1: 'hello 8',
+                    model1Relation1: { model1Prop1: 'hello 9', $afterFindCalled: 1 },
+                    $afterFindCalled: 1,
+                  },
+                  {
+                    model1Prop1: 'hello 6',
+                    model1Relation1: { model1Prop1: 'hello 7', $afterFindCalled: 1 },
+                    $afterFindCalled: 1,
+                  },
+                  {
+                    model1Prop1: 'hello 3',
+                    model1Relation1: { model1Prop1: 'hello 4', $afterFindCalled: 1 },
+                    $afterFindCalled: 1,
+                  },
+                  {
+                    model1Prop1: 'hello 2',
+                    model1Relation1: { model1Prop1: 'hello 3', $afterFindCalled: 1 },
+                    $afterFindCalled: 1,
+                  },
+                  {
+                    model1Prop1: 'hello 1',
+                    model1Relation1: { model1Prop1: 'hello 2', $afterFindCalled: 1 },
+                    $afterFindCalled: 1,
+                  },
+                ]);
+              });
+          }),
+        );
       });
     });
 
@@ -2754,80 +2752,76 @@ module.exports = (session) => {
 
     describe('aliases', () => {
       it('aliases in eager expressions should work', () => {
-        return Promise.map(
-          ['withGraphFetched', 'withGraphJoined'],
-          (method) => {
-            return Model1.query()
-              .where('Model1.id', 1)
-              .select('Model1.id')
-              [method](
-                `[
+        return mapSeries(['withGraphFetched', 'withGraphJoined'], (method) => {
+          return Model1.query()
+            .where('Model1.id', 1)
+            .select('Model1.id')
+            [method](
+              `[
               model1Relation1(f1) as a,
               model1Relation2(f2) as b .[
                 model2Relation1(f1) as c,
                 model2Relation1(f1) as d
               ]
             ]`,
-              )
-              .modifiers({
-                f1: (builder) => builder.select('Model1.id'),
-                f2: (builder) => builder.select('model2.id_col'),
-              })
-              .first()
-              .then((model) => {
-                model.b = sortBy(model.b, 'idCol');
-                model.b[1].c = sortBy(model.b[1].c, 'id');
-                model.b[1].d = sortBy(model.b[1].d, 'id');
+            )
+            .modifiers({
+              f1: (builder) => builder.select('Model1.id'),
+              f2: (builder) => builder.select('model2.id_col'),
+            })
+            .first()
+            .then((model) => {
+              model.b = sortBy(model.b, 'idCol');
+              model.b[1].c = sortBy(model.b[1].c, 'id');
+              model.b[1].d = sortBy(model.b[1].d, 'id');
 
-                expect(model).to.eql({
-                  id: 1,
+              expect(model).to.eql({
+                id: 1,
+                $afterFindCalled: 1,
+
+                a: {
+                  id: 2,
                   $afterFindCalled: 1,
+                },
 
-                  a: {
-                    id: 2,
+                b: [
+                  {
+                    idCol: 1,
                     $afterFindCalled: 1,
+
+                    c: [],
+                    d: [],
                   },
+                  {
+                    idCol: 2,
+                    $afterFindCalled: 1,
 
-                  b: [
-                    {
-                      idCol: 1,
-                      $afterFindCalled: 1,
+                    c: [
+                      {
+                        id: 5,
+                        $afterFindCalled: 1,
+                      },
+                      {
+                        id: 6,
+                        $afterFindCalled: 1,
+                      },
+                    ],
 
-                      c: [],
-                      d: [],
-                    },
-                    {
-                      idCol: 2,
-                      $afterFindCalled: 1,
-
-                      c: [
-                        {
-                          id: 5,
-                          $afterFindCalled: 1,
-                        },
-                        {
-                          id: 6,
-                          $afterFindCalled: 1,
-                        },
-                      ],
-
-                      d: [
-                        {
-                          id: 5,
-                          $afterFindCalled: 1,
-                        },
-                        {
-                          id: 6,
-                          $afterFindCalled: 1,
-                        },
-                      ],
-                    },
-                  ],
-                });
+                    d: [
+                      {
+                        id: 5,
+                        $afterFindCalled: 1,
+                      },
+                      {
+                        id: 6,
+                        $afterFindCalled: 1,
+                      },
+                    ],
+                  },
+                ],
               });
-          },
-          { concurrency: 1 },
-        );
+            });
+        });
       });
 
       it('aliases should alias the joined tables when using withGraphJoined', () => {
@@ -2891,31 +2885,27 @@ module.exports = (session) => {
       });
 
       it('alias method should work', () => {
-        return Promise.map(
-          ['withGraphFetched', 'withGraphJoined'],
-          (method) => {
-            return Model1.query()
-              .alias('m1')
-              .select('m1.id')
-              [method](`[model1Relation1(f1) as a]`)
-              .modifiers({
-                f1: (builder) => builder.select('id'),
-              })
-              .findOne({ 'm1.id': 1 })
-              .then((model) => {
-                expect(model).to.eql({
-                  id: 1,
-                  $afterFindCalled: 1,
+        return mapSeries(['withGraphFetched', 'withGraphJoined'], (method) => {
+          return Model1.query()
+            .alias('m1')
+            .select('m1.id')
+            [method](`[model1Relation1(f1) as a]`)
+            .modifiers({
+              f1: (builder) => builder.select('id'),
+            })
+            .findOne({ 'm1.id': 1 })
+            .then((model) => {
+              expect(model).to.eql({
+                id: 1,
+                $afterFindCalled: 1,
 
-                  a: {
-                    id: 2,
-                    $afterFindCalled: 1,
-                  },
-                });
+                a: {
+                  id: 2,
+                  $afterFindCalled: 1,
+                },
               });
-          },
-          { concurrency: 1 },
-        );
+            });
+        });
       });
     });
 
@@ -3103,32 +3093,28 @@ module.exports = (session) => {
         it('should work with a lot of data', function () {
           this.timeout(30000);
 
-          return Promise.map(
-            ['withGraphFecthed', 'withGraphJoined'],
-            (method) => {
-              let t1 = Date.now();
-              return Model1.query()
-                .where('Model1.model1Prop1', 'like', 'hello%')
-                [method](
-                  '[model1Relation1.model1Relation1, model1Relation1Inverse, model1Relation2.[model2Relation1, model2Relation2], model1Relation3]',
-                )
-                .then((res) => {
-                  console.log('query time', Date.now() - t1);
+          return mapSeries(['withGraphFecthed', 'withGraphJoined'], (method) => {
+            let t1 = Date.now();
+            return Model1.query()
+              .where('Model1.model1Prop1', 'like', 'hello%')
+              [method](
+                '[model1Relation1.model1Relation1, model1Relation1Inverse, model1Relation2.[model2Relation1, model2Relation2], model1Relation3]',
+              )
+              .then((res) => {
+                console.log('query time', Date.now() - t1);
 
-                  graph = sortBy(graph, 'id');
-                  res = sortBy(res, 'id');
+                graph = sortBy(graph, 'id');
+                res = sortBy(res, 'id');
 
-                  Model1.traverse(graph, traverser);
-                  Model1.traverse(res, traverser);
+                Model1.traverse(graph, traverser);
+                Model1.traverse(res, traverser);
 
-                  let expected = graph.map((it) => it.toJSON());
-                  let got = res.map((it) => it.toJSON());
+                let expected = graph.map((it) => it.toJSON());
+                let got = res.map((it) => it.toJSON());
 
-                  expect(got).to.eql(expected);
-                });
-            },
-            { concurrency: 1 },
-          );
+                expect(got).to.eql(expected);
+              });
+          });
         });
 
         function traverser(model) {

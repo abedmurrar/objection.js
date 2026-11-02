@@ -1,6 +1,5 @@
 const { cloneDeep } = require('../../lib/utils/cloneDeep');
 const expect = require('expect.js');
-const Promise = require('bluebird');
 const { Model, ref, val, raw } = require('../../');
 const { getMariaDbVersion } = require('../../lib/utils/knexUtils');
 

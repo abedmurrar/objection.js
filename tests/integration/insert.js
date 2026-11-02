@@ -1,6 +1,6 @@
+const { setTimeout: sleep } = require('node:timers/promises');
 const chai = require('chai');
 const expect = require('expect.js');
-const Promise = require('bluebird');
 const { inheritModel } = require('../../lib/model/inheritModel');
 const { ValidationError, UniqueViolationError } = require('../../');
 
@@ -578,7 +578,7 @@ module.exports = (session) => {
 
         model.$beforeInsert = function () {
           let self = this;
-          return Promise.delay(1).then(() => {
+          return sleep(1).then(() => {
             self.model1Prop1 = 'hello 3';
           });
         };

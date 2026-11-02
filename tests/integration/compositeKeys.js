@@ -1,7 +1,6 @@
 const { sortBy } = require('../../testUtils/testUtils');
 const { Model } = require('../../');
 const expect = require('expect.js');
-const Promise = require('bluebird');
 const mockKnexFactory = require('../../testUtils/mockKnex');
 
 module.exports = (session) => {
