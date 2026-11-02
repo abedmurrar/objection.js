@@ -1,22 +1,37 @@
-'use strict';
-
-const { ModelGraph } = require('../../model/graph/ModelGraph');
-const { ModelGraphEdge } = require('../../model/graph/ModelGraphEdge');
-const { createNotModelError } = require('../../model/graph/ModelGraphBuilder');
-const { GraphFetcher } = require('../graph/GraphFetcher');
-const { GraphInsert } = require('./insert/GraphInsert');
-const { GraphPatch } = require('./patch/GraphPatch');
-const { GraphDelete } = require('./delete/GraphDelete');
-const { GraphRecursiveUpsert } = require('./recursiveUpsert/GraphRecursiveUpsert');
-const { GraphOptions } = require('./GraphOptions');
-const { ValidationErrorType } = require('../../model/ValidationError');
-const { RelationExpression } = require('../RelationExpression');
-const { GraphNodeDbExistence } = require('./GraphNodeDbExistence');
-const { GraphData } = require('./GraphData');
-const { uniqBy, asArray, isObject } = require('../../utils/objectUtils');
+import { ModelGraph } from '../../model/graph/ModelGraph';
+import { ModelGraphEdge } from '../../model/graph/ModelGraphEdge';
+import { createNotModelError } from '../../model/graph/ModelGraphBuilder';
+import { GraphFetcher } from '../graph/GraphFetcher';
+import { GraphInsert } from './insert/GraphInsert';
+import { GraphPatch } from './patch/GraphPatch';
+import { GraphDelete } from './delete/GraphDelete';
+import { GraphRecursiveUpsert } from './recursiveUpsert/GraphRecursiveUpsert';
+import { GraphOptions } from './GraphOptions';
+import { ValidationErrorType } from '../../model/ValidationError';
+import { RelationExpression } from '../RelationExpression';
+import { GraphNodeDbExistence } from './GraphNodeDbExistence';
+import { GraphData } from './GraphData';
+import { uniqBy, asArray, isObject } from '../../utils/objectUtils';
+import type { Graph, GraphEdge, GraphModel, GraphNode } from './GraphData';
+import type { GraphAction } from './GraphAction';
+import type { GraphOptionsInput } from './GraphOptions';
+import type { QueryBuilder } from '../QueryBuilder';
+import type { ModelClass } from '../QueryBuilderOperationSupport';
 
 class GraphUpsert {
-  constructor({ rootModelClass, objects, upsertOptions }) {
+  declare objects: GraphModel[];
+  declare isArray: boolean;
+  declare upsertOpt: GraphOptionsInput;
+
+  constructor({
+    rootModelClass,
+    objects,
+    upsertOptions,
+  }: {
+    rootModelClass: ModelClass;
+    objects: unknown;
+    upsertOptions: GraphOptionsInput;
+  }) {
     checkCanBeConvertedToModels(rootModelClass, objects);
 
     this.objects = rootModelClass.ensureModelArray(objects, GraphUpsert.modelOptions);
@@ -24,11 +39,11 @@ class GraphUpsert {
     this.upsertOpt = upsertOptions;
   }
 
-  static get modelOptions() {
+  static get modelOptions(): { skipValidation: boolean } {
     return { skipValidation: true };
   }
 
-  run(builder) {
+  run(builder: QueryBuilder): Promise<GraphModel | GraphModel[]> {
     const modelClass = builder.modelClass();
     const graphOptions = new GraphOptions(this.upsertOpt);
 
@@ -43,15 +58,15 @@ class GraphUpsert {
   }
 }
 
-function checkCanBeConvertedToModels(modelClass, objects) {
-  asArray(objects).forEach((obj) => {
+function checkCanBeConvertedToModels(modelClass: ModelClass, objects: unknown): void {
+  asArray(objects).forEach((obj: unknown) => {
     if (!isObject(obj)) {
       throw createNotModelError(modelClass, obj);
     }
   });
 }
 
-function assignDbRefsAsRelateProps(graph) {
+function assignDbRefsAsRelateProps(graph: Graph): void {
   for (const node of graph.nodes) {
     if (!node.parentEdge || !node.parentEdge.relation || !node.isDbReference) {
       continue;
@@ -61,7 +76,11 @@ function assignDbRefsAsRelateProps(graph) {
   }
 }
 
-async function createGraphData(builder, graphOptions, graph) {
+async function createGraphData(
+  builder: QueryBuilder,
+  graphOptions: GraphOptions,
+  graph: Graph,
+): Promise<GraphData> {
   const currentGraph = await fetchCurrentGraph(builder, graphOptions, graph);
 
   const nodeDbExistence = await GraphNodeDbExistence.create({
@@ -74,7 +93,11 @@ async function createGraphData(builder, graphOptions, graph) {
   return new GraphData({ graph, currentGraph, graphOptions, nodeDbExistence });
 }
 
-function fetchCurrentGraph(builder, graphOptions, graph) {
+function fetchCurrentGraph(
+  builder: QueryBuilder,
+  graphOptions: GraphOptions,
+  graph: Graph,
+): Promise<Graph> {
   if (graphOptions.isInsertOnly()) {
     return Promise.resolve(ModelGraph.createEmpty());
   } else {
@@ -85,7 +108,7 @@ function fetchCurrentGraph(builder, graphOptions, graph) {
 // Remove branches from the graph that require no operations. For example
 // we never want to do anything for descendant nodes of a node that is
 // deleted or unrelated. We never delete recursively.
-function pruneGraphs() {
+function pruneGraphs(): (graphData: GraphData) => GraphData {
   return (graphData) => {
     pruneRelatedBranches(graphData);
 
@@ -97,7 +120,7 @@ function pruneGraphs() {
   };
 }
 
-function pruneRelatedBranches(graphData) {
+function pruneRelatedBranches(graphData: GraphData): void {
   const relateNodes = graphData.graph.nodes.filter((node) => {
     return (
       !graphData.currentGraph.nodeForNode(node) &&
@@ -108,7 +131,7 @@ function pruneRelatedBranches(graphData) {
   removeBranchesFromGraph(findRoots(relateNodes), graphData.graph);
 }
 
-function pruneDeletedBranches(graphData) {
+function pruneDeletedBranches(graphData: GraphData): void {
   const { graph, currentGraph } = graphData;
 
   const deleteNodes = currentGraph.nodes.filter((currentNode) => !graph.nodeForNode(currentNode));
@@ -122,7 +145,7 @@ function pruneDeletedBranches(graphData) {
       return false;
     }
 
-    const { relation } = deleteRoot.parentEdge;
+    const { relation } = deleteRoot.parentEdge!;
     const parentNode = graph.nodeForNode(deleteRoot.parentNode);
 
     if (!parentNode) {
@@ -136,7 +159,7 @@ function pruneDeletedBranches(graphData) {
   removeNodesFromGraph(new Set(rootsNotInRelation), currentGraph);
 }
 
-function findRoots(nodes) {
+function findRoots(nodes: GraphNode[]): GraphNode[] {
   const nodeSet = new Set(nodes);
 
   return uniqBy(
@@ -156,9 +179,9 @@ function findRoots(nodes) {
   );
 }
 
-function removeBranchesFromGraph(branchRoots, graph) {
+function removeBranchesFromGraph(branchRoots: GraphNode[], graph: Graph): void {
   const nodesToRemove = new Set(
-    branchRoots.reduce(
+    branchRoots.reduce<GraphNode[]>(
       (nodesToRemove, node) => [...nodesToRemove, ...node.descendantRelationNodes],
       [],
     ),
@@ -167,8 +190,8 @@ function removeBranchesFromGraph(branchRoots, graph) {
   removeNodesFromGraph(nodesToRemove, graph);
 }
 
-function removeNodesFromGraph(nodesToRemove, graph) {
-  const edgesToRemove = new Set();
+function removeNodesFromGraph(nodesToRemove: Set<GraphNode>, graph: Graph): Graph {
+  const edgesToRemove = new Set<GraphEdge>();
 
   for (const node of nodesToRemove) {
     for (const edge of node.edges) {
@@ -187,7 +210,7 @@ function removeNodesFromGraph(nodesToRemove, graph) {
   return graph;
 }
 
-function checkForErrors(builder) {
+function checkForErrors(builder: QueryBuilder): (graphData: GraphData) => GraphData {
   return (graphData) => {
     checkForNotFoundErrors(graphData, builder);
     checkForUnallowedRelationErrors(graphData, builder);
@@ -201,7 +224,7 @@ function checkForErrors(builder) {
   };
 }
 
-function checkForNotFoundErrors(graphData, builder) {
+function checkForNotFoundErrors(graphData: GraphData, builder: QueryBuilder): void {
   const { graphOptions, currentGraph, graph } = graphData;
 
   for (const node of graph.nodes) {
@@ -226,7 +249,7 @@ function checkForNotFoundErrors(graphData, builder) {
   }
 }
 
-function checkForUnallowedRelationErrors(graphData, builder) {
+function checkForUnallowedRelationErrors(graphData: GraphData, builder: QueryBuilder): void {
   const { graph } = graphData;
   const allowedExpression = builder.allowedGraphExpression();
 
@@ -243,7 +266,7 @@ function checkForUnallowedRelationErrors(graphData, builder) {
   }
 }
 
-function checkForUnallowedReferenceErrors(graphData, builder) {
+function checkForUnallowedReferenceErrors(graphData: GraphData, builder: QueryBuilder): void {
   const { graph, graphOptions } = graphData;
 
   if (graphOptions.allowRefs()) {
@@ -259,13 +282,13 @@ function checkForUnallowedReferenceErrors(graphData, builder) {
   }
 }
 
-function checkForHasManyRelateErrors(graphData) {
+function checkForHasManyRelateErrors(graphData: GraphData): void {
   const { graph, graphOptions } = graphData;
 
   for (const node of graph.nodes) {
     if (
       graphOptions.shouldRelate(node, graphData) &&
-      node.parentEdge.relation.isObjectionHasManyRelation
+      node.parentEdge!.relation.isObjectionHasManyRelation
     ) {
       throw new Error(
         'You cannot relate HasManyRelation or HasOneRelation using insertGraph, because those require update operations. Consider using upsertGraph instead.',
@@ -274,13 +297,13 @@ function checkForHasManyRelateErrors(graphData) {
   }
 }
 
-function executeOperations(builder) {
+function executeOperations(builder: QueryBuilder): (graphData: GraphData) => Promise<unknown> {
   return (graphData) => {
     const operations = graphData.graphOptions.isInsertOnly()
       ? [GraphInsert]
       : [GraphDelete, GraphInsert, GraphPatch, GraphRecursiveUpsert];
 
-    return operations.reduce((promise, Operation) => {
+    return operations.reduce<Promise<unknown>>((promise, Operation) => {
       const operation = new Operation(graphData);
       const actions = operation.createActions();
 
@@ -289,17 +312,15 @@ function executeOperations(builder) {
   };
 }
 
-function executeActions(builder, actions) {
-  return actions.reduce(
+function executeActions(builder: QueryBuilder, actions: GraphAction[]): Promise<unknown> {
+  return actions.reduce<Promise<unknown>>(
     (promise, action) => promise.then(() => action.run(builder)),
     Promise.resolve(),
   );
 }
 
-function returnResult(objects, isArray) {
+function returnResult(objects: GraphModel[], isArray: boolean): () => GraphModel | GraphModel[] {
   return () => (isArray ? objects : objects[0]);
 }
 
-module.exports = {
-  GraphUpsert,
-};
+export { GraphUpsert };

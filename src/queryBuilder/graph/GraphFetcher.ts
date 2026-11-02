@@ -1,16 +1,28 @@
-'use strict';
+import { asArray, groupBy } from '../../utils/objectUtils';
+import { ModelGraph } from '../../model/graph/ModelGraph';
+import { FetchStrategy } from './GraphOptions';
+import { RelationExpression } from '../RelationExpression';
+import type { Graph, GraphModel, GraphNode } from './GraphData';
+import type { GraphOptions } from './GraphOptions';
+import type { QueryBuilder } from '../QueryBuilder';
+import type { ManyToManyRelation } from '../../relations/manyToMany/ManyToManyRelation';
 
-const { asArray, groupBy } = require('../../utils/objectUtils');
-const { ModelGraph } = require('../../model/graph/ModelGraph');
-const { FetchStrategy } = require('./GraphOptions');
-const { RelationExpression } = require('../RelationExpression');
+type BuilderCallback = (builder: QueryBuilder) => void;
 
 class GraphFetcher {
   /**
    * Given a graph and options, fetches the current state of that graph
    * from the database and returns it as a ModelGraph instance.
    */
-  static async fetchCurrentGraph({ builder, graph, graphOptions }) {
+  static async fetchCurrentGraph({
+    builder,
+    graph,
+    graphOptions,
+  }: {
+    builder: QueryBuilder;
+    graph: Graph;
+    graphOptions: GraphOptions;
+  }): Promise<Graph> {
     const { rootObjects } = graph;
 
     const rootIds = getRootIds(rootObjects);
@@ -34,16 +46,16 @@ class GraphFetcher {
   }
 }
 
-function getRootIds(rootObjects) {
+function getRootIds(rootObjects: GraphModel | GraphModel[]): unknown[] {
   return asArray(rootObjects)
-    .filter((it) => it.$hasId())
-    .map((root) => root.$id());
+    .filter((it: GraphModel) => it.$hasId())
+    .map((root: GraphModel) => root.$id());
 }
 
-function propagateMethodCallsFromQuery(builder) {
+function propagateMethodCallsFromQuery(builder: QueryBuilder): BuilderCallback {
   return (fetchBuilder) => {
     // Propagate some method calls from the root query.
-    for (const method of ['forUpdate', 'forShare', 'forNoKeyUpdate', 'forKeyShare']) {
+    for (const method of ['forUpdate', 'forShare', 'forNoKeyUpdate', 'forKeyShare'] as const) {
       if (builder.has(method)) {
         fetchBuilder[method]();
       }
@@ -51,7 +63,11 @@ function propagateMethodCallsFromQuery(builder) {
   };
 }
 
-function buildFetchQuerySelects(graph, graphOptions, eagerExpr) {
+function buildFetchQuerySelects(
+  graph: Graph,
+  graphOptions: GraphOptions,
+  eagerExpr: RelationExpression,
+): BuilderCallback {
   return (builder) => {
     const nodesByRelationPath = groupNodesByRelationPath(graph, eagerExpr);
 
@@ -67,13 +83,16 @@ function buildFetchQuerySelects(graph, graphOptions, eagerExpr) {
   };
 }
 
-function groupNodesByRelationPath(graph, eagerExpr) {
-  const nodesByRelationPath = groupBy(graph.nodes, (node) => node.relationPathKey);
+function groupNodesByRelationPath(
+  graph: Graph,
+  eagerExpr: RelationExpression,
+): Map<string, GraphNode[]> {
+  const nodesByRelationPath = groupBy(graph.nodes, (node: GraphNode) => node.relationPathKey);
 
   // Not all relation paths have nodes. Relations with nulls or empty arrays
   // don't have nodes, but will still need to be fetched. Add these to the
   // map as empty arrays.
-  forEachPath(eagerExpr.node, (relationPath) => {
+  forEachPath(eagerExpr.node, (relationPath: string) => {
     if (!nodesByRelationPath.has(relationPath)) {
       nodesByRelationPath.set(relationPath, []);
     }
@@ -82,7 +101,10 @@ function groupNodesByRelationPath(graph, eagerExpr) {
   return nodesByRelationPath;
 }
 
-function createFetchSelectModifier(nodes, graphOptions) {
+function createFetchSelectModifier(
+  nodes: GraphNode[],
+  graphOptions: GraphOptions,
+): BuilderCallback {
   if (graphOptions.isFetchStrategy(FetchStrategy.OnlyIdentifiers)) {
     return createIdentifierSelector();
   } else if (graphOptions.isFetchStrategy(FetchStrategy.OnlyNeeded)) {
@@ -93,16 +115,16 @@ function createFetchSelectModifier(nodes, graphOptions) {
 }
 
 // Returns a function that only selects the id column.
-function createIdentifierSelector() {
+function createIdentifierSelector(): BuilderCallback {
   return (builder) => {
     builder.select(builder.fullIdColumn());
   };
 }
 
 // Returns a function that only selects the columns that exist in the input.
-function createInputColumnSelector(nodes) {
+function createInputColumnSelector(nodes: GraphNode[]): BuilderCallback {
   return (builder) => {
-    const selects = new Map();
+    const selects = new Map<string, string>();
 
     for (const node of nodes) {
       const databaseJson = node.obj.$toDatabaseJson(builder);
@@ -121,7 +143,7 @@ function createInputColumnSelector(nodes) {
     }
 
     const selectArr = Array.from(selects.values());
-    const idColumns = asArray(builder.fullIdColumn());
+    const idColumns: string[] = asArray(builder.fullIdColumn());
 
     for (const idColumn of idColumns) {
       if (!selectArr.includes(idColumn)) {
@@ -134,7 +156,11 @@ function createInputColumnSelector(nodes) {
   };
 }
 
-function shouldSelectColumn(column, selects, node) {
+function shouldSelectColumn(
+  column: string,
+  selects: Map<string, string>,
+  node: GraphNode,
+): boolean {
   const modelClass = node.modelClass;
 
   return (
@@ -145,13 +171,17 @@ function shouldSelectColumn(column, selects, node) {
   );
 }
 
-function createManyToManyExtraSelectionIfNeeded(builder, column, node) {
+function createManyToManyExtraSelectionIfNeeded(
+  builder: QueryBuilder,
+  column: string,
+  node: GraphNode,
+): string | null {
   if (node.parentEdge && node.parentEdge.relation.isObjectionManyToManyRelation) {
-    const relation = node.parentEdge.relation;
+    const relation = node.parentEdge.relation as ManyToManyRelation;
     const extra = relation.joinTableExtras.find((extra) => extra.aliasCol === column);
 
     if (extra) {
-      return `${builder.tableRefFor(relation.joinModelClass)}.${extra.joinTableCol} as ${
+      return `${builder.tableRefFor(relation.joinModelClass!)}.${extra.joinTableCol} as ${
         extra.aliasCol
       }`;
     }
@@ -160,24 +190,29 @@ function createManyToManyExtraSelectionIfNeeded(builder, column, node) {
   return null;
 }
 
-function createSelection(builder, column, node) {
+function createSelection(builder: QueryBuilder, column: string, node: GraphNode): string {
   return `${builder.tableRefFor(node.modelClass)}.${column}`;
 }
 
-function childQueryOptions() {
+function childQueryOptions(): { fork: boolean; isInternalQuery: boolean } {
   return {
     fork: true,
     isInternalQuery: true,
   };
 }
 
-function fetchQueryInternalOptions() {
+function fetchQueryInternalOptions(): { keepImplicitJoinProps: boolean } {
   return {
     keepImplicitJoinProps: true,
   };
 }
 
-function forEachPath(eagerExprNode, cb, path = []) {
+// `eagerExprNode` is a relation expression node: `$childNames` and a property per child.
+function forEachPath(
+  eagerExprNode: any,
+  cb: (relationPath: string) => void,
+  path: string[] = [],
+): void {
   for (const relation of eagerExprNode.$childNames) {
     path.push(relation);
     cb(path.join('.'));
@@ -186,6 +221,4 @@ function forEachPath(eagerExprNode, cb, path = []) {
   }
 }
 
-module.exports = {
-  GraphFetcher,
-};
+export { GraphFetcher };

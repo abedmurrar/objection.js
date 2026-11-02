@@ -1,10 +1,8 @@
-'use strict';
-
-const { GraphOperation } = require('../GraphOperation');
-const { GraphDeleteAction } = require('./GraphDeleteAction');
+import { GraphOperation } from '../GraphOperation';
+import { GraphDeleteAction } from './GraphDeleteAction';
 
 class GraphDelete extends GraphOperation {
-  createActions() {
+  createActions(): GraphDeleteAction[] {
     return [
       new GraphDeleteAction(this.graphData, {
         nodes: this.currentGraph.nodes.filter((currentNode) =>
@@ -15,6 +13,4 @@ class GraphDelete extends GraphOperation {
   }
 }
 
-module.exports = {
-  GraphDelete,
-};
+export { GraphDelete };

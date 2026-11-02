@@ -1,23 +1,32 @@
-'use strict';
-
-const { asArray } = require('../utils/objectUtils');
+import { asArray } from '../utils/objectUtils';
+import type { QueryBuilder } from './QueryBuilder';
+import type { ModelClass, Operation } from './QueryBuilderOperationSupport';
+import type { QueryBuilderUserContext } from './QueryBuilderUserContext';
 
 const BUILDER_SYMBOL = Symbol();
 
 // The static hooks of `Model`, which do nothing. Queries skip creating the
 // arguments and calling the hook when a model class hasn't overridden it.
-const defaultStaticHooks = new WeakSet();
+const defaultStaticHooks = new WeakSet<object>();
 
-function markDefaultStaticHook(hook) {
+function markDefaultStaticHook(hook: object): void {
   defaultStaticHooks.add(hook);
 }
 
-function hasStaticHook(modelClass, hookName) {
+function hasStaticHook(modelClass: ModelClass, hookName: string): boolean {
   return !defaultStaticHooks.has(modelClass[hookName]);
 }
 
+interface StaticHookArgumentsOptions {
+  builder: QueryBuilder;
+  result?: unknown;
+}
+
 class StaticHookArguments {
-  constructor({ builder, result = null }) {
+  declare readonly [BUILDER_SYMBOL]: QueryBuilder;
+  declare readonly result: unknown[];
+
+  constructor({ builder, result = null }: StaticHookArgumentsOptions) {
     // The builder should never be accessed through the arguments.
     // Hide it as well as possible to discourage people from
     // digging it out.
@@ -30,25 +39,25 @@ class StaticHookArguments {
     });
   }
 
-  static create(args) {
+  static create(args: StaticHookArgumentsOptions): StaticHookArguments {
     return new StaticHookArguments(args);
   }
 
-  get asFindQuery() {
+  get asFindQuery(): () => QueryBuilder {
     return () => {
       return this[BUILDER_SYMBOL].toFindQuery().clearWithGraphFetched().runAfter(asArray);
     };
   }
 
-  get context() {
+  get context(): QueryBuilderUserContext {
     return this[BUILDER_SYMBOL].context();
   }
 
-  get transaction() {
+  get transaction(): unknown {
     return this[BUILDER_SYMBOL].unsafeKnex();
   }
 
-  get relation() {
+  get relation(): unknown {
     const op = this[BUILDER_SYMBOL].findOperation(hasRelation);
 
     if (op) {
@@ -58,7 +67,7 @@ class StaticHookArguments {
     }
   }
 
-  get modelOptions() {
+  get modelOptions(): unknown {
     const op = this[BUILDER_SYMBOL].findOperation(hasModelOptions);
 
     if (op) {
@@ -68,7 +77,7 @@ class StaticHookArguments {
     }
   }
 
-  get items() {
+  get items(): unknown[] {
     const op = this[BUILDER_SYMBOL].findOperation(hasItems);
 
     if (op) {
@@ -78,7 +87,7 @@ class StaticHookArguments {
     }
   }
 
-  get inputItems() {
+  get inputItems(): unknown[] {
     const op = this[BUILDER_SYMBOL].findOperation(hasInputItems);
 
     if (op) {
@@ -88,7 +97,7 @@ class StaticHookArguments {
     }
   }
 
-  get cancelQuery() {
+  get cancelQuery(): (cancelValue?: unknown) => void {
     const args = this;
 
     return (cancelValue) => {
@@ -109,40 +118,48 @@ class StaticHookArguments {
   }
 }
 
-function getRelation(op) {
+// What some of the operations have: the relation operations have a relation
+// and an owner, the instance operations an instance, and the insert and update
+// operations models and model options.
+interface ItemOperation extends Operation {
+  relation?: unknown;
+  modelOptions?: unknown;
+  instance?: unknown;
+  owner?: { isModels: boolean; modelArray: unknown[] };
+  models?: unknown;
+  model?: unknown;
+}
+
+function getRelation(op: ItemOperation): unknown {
   return op.relation;
 }
 
-function hasRelation(op) {
+function hasRelation(op: ItemOperation): boolean {
   return !!getRelation(op);
 }
 
-function getModelOptions(op) {
+function getModelOptions(op: ItemOperation): unknown {
   return op.modelOptions;
 }
 
-function hasModelOptions(op) {
+function hasModelOptions(op: ItemOperation): boolean {
   return !!getModelOptions(op);
 }
 
-function getItems(op) {
+function getItems(op: ItemOperation): unknown {
   return op.instance || (op.owner && op.owner.isModels && op.owner.modelArray);
 }
 
-function hasItems(op) {
+function hasItems(op: ItemOperation): boolean {
   return !!getItems(op);
 }
 
-function getInputItems(op) {
+function getInputItems(op: ItemOperation): unknown {
   return op.models || op.model;
 }
 
-function hasInputItems(op) {
+function hasInputItems(op: ItemOperation): boolean {
   return !!getInputItems(op);
 }
 
-module.exports = {
-  StaticHookArguments,
-  markDefaultStaticHook,
-  hasStaticHook,
-};
+export { StaticHookArguments, markDefaultStaticHook, hasStaticHook };

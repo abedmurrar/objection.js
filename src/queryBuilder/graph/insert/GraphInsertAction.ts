@@ -1,9 +1,14 @@
-'use strict';
+import { GraphAction } from '../GraphAction';
+import { groupBy, chunk, get, set } from '../../../utils/objectUtils';
+import { ModelGraphEdge } from '../../../model/graph/ModelGraphEdge';
+import * as promiseUtils from '../../../utils/promiseUtils';
+import type { GraphData, GraphEdge, GraphNode } from '../GraphData';
+import type { QueryBuilder } from '../../QueryBuilder';
+import type { ManyToManyRelation } from '../../../relations/manyToMany/ManyToManyRelation';
+import type { ModelClass } from '../../QueryBuilderOperationSupport';
 
-const { GraphAction } = require('../GraphAction');
-const { groupBy, chunk, get, set } = require('../../../utils/objectUtils');
-const { ModelGraphEdge } = require('../../../model/graph/ModelGraphEdge');
-const promiseUtils = require('../../../utils/promiseUtils');
+// The edges each node depends on.
+type Dependencies = Map<GraphNode, GraphEdge[]>;
 
 /**
  * Inserts a batch of nodes for a GraphInsert.
@@ -14,7 +19,13 @@ const promiseUtils = require('../../../utils/promiseUtils');
  * when needed.
  */
 class GraphInsertAction extends GraphAction {
-  constructor(graphData, { nodes, dependencies }) {
+  declare nodes: GraphNode[];
+  declare dependencies: Dependencies;
+
+  constructor(
+    graphData: GraphData,
+    { nodes, dependencies }: { nodes: GraphNode[]; dependencies: Dependencies },
+  ) {
     super(graphData);
 
     // Nodes to insert.
@@ -22,15 +33,17 @@ class GraphInsertAction extends GraphAction {
     this.dependencies = dependencies;
   }
 
-  run(builder) {
+  run(builder: QueryBuilder): PromiseLike<unknown> {
     const batches = this._createInsertBatches(builder);
     const concurrency = this._getConcurrency(builder, this.nodes);
 
-    return promiseUtils.map(batches, (batch) => this._insertBatch(builder, batch), { concurrency });
+    return promiseUtils.map(batches, (batch: GraphNode[]) => this._insertBatch(builder, batch), {
+      concurrency,
+    });
   }
 
-  _createInsertBatches(builder) {
-    const batches = [];
+  _createInsertBatches(builder: QueryBuilder): GraphNode[][] {
+    const batches: GraphNode[][] = [];
     const batchSize = this._getBatchSize(builder);
     const nodesByModelClass = groupBy(this.nodes, getModelClass);
 
@@ -43,13 +56,13 @@ class GraphInsertAction extends GraphAction {
     return batches;
   }
 
-  async _insertBatch(parentBuilder, nodes) {
+  async _insertBatch(parentBuilder: QueryBuilder, nodes: GraphNode[]): Promise<void> {
     await this._beforeInsert(nodes);
     await this._insert(parentBuilder, nodes);
     await this._afterInsert(nodes);
   }
 
-  _beforeInsert(nodes) {
+  _beforeInsert(nodes: GraphNode[]): Promise<void> {
     this._resolveDependencies(nodes);
     this._omitManyToManyExtraProps(nodes);
     this._copyRelationPropsFromCurrentIfNeeded(nodes);
@@ -57,7 +70,7 @@ class GraphInsertAction extends GraphAction {
     return Promise.resolve();
   }
 
-  _resolveDependencies(nodes) {
+  _resolveDependencies(nodes: GraphNode[]): void {
     for (const node of nodes) {
       const edges = this.dependencies.get(node);
 
@@ -72,7 +85,7 @@ class GraphInsertAction extends GraphAction {
     }
   }
 
-  _resolveDependency(dependencyNode, edge) {
+  _resolveDependency(dependencyNode: GraphNode, edge: GraphEdge): void {
     if (edge.type === ModelGraphEdge.Type.Relation && !edge.relation.joinTable) {
       this._resolveRelationDependency(dependencyNode, edge);
     } else if (edge.refType === ModelGraphEdge.ReferenceType.Property) {
@@ -80,7 +93,7 @@ class GraphInsertAction extends GraphAction {
     }
   }
 
-  _resolveRelationDependency(dependencyNode, edge) {
+  _resolveRelationDependency(dependencyNode: GraphNode, edge: GraphEdge): void {
     const dependentNode = edge.getOtherNode(dependencyNode);
 
     let sourceProp;
@@ -96,23 +109,24 @@ class GraphInsertAction extends GraphAction {
 
     this._resolveReferences(dependencyNode);
 
-    targetProp.forEach((i) => {
+    targetProp.forEach((i: number) => {
       targetProp.setProp(dependentNode.obj, i, sourceProp.getProp(dependencyNode.obj, i));
     });
   }
 
-  _resolvePropertyReferenceNode(dependencyNode, edge) {
+  _resolvePropertyReferenceNode(dependencyNode: GraphNode, edge: GraphEdge): void {
     const dependentNode = edge.getOtherNode(dependencyNode);
 
-    let sourcePath;
-    let targetPath;
+    // A property reference edge has the paths.
+    let sourcePath: PropertyKey[];
+    let targetPath: PropertyKey[];
 
     if (edge.isOwnerNode(dependencyNode)) {
-      sourcePath = edge.refOwnerDataPath;
-      targetPath = edge.refRelatedDataPath;
+      sourcePath = edge.refOwnerDataPath!;
+      targetPath = edge.refRelatedDataPath!;
     } else {
-      targetPath = edge.refOwnerDataPath;
-      sourcePath = edge.refRelatedDataPath;
+      targetPath = edge.refOwnerDataPath!;
+      sourcePath = edge.refRelatedDataPath!;
     }
 
     const sourceValue = get(dependencyNode.obj, sourcePath);
@@ -121,23 +135,29 @@ class GraphInsertAction extends GraphAction {
     if (targetValue === edge.refMatch) {
       set(dependentNode.obj, targetPath, sourceValue);
     } else {
-      set(dependentNode.obj, targetPath, targetValue.replace(edge.refMatch, sourceValue));
+      // The reference is a part of a string: `replace()` converts the value to a string.
+      set(
+        dependentNode.obj,
+        targetPath,
+        (targetValue as string).replace(edge.refMatch!, sourceValue as string),
+      );
     }
   }
 
-  _omitManyToManyExtraProps(nodes) {
+  _omitManyToManyExtraProps(nodes: GraphNode[]): void {
     for (const node of nodes) {
       if (
         node.parentEdge &&
         node.parentEdge.type === ModelGraphEdge.Type.Relation &&
         node.parentEdge.relation.joinTableExtras.length > 0
       ) {
-        node.parentEdge.relation.omitExtraProps([node.obj]);
+        // Only many to many relations have join table extras.
+        (node.parentEdge.relation as ManyToManyRelation).omitExtraProps([node.obj]);
       }
     }
   }
 
-  _copyRelationPropsFromCurrentIfNeeded(nodes) {
+  _copyRelationPropsFromCurrentIfNeeded(nodes: GraphNode[]): void {
     for (const node of nodes) {
       const currentNode = this.currentGraph.nodeForNode(node);
 
@@ -152,7 +172,7 @@ class GraphInsertAction extends GraphAction {
 
         const prop = edge.isOwnerNode(node) ? edge.relation.ownerProp : edge.relation.relatedProp;
 
-        prop.forEach((i) => {
+        prop.forEach((i: number) => {
           const value = prop.getProp(node.obj, i);
 
           if (value !== undefined) {
@@ -165,7 +185,7 @@ class GraphInsertAction extends GraphAction {
     }
   }
 
-  _insert(parentBuilder, nodes) {
+  _insert(parentBuilder: QueryBuilder, nodes: GraphNode[]): Promise<unknown> | void {
     const [{ modelClass }] = nodes;
 
     nodes = nodes.filter((node) => {
@@ -195,7 +215,10 @@ class GraphInsertAction extends GraphAction {
     });
   }
 
-  _runRelationBeforeInsertMethods(parentBuilder, nodes) {
+  _runRelationBeforeInsertMethods(
+    parentBuilder: QueryBuilder,
+    nodes: GraphNode[],
+  ): Promise<unknown[]> {
     return Promise.all(
       nodes.map((node) => {
         if (node.parentEdge) {
@@ -207,19 +230,17 @@ class GraphInsertAction extends GraphAction {
     );
   }
 
-  _afterInsert(nodes) {
+  _afterInsert(nodes: GraphNode[]): void {
     for (const node of nodes) {
       for (const refNode of node.referencingNodes) {
-        this._resolveDependency(refNode, refNode.parentEdge);
+        this._resolveDependency(refNode, refNode.parentEdge!);
       }
     }
   }
 }
 
-function getModelClass(node) {
+function getModelClass(node: GraphNode): ModelClass {
   return node.modelClass;
 }
 
-module.exports = {
-  GraphInsertAction,
-};
+export { GraphInsertAction };

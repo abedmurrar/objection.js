@@ -1,4 +1,7 @@
-'use strict';
+import type { GraphData, GraphNode } from './GraphData';
+
+// The options of insertGraph and upsertGraph: booleans or arrays of relation paths.
+type GraphOptionsInput = Record<string, unknown>;
 
 const NO_RELATE = 'noRelate';
 const NO_UNRELATE = 'noUnrelate';
@@ -20,7 +23,9 @@ const FetchStrategy = {
 };
 
 class GraphOptions {
-  constructor(options) {
+  declare options: GraphOptionsInput;
+
+  constructor(options: GraphOptionsInput | GraphOptions) {
     if (options instanceof GraphOptions) {
       this.options = options.options;
     } else {
@@ -28,8 +33,8 @@ class GraphOptions {
     }
   }
 
-  isFetchStrategy(strategy) {
-    if (!FetchStrategy[strategy]) {
+  isFetchStrategy(strategy: string): boolean {
+    if (!(FetchStrategy as Record<string, string>)[strategy]) {
       throw new Error(`unknown strategy "${strategy}"`);
     }
 
@@ -40,7 +45,7 @@ class GraphOptions {
     }
   }
 
-  isInsertOnly() {
+  isInsertOnly(): boolean {
     // NO_RELATE is not in the list, since the `insert only` mode does
     // relate things that can be related using inserts.
     // TODO: Use a special key for this.
@@ -50,7 +55,7 @@ class GraphOptions {
   }
 
   // Like `shouldRelate` but ignores settings that explicitly disable relate operations.
-  shouldRelateIgnoreDisable(node, graphData) {
+  shouldRelateIgnoreDisable(node: GraphNode, graphData: GraphData): boolean {
     if (node.isReference || node.isDbReference) {
       return true;
     }
@@ -65,12 +70,12 @@ class GraphOptions {
     );
   }
 
-  shouldRelate(node, graphData) {
+  shouldRelate(node: GraphNode, graphData: GraphData): boolean {
     return !this._hasOption(node, NO_RELATE) && this.shouldRelateIgnoreDisable(node, graphData);
   }
 
   // Like `shouldInsert` but ignores settings that explicitly disable insert operations.
-  shouldInsertIgnoreDisable(node, graphData) {
+  shouldInsertIgnoreDisable(node: GraphNode, graphData: GraphData): boolean {
     return (
       !getCurrentNode(node, graphData) &&
       !this.shouldRelateIgnoreDisable(node, graphData) &&
@@ -78,17 +83,17 @@ class GraphOptions {
     );
   }
 
-  shouldInsert(node, graphData) {
+  shouldInsert(node: GraphNode, graphData: GraphData): boolean {
     return !this._hasOption(node, NO_INSERT) && this.shouldInsertIgnoreDisable(node, graphData);
   }
 
-  shouldInsertMissing(node) {
+  shouldInsertMissing(node: GraphNode): boolean {
     return this._hasOption(node, INSERT_MISSING);
   }
 
   // Like `shouldPatch() || shouldUpdate()` but ignores settings that explicitly disable
   // update or patch operations.
-  shouldPatchOrUpdateIgnoreDisable(node, graphData) {
+  shouldPatchOrUpdateIgnoreDisable(node: GraphNode, graphData: GraphData): boolean {
     if (this.shouldRelate(node, graphData)) {
       // We should update all nodes that are going to be related. Note that
       // we don't actually update anything unless there is something to update
@@ -99,7 +104,7 @@ class GraphOptions {
     return !!getCurrentNode(node, graphData);
   }
 
-  shouldPatch(node, graphData) {
+  shouldPatch(node: GraphNode, graphData: GraphData): boolean {
     return (
       this.shouldPatchOrUpdateIgnoreDisable(node, graphData) &&
       !this._hasOption(node, NO_UPDATE) &&
@@ -107,7 +112,7 @@ class GraphOptions {
     );
   }
 
-  shouldUpdate(node, graphData) {
+  shouldUpdate(node: GraphNode, graphData: GraphData): boolean {
     return (
       this.shouldPatchOrUpdateIgnoreDisable(node, graphData) &&
       !this._hasOption(node, NO_UPDATE) &&
@@ -116,11 +121,11 @@ class GraphOptions {
   }
 
   // Like `shouldUnrelate` but ignores settings that explicitly disable unrelate operations.
-  shouldUnrelateIgnoreDisable(currentNode) {
+  shouldUnrelateIgnoreDisable(currentNode: GraphNode): boolean {
     return this._hasOption(currentNode, UNRELATE);
   }
 
-  shouldUnrelate(currentNode, graphData) {
+  shouldUnrelate(currentNode: GraphNode, graphData: GraphData): boolean {
     return (
       !getNode(currentNode, graphData.graph) &&
       !this._hasOption(currentNode, NO_UNRELATE) &&
@@ -128,7 +133,7 @@ class GraphOptions {
     );
   }
 
-  shouldDelete(currentNode, graphData) {
+  shouldDelete(currentNode: GraphNode, graphData: GraphData): boolean {
     return (
       !getNode(currentNode, graphData.graph) &&
       !this._hasOption(currentNode, NO_DELETE) &&
@@ -136,20 +141,20 @@ class GraphOptions {
     );
   }
 
-  shouldInsertOrRelate(node, graphData) {
+  shouldInsertOrRelate(node: GraphNode, graphData: GraphData): boolean {
     return this.shouldInsert(node, graphData) || this.shouldRelate(node, graphData);
   }
 
-  shouldDeleteOrUnrelate(currentNode, graphData) {
+  shouldDeleteOrUnrelate(currentNode: GraphNode, graphData: GraphData): boolean {
     return this.shouldDelete(currentNode, graphData) || this.shouldUnrelate(currentNode, graphData);
   }
 
-  allowRefs() {
+  allowRefs(): boolean {
     return !!this.options[ALLOW_REFS];
   }
 
-  rebasedOptions(newRoot) {
-    const newOpt = {};
+  rebasedOptions(newRoot: GraphNode): GraphOptions {
+    const newOpt: GraphOptionsInput = {};
     const newRootRelationPath = newRoot.relationPathKey;
 
     for (const name of Object.keys(this.options)) {
@@ -157,9 +162,9 @@ class GraphOptions {
 
       if (Array.isArray(value)) {
         newOpt[name] = value
-          .filter((it) => it.startsWith(newRootRelationPath))
-          .map((it) => it.slice(newRootRelationPath.length + 1))
-          .filter((it) => !!it);
+          .filter((it: string) => it.startsWith(newRootRelationPath))
+          .map((it: string) => it.slice(newRootRelationPath.length + 1))
+          .filter((it: string) => !!it);
       } else {
         newOpt[name] = value;
       }
@@ -168,7 +173,7 @@ class GraphOptions {
     return new GraphOptions(newOpt);
   }
 
-  _hasOption(node, optionName) {
+  _hasOption(node: GraphNode, optionName: string): boolean {
     const option = this.options[optionName];
 
     if (Array.isArray(option)) {
@@ -185,7 +190,10 @@ class GraphOptions {
   }
 }
 
-function getCurrentNode(node, graphData) {
+function getCurrentNode(
+  node: GraphNode | null | undefined,
+  graphData: GraphData | null | undefined,
+): GraphNode | null {
   if (!graphData || !node) {
     return null;
   }
@@ -193,7 +201,10 @@ function getCurrentNode(node, graphData) {
   return graphData.currentGraph.nodeForNode(node);
 }
 
-function getNode(currentNode, graph) {
+function getNode(
+  currentNode: GraphNode | null | undefined,
+  graph: GraphData['graph'] | null | undefined,
+): GraphNode | null {
   if (!graph || !currentNode) {
     return null;
   }
@@ -201,7 +212,5 @@ function getNode(currentNode, graph) {
   return graph.nodeForNode(currentNode);
 }
 
-module.exports = {
-  GraphOptions,
-  FetchStrategy,
-};
+export { GraphOptions, FetchStrategy };
+export type { GraphOptionsInput };

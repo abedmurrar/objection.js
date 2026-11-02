@@ -1,25 +1,27 @@
-'use strict';
-
-const { getModel } = require('../../../model/getModel');
-const { GraphAction } = require('../GraphAction');
-const { isInternalProp } = require('../../../utils/internalPropUtils');
-const { difference, isObject, jsonEquals } = require('../../../utils/objectUtils');
-const promiseUtils = require('../../../utils/promiseUtils');
+import { getModel } from '../../../model/getModel';
+import { GraphAction } from '../GraphAction';
+import { isInternalProp } from '../../../utils/internalPropUtils';
+import { difference, isObject, jsonEquals } from '../../../utils/objectUtils';
+import * as promiseUtils from '../../../utils/promiseUtils';
+import type { GraphData, GraphNode } from '../GraphData';
+import type { QueryBuilder } from '../../QueryBuilder';
 
 class GraphPatchAction extends GraphAction {
-  constructor(graphData, { nodes }) {
+  declare nodes: GraphNode[];
+
+  constructor(graphData: GraphData, { nodes }: { nodes: GraphNode[] }) {
     super(graphData);
     // Nodes to patch.
     this.nodes = nodes;
   }
 
-  run(builder) {
-    return promiseUtils.map(this.nodes, (node) => this._runForNode(builder, node), {
+  run(builder: QueryBuilder): PromiseLike<unknown> {
+    return promiseUtils.map(this.nodes, (node: GraphNode) => this._runForNode(builder, node), {
       concurrency: this._getConcurrency(builder, this.nodes),
     });
   }
 
-  _runForNode(builder, node) {
+  _runForNode(builder: QueryBuilder, node: GraphNode): Promise<unknown> | null {
     const shouldPatch = this.graphOptions.shouldPatch(node, this.graphData);
     const shouldUpdate = this.graphOptions.shouldUpdate(node, this.graphData);
 
@@ -31,7 +33,7 @@ class GraphPatchAction extends GraphAction {
     // properties. That's why we handle them here.
     const changePropsBecauseOfBelongsToOneDelete = this._handleBelongsToOneDeletes(node);
 
-    const handleUpdate = () => {
+    const handleUpdate = (): boolean => {
       const { changedProps, unchangedProps } = this._findChanges(node);
       const allProps = [...changedProps, ...unchangedProps];
 
@@ -81,7 +83,7 @@ class GraphPatchAction extends GraphAction {
       patch: shouldPatch || (!shouldPatch && !shouldUpdate),
     });
 
-    const updateBuilder = this._createBuilder(node)
+    const updateBuilder: QueryBuilder = this._createBuilder(node)
       .childQueryOf(builder, childQueryOptions())
       .copyFrom(builder, GraphAction.ReturningAllSelector);
 
@@ -113,9 +115,9 @@ class GraphPatchAction extends GraphAction {
     });
   }
 
-  _handleBelongsToOneInserts(node) {
+  _handleBelongsToOneInserts(node: GraphNode): string[] {
     const currentNode = this.currentGraph.nodeForNode(node);
-    const updatedProps = [];
+    const updatedProps: string[] = [];
 
     for (const edge of node.edges) {
       if (
@@ -126,7 +128,7 @@ class GraphPatchAction extends GraphAction {
       ) {
         const { relation } = edge;
 
-        relation.ownerProp.forEach((i) => {
+        relation.ownerProp.forEach((i: number) => {
           const currentValue = currentNode && relation.ownerProp.getProp(currentNode.obj, i);
           const relatedValue = relation.relatedProp.getProp(edge.relatedNode.obj, i);
 
@@ -141,9 +143,9 @@ class GraphPatchAction extends GraphAction {
     return updatedProps;
   }
 
-  _handleBelongsToOneDeletes(node) {
+  _handleBelongsToOneDeletes(node: GraphNode): string[] {
     const currentNode = this.currentGraph.nodeForNode(node);
-    const updatedProps = [];
+    const updatedProps: string[] = [];
 
     if (!currentNode) {
       return updatedProps;
@@ -158,7 +160,7 @@ class GraphPatchAction extends GraphAction {
       ) {
         const { relation } = edge;
 
-        relation.ownerProp.forEach((i) => {
+        relation.ownerProp.forEach((i: number) => {
           const currentValue = relation.ownerProp.getProp(currentNode.obj, i);
 
           if (currentValue != null) {
@@ -172,14 +174,14 @@ class GraphPatchAction extends GraphAction {
     return updatedProps;
   }
 
-  _findChanges(node) {
+  _findChanges(node: GraphNode): { changedProps: string[]; unchangedProps: string[] } {
     const obj = node.obj;
     const currentNode = this.currentGraph.nodeForNode(node);
-    const currentObj = (currentNode && currentNode.obj) || {};
+    const currentObj: Record<string, unknown> = (currentNode && currentNode.obj) || {};
     const relationNames = node.modelClass.getRelationNames();
 
-    const unchangedProps = [];
-    const changedProps = [];
+    const unchangedProps: string[] = [];
+    const changedProps: string[] = [];
 
     for (const prop of Object.keys(obj)) {
       if (isInternalProp(prop) || relationNames.includes(prop)) {
@@ -211,12 +213,12 @@ class GraphPatchAction extends GraphAction {
     };
   }
 
-  _hasNonIdPropertyChanges(node) {
+  _hasNonIdPropertyChanges(node: GraphNode): boolean {
     const idProps = node.modelClass.getIdPropertyArray();
     return this._findChanges(node).changedProps.some((prop) => !idProps.includes(prop));
   }
 
-  _createBuilder(node) {
+  _createBuilder(node: GraphNode): QueryBuilder {
     if (node.parentEdge && !node.parentEdge.relation.isObjectionHasManyRelation) {
       return this._createRelatedBuilder(node);
     } else {
@@ -224,13 +226,13 @@ class GraphPatchAction extends GraphAction {
     }
   }
 
-  _createRelatedBuilder(node) {
-    return node.parentNode.obj
-      .$relatedQuery(node.parentEdge.relation.name)
+  _createRelatedBuilder(node: GraphNode): QueryBuilder {
+    return node
+      .parentNode!.obj.$relatedQuery(node.parentEdge!.relation.name)
       .findById(node.obj.$id());
   }
 
-  _createRootBuilder(node) {
+  _createRootBuilder(node: GraphNode): QueryBuilder {
     const currentNode = this.currentGraph.nodeForNode(node);
     const currentObj = currentNode && currentNode.obj;
 
@@ -238,14 +240,14 @@ class GraphPatchAction extends GraphAction {
   }
 }
 
-function childQueryOptions() {
+function childQueryOptions(): { fork: boolean; isInternalQuery: boolean } {
   return {
     fork: true,
     isInternalQuery: true,
   };
 }
 
-function nonStrictEquals(val1, val2) {
+function nonStrictEquals(val1: unknown, val2: unknown): boolean {
   if (val1 == val2) {
     return true;
   }
@@ -253,6 +255,4 @@ function nonStrictEquals(val1, val2) {
   return jsonEquals(val1, val2);
 }
 
-module.exports = {
-  GraphPatchAction,
-};
+export { GraphPatchAction };

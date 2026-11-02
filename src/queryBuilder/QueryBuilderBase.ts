@@ -1,35 +1,31 @@
-'use strict';
+import { QueryBuilderOperationSupport } from './QueryBuilderOperationSupport';
+import { isSqlite, isMsSql } from '../utils/knexUtils';
 
-const { QueryBuilderOperationSupport } = require('./QueryBuilderOperationSupport');
-const { isSqlite, isMsSql } = require('../utils/knexUtils');
+import { KnexOperation } from './operations/KnexOperation';
+import { expression } from './expressions';
+import { MergeOperation } from './operations/MergeOperation';
+import { SelectOperation } from './operations/select/SelectOperation';
+import { ReturningOperation } from './operations/ReturningOperation';
+import { WhereCompositeOperation } from './operations/WhereCompositeOperation';
+import { WhereJsonOperation } from './operations/jsonApi/WhereJsonOperation';
+import { WhereJsonOverlapsOperation } from './operations/jsonApi/WhereJsonOverlapsOperation';
 
-const { KnexOperation } = require('./operations/KnexOperation');
+import { WhereInCompositeOperation } from './operations/whereInComposite/WhereInCompositeOperation';
+import { WhereInCompositeSqliteOperation } from './operations/whereInComposite/WhereInCompositeSqliteOperation';
+import { WhereInCompositeMsSqlOperation } from './operations/whereInComposite/WhereInCompositeMsSqlOperation';
+import { WhereJsonHasOperation } from './operations/jsonApi/WhereJsonHasOperation';
+import { WhereJsonNotObjectOperation } from './operations/jsonApi/WhereJsonNotObjectOperation';
+import type { KnexInstance } from './operations/types';
 
 const HavingSelector = /^(having|orHaving|andHaving)/;
 const GroupBySelector = /^groupBy/;
-const { expression } = require('./expressions');
-const { MergeOperation } = require('./operations/MergeOperation');
-const { SelectOperation } = require('./operations/select/SelectOperation');
-const { ReturningOperation } = require('./operations/ReturningOperation');
-const { WhereCompositeOperation } = require('./operations/WhereCompositeOperation');
-const { WhereJsonOperation } = require('./operations/jsonApi/WhereJsonOperation');
-const { WhereJsonOverlapsOperation } = require('./operations/jsonApi/WhereJsonOverlapsOperation');
-
-const {
-  WhereInCompositeOperation,
-} = require('./operations/whereInComposite/WhereInCompositeOperation');
-const {
-  WhereInCompositeSqliteOperation,
-} = require('./operations/whereInComposite/WhereInCompositeSqliteOperation');
-const {
-  WhereInCompositeMsSqlOperation,
-} = require('./operations/whereInComposite/WhereInCompositeMsSqlOperation');
-const { WhereJsonHasOperation } = require('./operations/jsonApi/WhereJsonHasOperation');
-const { WhereJsonNotObjectOperation } = require('./operations/jsonApi/WhereJsonNotObjectOperation');
 
 class QueryBuilderBase extends QueryBuilderOperationSupport {
-  modify(...args) {
-    const func = args[0];
+  // Defined on the prototype below.
+  declare readonly isObjectionQueryBuilderBase: true;
+
+  modify(...args: unknown[]): this {
+    const func = args[0] as ((...args: unknown[]) => unknown) | null | undefined;
 
     if (!func) {
       return this;
@@ -45,551 +41,551 @@ class QueryBuilderBase extends QueryBuilderOperationSupport {
     return this;
   }
 
-  transacting(trx) {
+  transacting(trx: KnexInstance | null | undefined): this {
     this._context.knex = trx || null;
     return this;
   }
 
-  select(...args) {
+  select(...args: unknown[]): this {
     return this.addOperation(new SelectOperation('select'), args);
   }
 
-  insert(...args) {
+  insert(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('insert'), args);
   }
 
-  update(...args) {
+  update(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('update'), args);
   }
 
-  delete(...args) {
+  delete(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('delete'), args);
   }
 
-  del(...args) {
+  del(...args: unknown[]): this {
     return this.delete(...args);
   }
 
-  forUpdate(...args) {
+  forUpdate(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('forUpdate'), args);
   }
 
-  forShare(...args) {
+  forShare(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('forShare'), args);
   }
 
-  forNoKeyUpdate(...args) {
+  forNoKeyUpdate(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('forNoKeyUpdate'), args);
   }
 
-  forKeyShare(...args) {
+  forKeyShare(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('forKeyShare'), args);
   }
 
-  skipLocked(...args) {
+  skipLocked(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('skipLocked'), args);
   }
 
-  noWait(...args) {
+  noWait(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('noWait'), args);
   }
 
-  as(...args) {
+  as(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('as'), args);
   }
 
-  columns(...args) {
+  columns(...args: unknown[]): this {
     return this.addOperation(new SelectOperation('columns'), args);
   }
 
-  column(...args) {
+  column(...args: unknown[]): this {
     return this.addOperation(new SelectOperation('column'), args);
   }
 
-  from(...args) {
+  from(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('from'), args);
   }
 
-  fromJS(...args) {
+  fromJS(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('fromJS'), args);
   }
 
-  fromRaw(...args) {
+  fromRaw(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('fromRaw'), args);
   }
 
-  into(...args) {
+  into(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('into'), args);
   }
 
-  withSchema(...args) {
+  withSchema(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('withSchema'), args);
   }
 
-  table(...args) {
+  table(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('table'), args);
   }
 
-  distinct(...args) {
+  distinct(...args: unknown[]): this {
     return this.addOperation(new SelectOperation('distinct'), args);
   }
 
-  distinctOn(...args) {
+  distinctOn(...args: unknown[]): this {
     return this.addOperation(new SelectOperation('distinctOn'), args);
   }
 
-  join(...args) {
+  join(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('join'), args);
   }
 
-  joinRaw(...args) {
+  joinRaw(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('joinRaw'), args);
   }
 
-  innerJoin(...args) {
+  innerJoin(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('innerJoin'), args);
   }
 
-  leftJoin(...args) {
+  leftJoin(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('leftJoin'), args);
   }
 
-  leftOuterJoin(...args) {
+  leftOuterJoin(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('leftOuterJoin'), args);
   }
 
-  rightJoin(...args) {
+  rightJoin(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('rightJoin'), args);
   }
 
-  rightOuterJoin(...args) {
+  rightOuterJoin(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('rightOuterJoin'), args);
   }
 
-  outerJoin(...args) {
+  outerJoin(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('outerJoin'), args);
   }
 
-  fullOuterJoin(...args) {
+  fullOuterJoin(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('fullOuterJoin'), args);
   }
 
-  crossJoin(...args) {
+  crossJoin(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('crossJoin'), args);
   }
 
-  where(...args) {
+  where(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('where'), args);
   }
 
-  andWhere(...args) {
+  andWhere(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('andWhere'), args);
   }
 
-  orWhere(...args) {
+  orWhere(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('orWhere'), args);
   }
 
-  whereNot(...args) {
+  whereNot(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('whereNot'), args);
   }
 
-  andWhereNot(...args) {
+  andWhereNot(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('andWhereNot'), args);
   }
 
-  orWhereNot(...args) {
+  orWhereNot(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('orWhereNot'), args);
   }
 
   // Makes the query match no rows.
-  none() {
+  none(): this {
     return this.where(expression('(1 = 0)', []));
   }
 
-  whereRaw(...args) {
+  whereRaw(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('whereRaw'), args);
   }
 
-  andWhereRaw(...args) {
+  andWhereRaw(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('andWhereRaw'), args);
   }
 
-  orWhereRaw(...args) {
+  orWhereRaw(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('orWhereRaw'), args);
   }
 
-  whereWrapped(...args) {
+  whereWrapped(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('whereWrapped'), args);
   }
 
-  havingWrapped(...args) {
+  havingWrapped(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('havingWrapped'), args);
   }
 
-  whereExists(...args) {
+  whereExists(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('whereExists'), args);
   }
 
-  orWhereExists(...args) {
+  orWhereExists(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('orWhereExists'), args);
   }
 
-  whereNotExists(...args) {
+  whereNotExists(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('whereNotExists'), args);
   }
 
-  orWhereNotExists(...args) {
+  orWhereNotExists(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('orWhereNotExists'), args);
   }
 
-  whereIn(...args) {
+  whereIn(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('whereIn'), args);
   }
 
-  orWhereIn(...args) {
+  orWhereIn(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('orWhereIn'), args);
   }
 
-  whereNotIn(...args) {
+  whereNotIn(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('whereNotIn'), args);
   }
 
-  orWhereNotIn(...args) {
+  orWhereNotIn(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('orWhereNotIn'), args);
   }
 
-  whereNull(...args) {
+  whereNull(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('whereNull'), args);
   }
 
-  orWhereNull(...args) {
+  orWhereNull(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('orWhereNull'), args);
   }
 
-  whereNotNull(...args) {
+  whereNotNull(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('whereNotNull'), args);
   }
 
-  orWhereNotNull(...args) {
+  orWhereNotNull(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('orWhereNotNull'), args);
   }
 
-  whereBetween(...args) {
+  whereBetween(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('whereBetween'), args);
   }
 
-  andWhereBetween(...args) {
+  andWhereBetween(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('andWhereBetween'), args);
   }
 
-  whereNotBetween(...args) {
+  whereNotBetween(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('whereNotBetween'), args);
   }
 
-  andWhereNotBetween(...args) {
+  andWhereNotBetween(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('andWhereNotBetween'), args);
   }
 
-  orWhereBetween(...args) {
+  orWhereBetween(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('orWhereBetween'), args);
   }
 
-  orWhereNotBetween(...args) {
+  orWhereNotBetween(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('orWhereNotBetween'), args);
   }
 
-  whereLike(...args) {
+  whereLike(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('whereLike'), args);
   }
 
-  andWhereLike(...args) {
+  andWhereLike(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('andWhereLike'), args);
   }
 
-  orWhereLike(...args) {
+  orWhereLike(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('orWhereLike'), args);
   }
 
-  whereILike(...args) {
+  whereILike(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('whereILike'), args);
   }
 
-  andWhereILike(...args) {
+  andWhereILike(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('andWhereILike'), args);
   }
 
-  orWhereILike(...args) {
+  orWhereILike(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('orWhereILike'), args);
   }
 
-  groupBy(...args) {
+  groupBy(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('groupBy'), args);
   }
 
-  groupByRaw(...args) {
+  groupByRaw(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('groupByRaw'), args);
   }
 
-  orderBy(...args) {
+  orderBy(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('orderBy'), args);
   }
 
-  orderByRaw(...args) {
+  orderByRaw(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('orderByRaw'), args);
   }
 
-  union(...args) {
+  union(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('union'), args);
   }
 
-  unionAll(...args) {
+  unionAll(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('unionAll'), args);
   }
 
-  intersect(...args) {
+  intersect(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('intersect'), args);
   }
 
-  except(...args) {
+  except(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('except'), args);
   }
 
-  having(...args) {
+  having(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('having'), args);
   }
 
   // Like clearSelect() and clearWhere(), these remove the operations, so that
   // has() and copyFrom() see the query as it is.
-  clearHaving() {
+  clearHaving(): this {
     return this.clear(HavingSelector);
   }
 
-  clearGroup() {
+  clearGroup(): this {
     return this.clear(GroupBySelector);
   }
 
-  orHaving(...args) {
+  orHaving(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('orHaving'), args);
   }
 
-  havingIn(...args) {
+  havingIn(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('havingIn'), args);
   }
 
-  orHavingIn(...args) {
+  orHavingIn(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('orHavingIn'), args);
   }
 
-  havingNotIn(...args) {
+  havingNotIn(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('havingNotIn'), args);
   }
 
-  orHavingNotIn(...args) {
+  orHavingNotIn(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('orHavingNotIn'), args);
   }
 
-  havingNull(...args) {
+  havingNull(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('havingNull'), args);
   }
 
-  orHavingNull(...args) {
+  orHavingNull(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('orHavingNull'), args);
   }
 
-  havingNotNull(...args) {
+  havingNotNull(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('havingNotNull'), args);
   }
 
-  orHavingNotNull(...args) {
+  orHavingNotNull(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('orHavingNotNull'), args);
   }
 
-  havingExists(...args) {
+  havingExists(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('havingExists'), args);
   }
 
-  orHavingExists(...args) {
+  orHavingExists(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('orHavingExists'), args);
   }
 
-  havingNotExists(...args) {
+  havingNotExists(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('havingNotExists'), args);
   }
 
-  orHavingNotExists(...args) {
+  orHavingNotExists(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('orHavingNotExists'), args);
   }
 
-  havingBetween(...args) {
+  havingBetween(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('havingBetween'), args);
   }
 
-  orHavingBetween(...args) {
+  orHavingBetween(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('orHavingBetween'), args);
   }
 
-  havingNotBetween(...args) {
+  havingNotBetween(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('havingNotBetween'), args);
   }
 
-  orHavingNotBetween(...args) {
+  orHavingNotBetween(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('orHavingNotBetween'), args);
   }
 
-  andHaving(...args) {
+  andHaving(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('andHaving'), args);
   }
 
-  andHavingIn(...args) {
+  andHavingIn(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('andHavingIn'), args);
   }
 
-  andHavingNotIn(...args) {
+  andHavingNotIn(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('andHavingNotIn'), args);
   }
 
-  andHavingNull(...args) {
+  andHavingNull(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('andHavingNull'), args);
   }
 
-  andHavingNotNull(...args) {
+  andHavingNotNull(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('andHavingNotNull'), args);
   }
 
-  andHavingExists(...args) {
+  andHavingExists(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('andHavingExists'), args);
   }
 
-  andHavingNotExists(...args) {
+  andHavingNotExists(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('andHavingNotExists'), args);
   }
 
-  andHavingBetween(...args) {
+  andHavingBetween(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('andHavingBetween'), args);
   }
 
-  andHavingNotBetween(...args) {
+  andHavingNotBetween(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('andHavingNotBetween'), args);
   }
 
-  comment(...args) {
+  comment(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('comment'), args);
   }
 
-  hintComment(...args) {
+  hintComment(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('hintComment'), args);
   }
 
-  using(...args) {
+  using(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('using'), args);
   }
 
-  havingRaw(...args) {
+  havingRaw(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('havingRaw'), args);
   }
 
-  orHavingRaw(...args) {
+  orHavingRaw(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('orHavingRaw'), args);
   }
 
-  offset(...args) {
+  offset(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('offset'), args);
   }
 
-  limit(...args) {
+  limit(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('limit'), args);
   }
 
-  count(...args) {
+  count(...args: unknown[]): this {
     return this.addOperation(new SelectOperation('count'), args);
   }
 
-  countDistinct(...args) {
+  countDistinct(...args: unknown[]): this {
     return this.addOperation(new SelectOperation('countDistinct'), args);
   }
 
-  min(...args) {
+  min(...args: unknown[]): this {
     return this.addOperation(new SelectOperation('min'), args);
   }
 
-  max(...args) {
+  max(...args: unknown[]): this {
     return this.addOperation(new SelectOperation('max'), args);
   }
 
-  sum(...args) {
+  sum(...args: unknown[]): this {
     return this.addOperation(new SelectOperation('sum'), args);
   }
 
-  sumDistinct(...args) {
+  sumDistinct(...args: unknown[]): this {
     return this.addOperation(new SelectOperation('sumDistinct'), args);
   }
 
-  avg(...args) {
+  avg(...args: unknown[]): this {
     return this.addOperation(new SelectOperation('avg'), args);
   }
 
-  avgDistinct(...args) {
+  avgDistinct(...args: unknown[]): this {
     return this.addOperation(new SelectOperation('avgDistinct'), args);
   }
 
-  debug(...args) {
+  debug(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('debug'), args);
   }
 
-  returning(...args) {
+  returning(...args: unknown[]): this {
     return this.addOperation(new ReturningOperation('returning'), args);
   }
 
-  truncate(...args) {
+  truncate(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('truncate'), args);
   }
 
-  connection(...args) {
+  connection(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('connection'), args);
   }
 
-  options(...args) {
+  options(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('options'), args);
   }
 
-  columnInfo(...args) {
+  columnInfo(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('columnInfo'), args);
   }
 
-  off(...args) {
+  off(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('off'), args);
   }
 
-  timeout(...args) {
+  timeout(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('timeout'), args);
   }
 
-  with(...args) {
+  with(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('with'), args);
   }
 
-  withWrapped(...args) {
+  withWrapped(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('withWrapped'), args);
   }
 
-  withRecursive(...args) {
+  withRecursive(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('withRecursive'), args);
   }
 
-  withMaterialized(...args) {
+  withMaterialized(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('withMaterialized'), args);
   }
 
-  withNotMaterialized(...args) {
+  withNotMaterialized(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('withNotMaterialized'), args);
   }
 
-  whereComposite(...args) {
+  whereComposite(...args: unknown[]): this {
     return this.addOperation(new WhereCompositeOperation('whereComposite'), args);
   }
 
-  whereInComposite(...args) {
+  whereInComposite(...args: unknown[]): this {
     let operation = null;
 
     if (isSqlite(this.knex())) {
@@ -603,7 +599,7 @@ class QueryBuilderBase extends QueryBuilderOperationSupport {
     return this.addOperation(operation, args);
   }
 
-  whereNotInComposite(...args) {
+  whereNotInComposite(...args: unknown[]): this {
     let operation = null;
 
     if (isSqlite(this.knex())) {
@@ -617,80 +613,80 @@ class QueryBuilderBase extends QueryBuilderOperationSupport {
     return this.addOperation(operation, args);
   }
 
-  jsonExtract(...args) {
+  jsonExtract(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('jsonExtract'), args);
   }
 
-  jsonSet(...args) {
+  jsonSet(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('jsonSet'), args);
   }
 
-  jsonInsert(...args) {
+  jsonInsert(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('jsonInsert'), args);
   }
 
-  jsonRemove(...args) {
+  jsonRemove(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('jsonRemove'), args);
   }
 
-  whereJsonObject(...args) {
+  whereJsonObject(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('whereJsonObject'), args);
   }
 
-  orWhereJsonObject(...args) {
+  orWhereJsonObject(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('orWhereJsonObject'), args);
   }
 
-  andWhereJsonObject(...args) {
+  andWhereJsonObject(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('andWhereJsonObject'), args);
   }
 
-  whereNotJsonObject(...args) {
+  whereNotJsonObject(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('whereNotJsonObject'), args);
   }
 
-  orWhereNotJsonObject(...args) {
+  orWhereNotJsonObject(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('orWhereNotJsonObject'), args);
   }
 
-  andWhereNotJsonObject(...args) {
+  andWhereNotJsonObject(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('andWhereNotJsonObject'), args);
   }
 
-  whereJsonPath(...args) {
+  whereJsonPath(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('whereJsonPath'), args);
   }
 
-  orWhereJsonPath(...args) {
+  orWhereJsonPath(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('orWhereJsonPath'), args);
   }
 
-  andWhereJsonPath(...args) {
+  andWhereJsonPath(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('andWhereJsonPath'), args);
   }
 
   // whereJson(Not)SupersetOf / whereJson(Not)SubsetOf are now supported by knex >= 1.0, but for now
   // objection handles them differently and only for postgres.
   // Changing them to utilize knex methods directly may require a major version bump and upgrade guide.
-  whereJsonSupersetOf(...args) {
+  whereJsonSupersetOf(...args: unknown[]): this {
     return this.addOperation(
       new WhereJsonOperation('whereJsonSupersetOf', { operator: '@>', bool: 'and' }),
       args,
     );
   }
 
-  andWhereJsonSupersetOf(...args) {
+  andWhereJsonSupersetOf(...args: unknown[]): this {
     return this.whereJsonSupersetOf(...args);
   }
 
-  orWhereJsonSupersetOf(...args) {
+  orWhereJsonSupersetOf(...args: unknown[]): this {
     return this.addOperation(
       new WhereJsonOperation('orWhereJsonSupersetOf', { operator: '@>', bool: 'or' }),
       args,
     );
   }
 
-  whereJsonNotSupersetOf(...args) {
+  whereJsonNotSupersetOf(...args: unknown[]): this {
     return this.addOperation(
       new WhereJsonOperation('whereJsonNotSupersetOf', {
         operator: '@>',
@@ -701,11 +697,11 @@ class QueryBuilderBase extends QueryBuilderOperationSupport {
     );
   }
 
-  andWhereJsonNotSupersetOf(...args) {
+  andWhereJsonNotSupersetOf(...args: unknown[]): this {
     return this.whereJsonNotSupersetOf(...args);
   }
 
-  orWhereJsonNotSupersetOf(...args) {
+  orWhereJsonNotSupersetOf(...args: unknown[]): this {
     return this.addOperation(
       new WhereJsonOperation('orWhereJsonNotSupersetOf', {
         operator: '@>',
@@ -716,25 +712,25 @@ class QueryBuilderBase extends QueryBuilderOperationSupport {
     );
   }
 
-  whereJsonSubsetOf(...args) {
+  whereJsonSubsetOf(...args: unknown[]): this {
     return this.addOperation(
       new WhereJsonOperation('whereJsonSubsetOf', { operator: '<@', bool: 'and' }),
       args,
     );
   }
 
-  andWhereJsonSubsetOf(...args) {
+  andWhereJsonSubsetOf(...args: unknown[]): this {
     return this.whereJsonSubsetOf(...args);
   }
 
-  orWhereJsonSubsetOf(...args) {
+  orWhereJsonSubsetOf(...args: unknown[]): this {
     return this.addOperation(
       new WhereJsonOperation('orWhereJsonSubsetOf', { operator: '<@', bool: 'or' }),
       args,
     );
   }
 
-  whereJsonNotSubsetOf(...args) {
+  whereJsonNotSubsetOf(...args: unknown[]): this {
     return this.addOperation(
       new WhereJsonOperation('whereJsonNotSubsetOf', {
         operator: '<@',
@@ -745,11 +741,11 @@ class QueryBuilderBase extends QueryBuilderOperationSupport {
     );
   }
 
-  andWhereJsonNotSubsetOf(...args) {
+  andWhereJsonNotSubsetOf(...args: unknown[]): this {
     return this.whereJsonNotSubsetOf(...args);
   }
 
-  orWhereJsonNotSubsetOf(...args) {
+  orWhereJsonNotSubsetOf(...args: unknown[]): this {
     return this.addOperation(
       new WhereJsonOperation('orWhereJsonNotSubsetOf', {
         operator: '<@',
@@ -760,7 +756,7 @@ class QueryBuilderBase extends QueryBuilderOperationSupport {
     );
   }
 
-  whereJsonNotArray(...args) {
+  whereJsonNotArray(...args: unknown[]): this {
     return this.addOperation(
       new WhereJsonNotObjectOperation('whereJsonNotArray', {
         bool: 'and',
@@ -770,7 +766,7 @@ class QueryBuilderBase extends QueryBuilderOperationSupport {
     );
   }
 
-  orWhereJsonNotArray(...args) {
+  orWhereJsonNotArray(...args: unknown[]): this {
     return this.addOperation(
       new WhereJsonNotObjectOperation('orWhereJsonNotArray', {
         bool: 'or',
@@ -780,7 +776,7 @@ class QueryBuilderBase extends QueryBuilderOperationSupport {
     );
   }
 
-  whereJsonNotObject(...args) {
+  whereJsonNotObject(...args: unknown[]): this {
     return this.addOperation(
       new WhereJsonNotObjectOperation('whereJsonNotObject', {
         bool: 'and',
@@ -790,7 +786,7 @@ class QueryBuilderBase extends QueryBuilderOperationSupport {
     );
   }
 
-  orWhereJsonNotObject(...args) {
+  orWhereJsonNotObject(...args: unknown[]): this {
     return this.addOperation(
       new WhereJsonNotObjectOperation('orWhereJsonNotObject', {
         bool: 'or',
@@ -800,119 +796,119 @@ class QueryBuilderBase extends QueryBuilderOperationSupport {
     );
   }
 
-  whereJsonHasAny(...args) {
+  whereJsonHasAny(...args: unknown[]): this {
     return this.addOperation(
       new WhereJsonHasOperation('whereJsonHasAny', { bool: 'and', operator: '?|' }),
       args,
     );
   }
 
-  orWhereJsonHasAny(...args) {
+  orWhereJsonHasAny(...args: unknown[]): this {
     return this.addOperation(
       new WhereJsonHasOperation('orWhereJsonHasAny', { bool: 'or', operator: '?|' }),
       args,
     );
   }
 
-  whereJsonHasAll(...args) {
+  whereJsonHasAll(...args: unknown[]): this {
     return this.addOperation(
       new WhereJsonHasOperation('whereJsonHasAll', { bool: 'and', operator: '?&' }),
       args,
     );
   }
 
-  orWhereJsonHasAll(...args) {
+  orWhereJsonHasAll(...args: unknown[]): this {
     return this.addOperation(
       new WhereJsonHasOperation('orWhereJsonHasAll', { bool: 'or', operator: '?&' }),
       args,
     );
   }
 
-  whereJsonOverlaps(...args) {
+  whereJsonOverlaps(...args: unknown[]): this {
     return this.addOperation(
       new WhereJsonOverlapsOperation('whereJsonOverlaps', { bool: 'and' }),
       args,
     );
   }
 
-  andWhereJsonOverlaps(...args) {
+  andWhereJsonOverlaps(...args: unknown[]): this {
     return this.whereJsonOverlaps(...args);
   }
 
-  orWhereJsonOverlaps(...args) {
+  orWhereJsonOverlaps(...args: unknown[]): this {
     return this.addOperation(
       new WhereJsonOverlapsOperation('orWhereJsonOverlaps', { bool: 'or' }),
       args,
     );
   }
 
-  whereJsonNotOverlaps(...args) {
+  whereJsonNotOverlaps(...args: unknown[]): this {
     return this.addOperation(
       new WhereJsonOverlapsOperation('whereJsonNotOverlaps', { bool: 'and', prefix: 'not' }),
       args,
     );
   }
 
-  andWhereJsonNotOverlaps(...args) {
+  andWhereJsonNotOverlaps(...args: unknown[]): this {
     return this.whereJsonNotOverlaps(...args);
   }
 
-  orWhereJsonNotOverlaps(...args) {
+  orWhereJsonNotOverlaps(...args: unknown[]): this {
     return this.addOperation(
       new WhereJsonOverlapsOperation('orWhereJsonNotOverlaps', { bool: 'or', prefix: 'not' }),
       args,
     );
   }
 
-  whereJsonIsArray(fieldExpression) {
+  whereJsonIsArray(fieldExpression: unknown): this {
     return this.whereJsonSupersetOf(fieldExpression, []);
   }
 
-  orWhereJsonIsArray(fieldExpression) {
+  orWhereJsonIsArray(fieldExpression: unknown): this {
     return this.orWhereJsonSupersetOf(fieldExpression, []);
   }
 
-  whereJsonIsObject(fieldExpression) {
+  whereJsonIsObject(fieldExpression: unknown): this {
     return this.whereJsonSupersetOf(fieldExpression, {});
   }
 
-  orWhereJsonIsObject(fieldExpression) {
+  orWhereJsonIsObject(fieldExpression: unknown): this {
     return this.orWhereJsonSupersetOf(fieldExpression, {});
   }
 
-  whereColumn(...args) {
+  whereColumn(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('whereColumn'), args);
   }
 
-  andWhereColumn(...args) {
+  andWhereColumn(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('andWhereColumn'), args);
   }
 
-  orWhereColumn(...args) {
+  orWhereColumn(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('orWhereColumn'), args);
   }
 
-  whereNotColumn(...args) {
+  whereNotColumn(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('whereNotColumn'), args);
   }
 
-  andWhereNotColumn(...args) {
+  andWhereNotColumn(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('andWhereNotColumn'), args);
   }
 
-  orWhereNotColumn(...args) {
+  orWhereNotColumn(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('orWhereNotColumn'), args);
   }
 
-  onConflict(...args) {
+  onConflict(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('onConflict'), args);
   }
 
-  ignore(...args) {
+  ignore(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('ignore'), args);
   }
 
-  merge(...args) {
+  merge(...args: unknown[]): this {
     return this.addOperation(new MergeOperation('merge'), args);
   }
 }
@@ -925,6 +921,4 @@ Object.defineProperties(QueryBuilderBase.prototype, {
   },
 });
 
-module.exports = {
-  QueryBuilderBase,
-};
+export { QueryBuilderBase };

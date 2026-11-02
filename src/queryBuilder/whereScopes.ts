@@ -1,7 +1,10 @@
-'use strict';
-
-const { isObject, isFunction } = require('../utils/objectUtils');
-const { isKnexRaw } = require('../utils/knexUtils');
+import { isObject, isFunction } from '../utils/objectUtils';
+import { isKnexRaw } from '../utils/knexUtils';
+import type {
+  KnexLike,
+  Operation,
+  QueryBuilderOperationSupport,
+} from './QueryBuilderOperationSupport';
 
 // Where clauses objection adds on its own, like the owner condition of a relation
 // query or the id condition of `$query()`, are tagged with a "where scope". When
@@ -12,6 +15,14 @@ const { isKnexRaw } = require('../utils/knexUtils');
 //
 // The scopes are only used when the knex query is built. The operation tree is
 // never modified.
+
+// A fresh object works as a unique token.
+type WhereScope = object;
+
+interface WhereGrouping {
+  isGrouped(op: Operation): boolean;
+  build(op: Operation, knexBuilder: KnexLike): KnexLike;
+}
 
 const WhereSelector = /^(where|orWhere|andWhere|find\w+)/;
 
@@ -57,7 +68,7 @@ const AND_ONLY_OPERATIONS = new Set([
   'findByIds',
 ]);
 
-function withWhereScope(builder, callback) {
+function withWhereScope<T>(builder: QueryBuilderOperationSupport, callback: () => T): T {
   const previous = builder._whereScope;
   // A fresh object works as a unique token.
   builder._whereScope = {};
@@ -69,7 +80,8 @@ function withWhereScope(builder, callback) {
   }
 }
 
-function effectiveWhereScope(op) {
+// Returns the where scope token, or null.
+function effectiveWhereScope(op: Operation | null): unknown {
   while (op) {
     if (op.whereScope !== null) {
       return op.whereScope;
@@ -84,8 +96,8 @@ function effectiveWhereScope(op) {
 // Returns null if no where clauses need to be grouped. Otherwise returns an
 // object that tells, for each operation, whether the operation is built as
 // part of a group.
-function createWhereGrouping(builder) {
-  const scopes = new Map();
+function createWhereGrouping(builder: QueryBuilderOperationSupport): WhereGrouping | null {
+  const scopes = new Map<unknown, Operation[]>();
 
   builder.forEachOperation(WhereSelector, (op) => {
     if (!hasWhereAncestor(op)) {
@@ -101,8 +113,8 @@ function createWhereGrouping(builder) {
     return null;
   }
 
-  const groupByFirstOp = new Map();
-  const groupedOps = new Set();
+  const groupByFirstOp = new Map<Operation, Operation[]>();
+  const groupedOps = new Set<Operation>();
 
   for (const ops of scopes.values()) {
     if (ops.every(isAndOnlyTree)) {
@@ -136,7 +148,7 @@ function createWhereGrouping(builder) {
         return knexBuilder;
       }
 
-      return knexBuilder.where(function () {
+      return knexBuilder.where(function (this: KnexLike) {
         let groupBuilder = this;
 
         for (const groupOp of ops) {
@@ -147,7 +159,11 @@ function createWhereGrouping(builder) {
   };
 }
 
-function buildOperationTree(builder, op, knexBuilder) {
+function buildOperationTree(
+  builder: QueryBuilderOperationSupport,
+  op: Operation,
+  knexBuilder: KnexLike,
+): KnexLike {
   const ops = [op];
 
   op.forEachDescendantOperation((it) => {
@@ -164,9 +180,10 @@ function buildOperationTree(builder, op, knexBuilder) {
   return knexBuilder;
 }
 
-function hasWhereAncestor(op) {
+function hasWhereAncestor(op: Operation): boolean {
   for (let parent = op.parentOperation; parent; parent = parent.parentOperation) {
-    if (WhereSelector.test(parent.name)) {
+    // A null name is tested as 'null', as `test()` converts it to a string.
+    if (WhereSelector.test(parent.name as string)) {
       return true;
     }
   }
@@ -174,14 +191,14 @@ function hasWhereAncestor(op) {
   return false;
 }
 
-function isAndOnlyTree(op) {
+function isAndOnlyTree(op: Operation): boolean {
   if (!isAndOnly(op)) {
     return false;
   }
 
   let andOnly = true;
 
-  op.forEachDescendantOperation((it) => {
+  op.forEachDescendantOperation((it): boolean | void => {
     if (it.hasOnBuildKnex() && !isAndOnly(it)) {
       andOnly = false;
       return false;
@@ -191,11 +208,15 @@ function isAndOnlyTree(op) {
   return andOnly;
 }
 
-function isAndOnly(op) {
-  return AND_ONLY_OPERATIONS.has(op.name) && !containsRaw(op.args);
+function isAndOnly(op: Operation): boolean {
+  // The operations that convert their arguments for knex have `args`.
+  return (
+    AND_ONLY_OPERATIONS.has(op.name as string) && !containsRaw((op as { args?: unknown }).args)
+  );
 }
 
-function containsRaw(value) {
+// `value` is a user value of any shape: operation arguments.
+function containsRaw(value: any): boolean {
   if (Array.isArray(value)) {
     return value.some(containsRaw);
   } else if (!isObject(value)) {
@@ -220,8 +241,5 @@ function containsRaw(value) {
   }
 }
 
-module.exports = {
-  withWhereScope,
-  effectiveWhereScope,
-  createWhereGrouping,
-};
+export { withWhereScope, effectiveWhereScope, createWhereGrouping };
+export type { WhereScope, WhereGrouping };

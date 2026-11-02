@@ -1,54 +1,90 @@
-'use strict';
+import { withWhereScope } from './whereScopes';
+import { wrapError } from 'db-errors';
 
-const { withWhereScope } = require('./whereScopes');
-const { wrapError } = require('db-errors');
+import { raw } from './RawBuilder';
+import { createModifier } from '../utils/createModifier';
+import { ValidationErrorType } from '../model/ValidationError';
+import { isObject, isFunction, last } from '../utils/objectUtils';
+import { RelationExpression, DuplicateRelationError } from './RelationExpression';
+import { assertIdNotUndefined } from '../utils/assert';
 
-const { raw } = require('./RawBuilder');
-const { createModifier } = require('../utils/createModifier');
-const { ValidationErrorType } = require('../model/ValidationError');
-const { isObject, isString, isFunction, last, flatten } = require('../utils/objectUtils');
-const { RelationExpression, DuplicateRelationError } = require('./RelationExpression');
-const { assertIdNotUndefined } = require('../utils/assert');
+import { Selection } from './operations/select/Selection';
 
-const { Selection } = require('./operations/select/Selection');
+import { QueryBuilderContext } from './QueryBuilderContext';
+import { QueryBuilderBase } from './QueryBuilderBase';
 
-const { QueryBuilderContext } = require('./QueryBuilderContext');
-const { QueryBuilderBase } = require('./QueryBuilderBase');
+import { FindOperation } from './operations/FindOperation';
+import { DeleteOperation } from './operations/DeleteOperation';
+import { UpdateOperation } from './operations/UpdateOperation';
+import { InsertOperation } from './operations/InsertOperation';
+import { RelateOperation } from './operations/RelateOperation';
+import { UnrelateOperation } from './operations/UnrelateOperation';
 
-const { FindOperation } = require('./operations/FindOperation');
-const { DeleteOperation } = require('./operations/DeleteOperation');
-const { UpdateOperation } = require('./operations/UpdateOperation');
-const { InsertOperation } = require('./operations/InsertOperation');
-const { RelateOperation } = require('./operations/RelateOperation');
-const { UnrelateOperation } = require('./operations/UnrelateOperation');
+import { JoinEagerOperation } from './operations/eager/JoinEagerOperation';
+import { NaiveEagerOperation } from './operations/eager/NaiveEagerOperation';
+import { WhereInEagerOperation } from './operations/eager/WhereInEagerOperation';
 
-const { JoinEagerOperation } = require('./operations/eager/JoinEagerOperation');
-const { NaiveEagerOperation } = require('./operations/eager/NaiveEagerOperation');
-const { WhereInEagerOperation } = require('./operations/eager/WhereInEagerOperation');
+import { InsertGraphAndFetchOperation } from './operations/InsertGraphAndFetchOperation';
+import { UpsertGraphAndFetchOperation } from './operations/UpsertGraphAndFetchOperation';
+import { InsertAndFetchOperation } from './operations/InsertAndFetchOperation';
+import { UpdateAndFetchOperation } from './operations/UpdateAndFetchOperation';
+import { JoinRelatedOperation } from './operations/JoinRelatedOperation';
+import { OnBuildKnexOperation } from './operations/OnBuildKnexOperation';
+import { InsertGraphOperation } from './operations/InsertGraphOperation';
+import { UpsertGraphOperation } from './operations/UpsertGraphOperation';
+import { RunBeforeOperation } from './operations/RunBeforeOperation';
+import { RunAfterOperation } from './operations/RunAfterOperation';
+import { FindByIdOperation } from './operations/FindByIdOperation';
+import { FindByIdsOperation } from './operations/FindByIdsOperation';
+import { OnBuildOperation } from './operations/OnBuildOperation';
+import { OnErrorOperation } from './operations/OnErrorOperation';
+import { SelectOperation } from './operations/select/SelectOperation';
+import { EagerOperation } from './operations/eager/EagerOperation';
+import { RangeOperation } from './operations/RangeOperation';
+import { FirstOperation } from './operations/FirstOperation';
+import { FromOperation } from './operations/FromOperation';
+import { KnexOperation } from './operations/KnexOperation';
 
-const { InsertGraphAndFetchOperation } = require('./operations/InsertGraphAndFetchOperation');
-const { UpsertGraphAndFetchOperation } = require('./operations/UpsertGraphAndFetchOperation');
-const { InsertAndFetchOperation } = require('./operations/InsertAndFetchOperation');
-const { UpdateAndFetchOperation } = require('./operations/UpdateAndFetchOperation');
-const { JoinRelatedOperation } = require('./operations/JoinRelatedOperation');
-const { OnBuildKnexOperation } = require('./operations/OnBuildKnexOperation');
-const { InsertGraphOperation } = require('./operations/InsertGraphOperation');
-const { UpsertGraphOperation } = require('./operations/UpsertGraphOperation');
-const { RunBeforeOperation } = require('./operations/RunBeforeOperation');
-const { RunAfterOperation } = require('./operations/RunAfterOperation');
-const { FindByIdOperation } = require('./operations/FindByIdOperation');
-const { FindByIdsOperation } = require('./operations/FindByIdsOperation');
-const { OnBuildOperation } = require('./operations/OnBuildOperation');
-const { OnErrorOperation } = require('./operations/OnErrorOperation');
-const { SelectOperation } = require('./operations/select/SelectOperation');
-const { EagerOperation } = require('./operations/eager/EagerOperation');
-const { RangeOperation } = require('./operations/RangeOperation');
-const { FirstOperation } = require('./operations/FirstOperation');
-const { FromOperation } = require('./operations/FromOperation');
-const { KnexOperation } = require('./operations/KnexOperation');
+import type { KnexLike, ModelClass, Operation } from './QueryBuilderOperationSupport';
+import type { FindOptions } from './operations/types';
+import type { HookName } from './operations/QueryBuilderOperation';
+import type { InstanceUpdateOperation } from './operations/InstanceUpdateOperation';
+import type { RelationOperationOptions } from '../relations/Relation';
+
+// A modifier: a function, the name of a modifier, an object of `where`
+// conditions or an array of those. `any[]`: the modifier gets the arguments
+// of `modify()` as they are.
+type Modifier<B> = ((builder: B, ...args: any[]) => unknown) | string | object | null | undefined;
+
+// Creates the operation that a write method (or a find query) adds.
+type OperationFactory = (builder: QueryBuilder) => Operation;
 
 class QueryBuilder extends QueryBuilderBase {
-  static init(self, modelClass) {
+  // Types `this.constructor` (and `builder.constructor.forClass()` in the operations).
+  // biome-ignore lint/complexity/useLiteralKeys: a field can't be named `constructor` without the brackets.
+  declare ['constructor']: typeof QueryBuilder;
+  declare _context: QueryBuilderContext;
+
+  declare _resultModelClass: ModelClass | null;
+  declare _explicitRejectValue: unknown;
+  declare _explicitResolveValue: unknown;
+  declare _modifiers: Record<string, unknown>;
+
+  declare _allowedGraphExpression: RelationExpression | null;
+  declare _findOperationOptions: FindOptions;
+  declare _relatedQueryFor: unknown;
+  declare _isRelatedQuery: boolean;
+  declare _forError: Error | null;
+
+  declare _findOperationFactory: OperationFactory;
+  declare _insertOperationFactory: OperationFactory;
+  declare _updateOperationFactory: OperationFactory;
+  declare _patchOperationFactory: OperationFactory;
+  declare _relateOperationFactory: OperationFactory;
+  declare _unrelateOperationFactory: OperationFactory;
+  declare _deleteOperationFactory: OperationFactory;
+
+  static init(self: QueryBuilder, modelClass: ModelClass): void {
     super.init(self, modelClass);
 
     self._resultModelClass = null;
@@ -71,42 +107,48 @@ class QueryBuilder extends QueryBuilderBase {
     self._deleteOperationFactory = deleteOperationFactory;
   }
 
-  static get QueryBuilderContext() {
+  static get QueryBuilderContext(): typeof QueryBuilderContext {
     return QueryBuilderContext;
   }
 
-  static parseRelationExpression(expr) {
+  static parseRelationExpression(expr: unknown): unknown {
     return RelationExpression.create(expr).toPojo();
   }
 
-  tableName(newTableName) {
+  tableName(): string;
+  tableName(newTableName: string): this;
+  tableName(newTableName?: string): string | this {
     return this.tableNameFor(this.modelClass().getTableName(), newTableName);
   }
 
-  tableRef() {
+  tableRef(): string {
     return this.tableRefFor(this.modelClass().getTableName());
   }
 
-  alias(alias) {
+  alias(): string | null;
+  alias(alias: string): this;
+  alias(alias?: string): string | null | this {
     return this.aliasFor(this.modelClass().getTableName(), alias);
   }
 
-  fullIdColumnFor(modelClass) {
+  fullIdColumnFor(modelClass: ModelClass): string | string[] {
     const tableName = this.tableRefFor(modelClass);
     const idColumn = modelClass.getIdColumn();
 
     if (Array.isArray(idColumn)) {
-      return idColumn.map((col) => `${tableName}.${col}`);
+      return idColumn.map((col: string) => `${tableName}.${col}`);
     } else {
       return `${tableName}.${idColumn}`;
     }
   }
 
-  fullIdColumn() {
+  fullIdColumn(): string | string[] {
     return this.fullIdColumnFor(this.modelClass());
   }
 
-  modifiers(modifiers) {
+  modifiers(): Record<string, unknown>;
+  modifiers(modifiers: Record<string, unknown>): this;
+  modifiers(modifiers?: Record<string, unknown>): Record<string, unknown> | this {
     if (arguments.length === 0) {
       return { ...this._modifiers };
     } else {
@@ -115,7 +157,7 @@ class QueryBuilder extends QueryBuilderBase {
     }
   }
 
-  modify(modifier, ...args) {
+  modify(modifier: Modifier<this>, ...args: unknown[]): this {
     if (!modifier) {
       return this;
     }
@@ -126,72 +168,72 @@ class QueryBuilder extends QueryBuilderBase {
       modifiers: this._modifiers,
     });
 
-    modifier(this, ...args);
+    (modifier as (builder: this, ...args: unknown[]) => void)(this, ...args);
     return this;
   }
 
-  reject(error) {
+  reject(error: unknown): this {
     this._explicitRejectValue = error;
     return this;
   }
 
-  resolve(value) {
+  resolve(value: unknown): this {
     this._explicitResolveValue = value;
     return this;
   }
 
-  isExplicitlyResolvedOrRejected() {
+  isExplicitlyResolvedOrRejected(): boolean {
     return !!(this._explicitRejectValue || this._explicitResolveValue);
   }
 
-  isExecutable() {
+  isExecutable(): boolean {
     return !this.isExplicitlyResolvedOrRejected() && !findQueryExecutorOperation(this);
   }
 
-  findOperationFactory(factory) {
+  findOperationFactory(factory: OperationFactory): this {
     this._findOperationFactory = factory;
     return this;
   }
 
-  insertOperationFactory(factory) {
+  insertOperationFactory(factory: OperationFactory): this {
     this._insertOperationFactory = factory;
     return this;
   }
 
-  updateOperationFactory(factory) {
+  updateOperationFactory(factory: OperationFactory): this {
     this._updateOperationFactory = factory;
     return this;
   }
 
-  patchOperationFactory(factory) {
+  patchOperationFactory(factory: OperationFactory): this {
     this._patchOperationFactory = factory;
     return this;
   }
 
-  deleteOperationFactory(factory) {
+  deleteOperationFactory(factory: OperationFactory): this {
     this._deleteOperationFactory = factory;
     return this;
   }
 
-  relateOperationFactory(factory) {
+  relateOperationFactory(factory: OperationFactory): this {
     this._relateOperationFactory = factory;
     return this;
   }
 
-  unrelateOperationFactory(factory) {
+  unrelateOperationFactory(factory: OperationFactory): this {
     this._unrelateOperationFactory = factory;
     return this;
   }
 
-  withGraphFetched(exp, options = {}) {
+  withGraphFetched(exp: unknown, options: object = {}): this {
     return this._withGraph(exp, options, getWhereInEagerAlgorithm(this));
   }
 
-  withGraphJoined(exp, options = {}) {
+  withGraphJoined(exp: unknown, options: object = {}): this {
     return this._withGraph(exp, options, getJoinEagerAlgorithm(this));
   }
 
-  _withGraph(exp, options, algorithm) {
+  _withGraph(exp: unknown, options: object, algorithm: unknown): this {
     const eagerOp = ensureEagerOperation(this, algorithm);
     const parsedExp = parseRelationExpression(this.modelClass(), exp);
 
@@ -202,7 +244,7 @@ class QueryBuilder extends QueryBuilderBase {
     return this;
   }
 
-  allowGraph(exp) {
+  allowGraph(exp: unknown): this {
     const currentExpr = this._allowedGraphExpression || RelationExpression.create();
 
     this._allowedGraphExpression = currentExpr.merge(
@@ -213,11 +255,11 @@ class QueryBuilder extends QueryBuilderBase {
     return this;
   }
 
-  allowedGraphExpression() {
+  allowedGraphExpression(): RelationExpression | null {
     return this._allowedGraphExpression;
   }
 
-  graphExpressionObject() {
+  graphExpressionObject(): unknown {
     const eagerOp = this.findOperation(EagerOperation);
 
     if (eagerOp && !eagerOp.expression.isEmpty) {
@@ -227,23 +269,25 @@ class QueryBuilder extends QueryBuilderBase {
     }
   }
 
-  graphModifiersAtPath() {
+  graphModifiersAtPath(): object[] {
     const eagerOp = this.findOperation(EagerOperation);
 
     if (eagerOp && !eagerOp.expression.isEmpty) {
-      return eagerOp.modifiersAtPath.map((it) => Object.assign({}, it));
+      return eagerOp.modifiersAtPath.map((it: object) => Object.assign({}, it));
     } else {
       return [];
     }
   }
 
-  modifyGraph(path, modifier) {
+  modifyGraph(path: unknown, modifier: unknown): this {
     const eagerOp = ensureEagerOperation(this);
     eagerOp.modifiersAtPath.push({ path, modifier });
     return this;
   }
 
-  findOptions(opt) {
+  findOptions(): FindOptions;
+  findOptions(opt: FindOptions): this;
+  findOptions(opt?: FindOptions): FindOptions | this {
     if (arguments.length !== 0) {
       this._findOperationOptions = Object.assign({}, this._findOperationOptions, opt);
       return this;
@@ -252,11 +296,11 @@ class QueryBuilder extends QueryBuilderBase {
     }
   }
 
-  resultModelClass() {
+  resultModelClass(): ModelClass {
     return this._resultModelClass || this.modelClass();
   }
 
-  isFind() {
+  isFind(): boolean {
     if (
       this.isInsert === QueryBuilder.prototype.isInsert &&
       this.isUpdate === QueryBuilder.prototype.isUpdate &&
@@ -277,41 +321,41 @@ class QueryBuilder extends QueryBuilderBase {
     );
   }
 
-  isInsert() {
+  isInsert(): boolean {
     return this.has(InsertOperation);
   }
 
-  isUpdate() {
+  isUpdate(): boolean {
     return this.has(UpdateOperation);
   }
 
-  isDelete() {
+  isDelete(): boolean {
     return this.has(DeleteOperation);
   }
 
-  isRelate() {
+  isRelate(): boolean {
     return this.has(RelateOperation);
   }
 
-  isUnrelate() {
+  isUnrelate(): boolean {
     return this.has(UnrelateOperation);
   }
 
-  hasWheres() {
+  hasWheres(): boolean {
     const queryWithoutGraph = this.clone().clearWithGraph();
     return prebuildQuery(queryWithoutGraph).has(QueryBuilderBase.WhereSelector);
   }
 
-  hasSelects() {
+  hasSelects(): boolean {
     return this.has(QueryBuilderBase.SelectSelector);
   }
 
-  hasWithGraph() {
+  hasWithGraph(): boolean {
     const eagerOp = this.findOperation(EagerOperation);
     return !!eagerOp && !eagerOp.expression.isEmpty;
   }
 
-  isSelectAll() {
+  isSelectAll(): boolean {
     if (this._operations.length === 0) {
       return true;
     }
@@ -320,17 +364,19 @@ class QueryBuilder extends QueryBuilderBase {
     const tableName = this.tableName();
 
     return this.everyOperation((op) => {
-      if (op.constructor === SelectOperation) {
+      // TypeScript narrows `op` to `never` when its constructor is compared with
+      // a subclass, hence `as unknown` and the casts in the branches.
+      if ((op.constructor as unknown) === SelectOperation) {
         // SelectOperations with zero selections are the ones that only have
         // raw items or other non-trivial selections.
         return (
-          op.selections.length > 0 &&
-          op.selections.every((select) => {
+          (op as SelectOperation).selections.length > 0 &&
+          (op as SelectOperation).selections.every((select) => {
             return (!select.table || select.table === tableRef) && select.column === '*';
           })
         );
-      } else if (op.constructor === FromOperation) {
-        return op.table === tableName;
+      } else if ((op.constructor as unknown) === FromOperation) {
+        return (op as FromOperation).table === tableName;
       } else if (op.name === 'as' || op.is(FindOperation) || op.is(OnErrorOperation)) {
         return true;
       } else {
@@ -339,11 +385,11 @@ class QueryBuilder extends QueryBuilderBase {
     });
   }
 
-  toString() {
+  toString(): string {
     return '[object QueryBuilder]';
   }
 
-  clone() {
+  clone(): this {
     const builder = this.emptyInstance();
 
     // Call the super class's clone implementation.
@@ -362,8 +408,8 @@ class QueryBuilder extends QueryBuilderBase {
     return builder;
   }
 
-  emptyInstance() {
-    const builder = new this.constructor(this.modelClass());
+  emptyInstance(): this {
+    const builder = new this.constructor(this.modelClass()) as this;
 
     builder._findOperationFactory = this._findOperationFactory;
     builder._insertOperationFactory = this._insertOperationFactory;
@@ -379,63 +425,66 @@ class QueryBuilder extends QueryBuilderBase {
     return builder;
   }
 
-  clearWithGraph() {
+  clearWithGraph(): this {
     this.clear(EagerOperation);
     return this;
   }
 
-  clearWithGraphFetched() {
+  clearWithGraphFetched(): this {
     this.clear(WhereInEagerOperation);
     return this;
   }
 
-  clearAllowGraph() {
+  clearAllowGraph(): this {
     this._allowedGraphExpression = null;
     return this;
   }
 
-  clearModifiers() {
+  clearModifiers(): this {
     this._modifiers = {};
     return this;
   }
 
-  clearReject() {
+  clearReject(): this {
     this._explicitRejectValue = null;
     return this;
   }
 
-  clearResolve() {
+  clearResolve(): this {
     this._explicitResolveValue = null;
     return this;
   }
 
-  castTo(modelClass) {
+  castTo(modelClass: ModelClass | null | undefined): this {
     this._resultModelClass = modelClass || null;
     return this;
   }
 
-  then(...args) {
+  then(...args: Parameters<Promise<any>['then']>): Promise<unknown> {
     const promise = this.execute();
     return promise.then(...args);
   }
 
-  catch(...args) {
+  catch(...args: Parameters<Promise<any>['catch']>): Promise<unknown> {
     const promise = this.execute();
     return promise.catch(...args);
   }
 
-  finally(...args) {
+  finally(...args: Parameters<Promise<any>['finally']>): Promise<unknown> {
     const promise = this.execute();
     return promise.finally(...args);
   }
 
-  async resultSize() {
+  async resultSize(): Promise<number> {
     const knex = this.knex();
     const builder = this.clone().clear(/orderBy|offset|limit/);
 
-    const countQuery = knex.count('* as count').from((knexBuilder) => {
-      builder.toKnexQuery(knexBuilder).as('temp');
-    });
+    // knex's types don't accept this `from()` callback or `debug()` without an argument.
+    const countQuery: KnexLike = (knex as KnexLike)
+      .count('* as count')
+      .from((knexBuilder: KnexLike) => {
+        builder.toKnexQuery(knexBuilder).as('temp');
+      });
 
     if (this.internalOptions().debug) {
       countQuery.debug();
@@ -445,12 +494,13 @@ class QueryBuilder extends QueryBuilderBase {
     return result[0] && result[0].count ? parseInt(result[0].count, 10) : 0;
   }
 
-  toKnexQuery(knexBuilder = this.knex().queryBuilder()) {
+  toKnexQuery(knexBuilder: KnexLike = this.knex().queryBuilder()): KnexLike {
     const prebuiltQuery = prebuildQuery(this.clone());
     return buildKnexQuery(prebuiltQuery, knexBuilder);
   }
 
-  async execute() {
+  // Resolves to whatever the operations produce: models, rows, counts...
+  async execute(): Promise<any> {
     // Take a clone so that we don't modify this instance during execution.
     const builder = this.clone();
 
@@ -463,8 +513,8 @@ class QueryBuilder extends QueryBuilderBase {
     }
   }
 
-  throwIfNotFound(data = {}) {
-    return this.runAfter((result) => {
+  throwIfNotFound(data: object = {}): this {
+    return this.runAfter((result: unknown) => {
       if (
         (Array.isArray(result) && result.length === 0) ||
         result === null ||
@@ -478,13 +528,14 @@ class QueryBuilder extends QueryBuilderBase {
     });
   }
 
-  findSelection(selection, explicit = false) {
+  findSelection(selection: unknown, explicit = false): Selection | null {
     let noSelectStatements = true;
-    let selectionInstance = null;
+    let selectionInstance: Selection | null = null;
 
-    this.forEachOperation(true, (op) => {
-      if (op.constructor === SelectOperation) {
-        selectionInstance = op.findSelection(this, selection);
+    this.forEachOperation(true, (op): boolean | void => {
+      // See `isSelectAll()` for the casts.
+      if ((op.constructor as unknown) === SelectOperation) {
+        selectionInstance = (op as SelectOperation).findSelection(this, selection);
         noSelectStatements = false;
 
         if (selectionInstance) {
@@ -510,23 +561,24 @@ class QueryBuilder extends QueryBuilderBase {
     }
   }
 
-  findAllSelections() {
-    let allSelections = [];
+  findAllSelections(): Selection[] {
+    let allSelections: Selection[] = [];
 
     this.forEachOperation(true, (op) => {
-      if (op.constructor === SelectOperation) {
-        allSelections = allSelections.concat(op.selections);
+      // See `isSelectAll()` for the casts.
+      if ((op.constructor as unknown) === SelectOperation) {
+        allSelections = allSelections.concat((op as SelectOperation).selections);
       }
     });
 
     return allSelections;
   }
 
-  hasSelection(selection, explicit) {
+  hasSelection(selection: unknown, explicit?: boolean): boolean {
     return this.findSelection(selection, explicit) !== null;
   }
 
-  hasSelectionAs(selection, alias, explicit) {
+  hasSelectionAs(selection: unknown, alias: string, explicit?: boolean): boolean {
     selection = Selection.create(selection);
     const foundSelection = this.findSelection(selection, explicit);
 
@@ -535,35 +587,36 @@ class QueryBuilder extends QueryBuilderBase {
     } else {
       if (foundSelection.column === '*') {
         // * selects the columns with their column names as aliases.
-        return selection.column === alias;
+        return (selection as Selection).column === alias;
       } else {
         return foundSelection.name === alias;
       }
     }
   }
 
-  traverse(modelClass, traverser) {
+  traverse(modelClass: unknown, traverser?: unknown): this {
     if (typeof traverser === 'undefined') {
       traverser = modelClass;
       modelClass = null;
     }
 
-    return this.runAfter((result) => {
+    return this.runAfter((result: unknown) => {
       this.resultModelClass().traverse(modelClass, result, traverser);
       return result;
     });
   }
 
-  page(page, pageSize) {
+  page(page: number, pageSize: number): this {
     return this.range(+page * +pageSize, (+page + 1) * +pageSize - 1);
   }
 
-  columnInfo({ table = null } = {}) {
+  columnInfo({ table = null }: { table?: string | null } = {}): KnexLike {
     table = table || this.tableName();
 
     const knex = this.knex();
     const tableParts = table.split('.');
-    const columnInfoQuery = knex(last(tableParts)).columnInfo();
+    // knex's types make `columnInfo()` a promise, but it's the query builder.
+    const columnInfoQuery: KnexLike = knex(last(tableParts)).columnInfo();
     const schema = this.internalOptions().schema;
 
     if (schema) {
@@ -579,7 +632,7 @@ class QueryBuilder extends QueryBuilderBase {
     return columnInfoQuery;
   }
 
-  withSchema(schema) {
+  withSchema(schema: string): this {
     this.internalOptions().schema = schema;
     this.internalContext().onBuild.push((builder) => {
       if (!builder.has(/withSchema/)) {
@@ -592,7 +645,7 @@ class QueryBuilder extends QueryBuilderBase {
     return this;
   }
 
-  debug /* istanbul ignore next */() {
+  debug /* istanbul ignore next */(): this {
     this.internalOptions().debug = true;
     this.internalContext().onBuild.push((builder) => {
       builder.addOperation(new KnexOperation('debug'), []);
@@ -601,7 +654,7 @@ class QueryBuilder extends QueryBuilderBase {
     return this;
   }
 
-  insert(modelsOrObjects) {
+  insert(modelsOrObjects: unknown): this {
     return writeOperation(this, () => {
       const insertOperation = this._insertOperationFactory(this);
 
@@ -609,7 +662,7 @@ class QueryBuilder extends QueryBuilderBase {
     });
   }
 
-  insertAndFetch(modelsOrObjects) {
+  insertAndFetch(modelsOrObjects: unknown): this {
     return writeOperation(this, () => {
       const insertOperation = this._insertOperationFactory(this);
 
@@ -621,7 +674,7 @@ class QueryBuilder extends QueryBuilderBase {
     });
   }
 
-  insertGraph(modelsOrObjects, opt) {
+  insertGraph(modelsOrObjects: unknown, opt?: Record<string, unknown>): this {
     return writeOperation(this, () => {
       const insertOperation = this._insertOperationFactory(this);
 
@@ -634,7 +687,7 @@ class QueryBuilder extends QueryBuilderBase {
     });
   }
 
-  insertGraphAndFetch(modelsOrObjects, opt) {
+  insertGraphAndFetch(modelsOrObjects: unknown, opt?: Record<string, unknown>): this {
     return writeOperation(this, () => {
       const insertOperation = this._insertOperationFactory(this);
 
@@ -651,7 +704,7 @@ class QueryBuilder extends QueryBuilderBase {
     });
   }
 
-  update(modelOrObject) {
+  update(modelOrObject: unknown): this {
     return writeOperation(this, () => {
       const updateOperation = this._updateOperationFactory(this);
 
@@ -659,11 +712,12 @@ class QueryBuilder extends QueryBuilderBase {
     });
   }
 
-  updateAndFetch(modelOrObject) {
+  updateAndFetch(modelOrObject: unknown): this {
     return writeOperation(this, () => {
       const updateOperation = this._updateOperationFactory(this);
 
-      if (!(updateOperation.instance instanceof this.modelClass())) {
+      // Only instance operations have `instance`, and this throws for the others.
+      if (!((updateOperation as InstanceUpdateOperation).instance instanceof this.modelClass())) {
         throw new Error('updateAndFetch can only be called for instance operations');
       }
 
@@ -675,11 +729,14 @@ class QueryBuilder extends QueryBuilderBase {
       // required "where id = $" clause.
       updateAndFetch.skipIdWhere = true;
 
-      this.addOperation(updateAndFetch, [updateOperation.instance.$id(), modelOrObject]);
+      this.addOperation(updateAndFetch, [
+        (updateOperation as InstanceUpdateOperation).instance.$id(),
+        modelOrObject,
+      ]);
     });
   }
 
-  updateAndFetchById(id, modelOrObject) {
+  updateAndFetchById(id: unknown, modelOrObject: unknown): this {
     return writeOperation(this, () => {
       const updateOperation = this._updateOperationFactory(this);
 
@@ -691,7 +748,7 @@ class QueryBuilder extends QueryBuilderBase {
     });
   }
 
-  upsertGraph(modelsOrObjects, upsertOptions) {
+  upsertGraph(modelsOrObjects: unknown, upsertOptions?: Record<string, unknown>): this {
     return writeOperation(this, () => {
       const upsertGraphOperation = new UpsertGraphOperation('upsertGraph', {
         upsertOptions,
@@ -701,7 +758,7 @@ class QueryBuilder extends QueryBuilderBase {
     });
   }
 
-  upsertGraphAndFetch(modelsOrObjects, upsertOptions) {
+  upsertGraphAndFetch(modelsOrObjects: unknown, upsertOptions?: Record<string, unknown>): this {
     return writeOperation(this, () => {
       const upsertGraphOperation = new UpsertGraphOperation('upsertGraph', {
         upsertOptions,
@@ -715,7 +772,7 @@ class QueryBuilder extends QueryBuilderBase {
     });
   }
 
-  patch(modelOrObject) {
+  patch(modelOrObject: unknown): this {
     return writeOperation(this, () => {
       const patchOperation = this._patchOperationFactory(this);
 
@@ -723,11 +780,12 @@ class QueryBuilder extends QueryBuilderBase {
     });
   }
 
-  patchAndFetch(modelOrObject) {
+  patchAndFetch(modelOrObject: unknown): this {
     return writeOperation(this, () => {
       const patchOperation = this._patchOperationFactory(this);
 
-      if (!(patchOperation.instance instanceof this.modelClass())) {
+      // Only instance operations have `instance`, and this throws for the others.
+      if (!((patchOperation as InstanceUpdateOperation).instance instanceof this.modelClass())) {
         throw new Error('patchAndFetch can only be called for instance operations');
       }
 
@@ -739,11 +797,14 @@ class QueryBuilder extends QueryBuilderBase {
       // required "where id = $" clause.
       patchAndFetch.skipIdWhere = true;
 
-      this.addOperation(patchAndFetch, [patchOperation.instance.$id(), modelOrObject]);
+      this.addOperation(patchAndFetch, [
+        (patchOperation as InstanceUpdateOperation).instance.$id(),
+        modelOrObject,
+      ]);
     });
   }
 
-  patchAndFetchById(id, modelOrObject) {
+  patchAndFetchById(id: unknown, modelOrObject: unknown): this {
     return writeOperation(this, () => {
       const patchOperation = this._patchOperationFactory(this);
 
@@ -755,7 +816,7 @@ class QueryBuilder extends QueryBuilderBase {
     });
   }
 
-  delete(...args) {
+  delete(...args: unknown[]): this {
     return writeOperation(this, () => {
       if (args.length) {
         throw new Error(
@@ -768,11 +829,11 @@ class QueryBuilder extends QueryBuilderBase {
     });
   }
 
-  del(...args) {
+  del(...args: unknown[]): this {
     return this.delete(...args);
   }
 
-  relate(...args) {
+  relate(...args: unknown[]): this {
     return writeOperation(this, () => {
       const relateOperation = this._relateOperationFactory(this);
 
@@ -780,7 +841,7 @@ class QueryBuilder extends QueryBuilderBase {
     });
   }
 
-  unrelate(...args) {
+  unrelate(...args: unknown[]): this {
     return writeOperation(this, () => {
       if (args.length) {
         throw new Error(
@@ -793,7 +854,7 @@ class QueryBuilder extends QueryBuilderBase {
     });
   }
 
-  increment(propertyName, howMuch) {
+  increment(propertyName: string, howMuch: number): this {
     const columnName = this.modelClass().propertyNameToColumnName(propertyName);
 
     return this.patch({
@@ -801,7 +862,7 @@ class QueryBuilder extends QueryBuilderBase {
     });
   }
 
-  decrement(propertyName, howMuch) {
+  decrement(propertyName: string, howMuch: number): this {
     const columnName = this.modelClass().propertyNameToColumnName(propertyName);
 
     return this.patch({
@@ -809,19 +870,19 @@ class QueryBuilder extends QueryBuilderBase {
     });
   }
 
-  findOne(...args) {
+  findOne(...args: unknown[]): this {
     return this.where.apply(this, args).first();
   }
 
-  range(...args) {
+  range(...args: unknown[]): this {
     return this.clear(RangeOperation).addOperation(new RangeOperation('range'), args);
   }
 
-  first(...args) {
+  first(...args: unknown[]): this {
     return this.addOperation(new FirstOperation('first'), args);
   }
 
-  joinRelated(expression, options) {
+  joinRelated(expression: unknown, options?: object): this {
     ensureJoinRelatedOperation(this, 'innerJoin').addCall({
       expression,
       options,
@@ -830,7 +891,7 @@ class QueryBuilder extends QueryBuilderBase {
     return this;
   }
 
-  innerJoinRelated(expression, options) {
+  innerJoinRelated(expression: unknown, options?: object): this {
     ensureJoinRelatedOperation(this, 'innerJoin').addCall({
       expression,
       options,
@@ -839,7 +900,7 @@ class QueryBuilder extends QueryBuilderBase {
     return this;
   }
 
-  outerJoinRelated(expression, options) {
+  outerJoinRelated(expression: unknown, options?: object): this {
     ensureJoinRelatedOperation(this, 'outerJoin').addCall({
       expression,
       options,
@@ -848,7 +909,7 @@ class QueryBuilder extends QueryBuilderBase {
     return this;
   }
 
-  fullOuterJoinRelated(expression, options) {
+  fullOuterJoinRelated(expression: unknown, options?: object): this {
     ensureJoinRelatedOperation(this, 'fullOuterJoin').addCall({
       expression,
       options,
@@ -857,7 +918,7 @@ class QueryBuilder extends QueryBuilderBase {
     return this;
   }
 
-  leftJoinRelated(expression, options) {
+  leftJoinRelated(expression: unknown, options?: object): this {
     ensureJoinRelatedOperation(this, 'leftJoin').addCall({
       expression,
       options,
@@ -866,7 +927,7 @@ class QueryBuilder extends QueryBuilderBase {
     return this;
   }
 
-  leftOuterJoinRelated(expression, options) {
+  leftOuterJoinRelated(expression: unknown, options?: object): this {
     ensureJoinRelatedOperation(this, 'leftOuterJoin').addCall({
       expression,
       options,
@@ -875,7 +936,7 @@ class QueryBuilder extends QueryBuilderBase {
     return this;
   }
 
-  rightJoinRelated(expression, options) {
+  rightJoinRelated(expression: unknown, options?: object): this {
     ensureJoinRelatedOperation(this, 'rightJoin').addCall({
       expression,
       options,
@@ -884,7 +945,7 @@ class QueryBuilder extends QueryBuilderBase {
     return this;
   }
 
-  rightOuterJoinRelated(expression, options) {
+  rightOuterJoinRelated(expression: unknown, options?: object): this {
     ensureJoinRelatedOperation(this, 'rightOuterJoin').addCall({
       expression,
       options,
@@ -893,57 +954,59 @@ class QueryBuilder extends QueryBuilderBase {
     return this;
   }
 
-  deleteById(id) {
+  deleteById(id: unknown): this {
     return withWhereScope(this, () => this.findById(id))
       .delete()
-      .runBefore((_, builder) => {
+      .runBefore((_: unknown, builder: QueryBuilder) => {
         if (!builder.internalOptions().skipUndefined) {
           assertIdNotUndefined(id, `undefined was passed to deleteById`);
         }
       });
   }
 
-  findById(...args) {
+  findById(...args: unknown[]): this {
     return this.addOperation(new FindByIdOperation('findById'), args).first();
   }
 
-  findByIds(...args) {
+  findByIds(...args: unknown[]): this {
     return this.addOperation(new FindByIdsOperation('findByIds'), args);
   }
 
-  runBefore(...args) {
+  runBefore(...args: unknown[]): this {
     return this.addOperation(new RunBeforeOperation('runBefore'), args);
   }
 
-  onBuild(...args) {
+  onBuild(...args: unknown[]): this {
     return this.addOperation(new OnBuildOperation('onBuild'), args);
   }
 
-  onBuildKnex(...args) {
+  onBuildKnex(...args: unknown[]): this {
     return this.addOperation(new OnBuildKnexOperation('onBuildKnex'), args);
   }
 
-  runAfter(...args) {
+  runAfter(...args: unknown[]): this {
     return this.addOperation(new RunAfterOperation('runAfter'), args);
   }
 
-  onError(...args) {
+  onError(...args: unknown[]): this {
     return this.addOperation(new OnErrorOperation('onError'), args);
   }
 
-  from(...args) {
+  from(...args: unknown[]): this {
     return this.addOperation(new FromOperation('from'), args);
   }
 
-  updateFrom(...args) {
+  updateFrom(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('updateFrom'), args);
   }
 
-  table(...args) {
+  table(...args: unknown[]): this {
     return this.addOperation(new FromOperation('table'), args);
   }
 
-  for(relatedQueryFor) {
+  for(): unknown;
+  for(relatedQueryFor: unknown): this;
+  for(relatedQueryFor?: unknown): unknown {
     if (arguments.length === 0) {
       return this._relatedQueryFor;
     }
@@ -976,7 +1039,7 @@ Object.defineProperties(QueryBuilder.prototype, {
   },
 });
 
-function isWriteOperation(op) {
+function isWriteOperation(op: Operation): boolean {
   return (
     op.is(InsertOperation) ||
     op.is(UpdateOperation) ||
@@ -986,7 +1049,8 @@ function isWriteOperation(op) {
   );
 }
 
-function ensureEagerOperation(builder, algorithm = null) {
+// Returns the eager operation, whose class depends on the algorithm.
+function ensureEagerOperation(builder: QueryBuilder, algorithm: unknown = null): EagerOperation {
   const modelClass = builder.modelClass();
   const defaultGraphOptions = modelClass.getDefaultGraphOptions();
   const eagerOp = builder.findOperation(EagerOperation);
@@ -1030,19 +1094,22 @@ function ensureEagerOperation(builder, algorithm = null) {
   }
 }
 
-function getWhereInEagerAlgorithm(builder) {
+function getWhereInEagerAlgorithm(builder: QueryBuilder): unknown {
   return builder.modelClass().WhereInEagerAlgorithm;
 }
 
-function getJoinEagerAlgorithm(builder) {
+function getJoinEagerAlgorithm(builder: QueryBuilder): unknown {
   return builder.modelClass().JoinEagerAlgorithm;
 }
 
-function getNaiveEagerAlgorithm(builder) {
+function getNaiveEagerAlgorithm(builder: QueryBuilder): unknown {
   return builder.modelClass().NaiveEagerAlgorithm;
 }
 
-function getOperationClassForEagerAlgorithm(builder, algorithm) {
+function getOperationClassForEagerAlgorithm(
+  builder: QueryBuilder,
+  algorithm: unknown,
+): typeof JoinEagerOperation | typeof NaiveEagerOperation | typeof WhereInEagerOperation {
   if (algorithm === getJoinEagerAlgorithm(builder)) {
     return JoinEagerOperation;
   } else if (algorithm === getNaiveEagerAlgorithm(builder)) {
@@ -1052,7 +1119,7 @@ function getOperationClassForEagerAlgorithm(builder, algorithm) {
   }
 }
 
-function parseRelationExpression(modelClass, exp) {
+function parseRelationExpression(modelClass: ModelClass, exp: unknown): RelationExpression {
   try {
     return RelationExpression.create(exp);
   } catch (err) {
@@ -1070,7 +1137,7 @@ function parseRelationExpression(modelClass, exp) {
   }
 }
 
-function checkEager(builder) {
+function checkEager(builder: QueryBuilder): void {
   const eagerOp = builder.findOperation(EagerOperation);
 
   if (!eagerOp) {
@@ -1092,18 +1159,18 @@ function checkEager(builder) {
   }
 }
 
-function findQueryExecutorOperation(builder) {
-  return builder.findOperation((op) => op.hasQueryExecutor());
+function findQueryExecutorOperation(builder: QueryBuilder): Operation | null {
+  return builder.findOperation((op: Operation) => op.hasQueryExecutor());
 }
 
-function checkForUsage(builder) {
+function checkForUsage(builder: QueryBuilder): void {
   if (builder._forError !== null) {
     throw builder._forError;
   }
 }
 
-function beforeExecute(builder) {
-  let promise = Promise.resolve();
+function beforeExecute(builder: QueryBuilder): Promise<unknown> {
+  let promise: Promise<unknown> = Promise.resolve();
 
   // This needs to be checked before any hooks are called.
   checkForUsage(builder);
@@ -1123,8 +1190,8 @@ function beforeExecute(builder) {
   return promise;
 }
 
-function doExecute(builder) {
-  let promise = Promise.resolve();
+function doExecute(builder: QueryBuilder): Promise<unknown> {
+  let promise: Promise<unknown> = Promise.resolve();
 
   builder = callOnBuildHooks(builder);
   const queryExecutorOperation = findQueryExecutorOperation(builder);
@@ -1148,7 +1215,7 @@ function doExecute(builder) {
   return promise;
 }
 
-function afterExecute(builder, result) {
+function afterExecute(builder: QueryBuilder, result: unknown): Promise<unknown> {
   let promise = Promise.resolve(result);
 
   promise = chainOperationHooks(promise, builder, 'onAfter1');
@@ -1163,24 +1230,26 @@ function afterExecute(builder, result) {
 }
 
 class ReturnImmediatelyException {
-  constructor(value) {
+  declare value: unknown;
+
+  constructor(value: unknown) {
     this.value = value;
   }
 }
 
-function handleReturnImmediatelyValue(builder) {
+function handleReturnImmediatelyValue(builder: QueryBuilder): void {
   const { returnImmediatelyValue } = builder.internalOptions();
   if (returnImmediatelyValue !== undefined) {
     throw new ReturnImmediatelyException(returnImmediatelyValue);
   }
 }
 
-function handleExecuteError(builder, err) {
+function handleExecuteError(builder: QueryBuilder, err: unknown): Promise<unknown> {
   if (err instanceof ReturnImmediatelyException) {
     return Promise.resolve(err.value);
   }
 
-  let promise = Promise.reject(wrapError(err));
+  let promise: Promise<unknown> = Promise.reject(wrapError(err as Error));
 
   builder.forEachOperation(true, (op) => {
     if (op.hasOnError()) {
@@ -1193,7 +1262,11 @@ function handleExecuteError(builder, err) {
   return promise;
 }
 
-function chainOperationHooks(promise, builder, hookName) {
+function chainOperationHooks(
+  promise: Promise<unknown>,
+  builder: QueryBuilder,
+  hookName: HookName,
+): Promise<unknown> {
   return promise.then((result) => {
     let promise = Promise.resolve(result);
 
@@ -1211,9 +1284,13 @@ function chainOperationHooks(promise, builder, hookName) {
   });
 }
 
-function ensureJoinRelatedOperation(builder, joinOperation) {
+function ensureJoinRelatedOperation(
+  builder: QueryBuilder,
+  joinOperation: string,
+): JoinRelatedOperation {
   const opName = joinOperation + 'Relation';
-  let op = builder.findOperation(opName);
+  // The operation named `opName` is the join related operation added below.
+  let op = builder.findOperation(opName) as JoinRelatedOperation | null;
 
   if (!op) {
     op = new JoinRelatedOperation(opName, { joinOperation });
@@ -1223,7 +1300,7 @@ function ensureJoinRelatedOperation(builder, joinOperation) {
   return op;
 }
 
-function prebuildQuery(builder) {
+function prebuildQuery(builder: QueryBuilder): QueryBuilder {
   checkForUsage(builder);
 
   builder = addImplicitOperations(builder);
@@ -1232,13 +1309,14 @@ function prebuildQuery(builder) {
   const queryExecutorOperation = findQueryExecutorOperation(builder);
 
   if (queryExecutorOperation) {
-    return prebuildQuery(queryExecutorOperation.queryExecutor(builder));
+    // The base hook returns nothing, but a query executor returns the query to run.
+    return prebuildQuery(queryExecutorOperation.queryExecutor(builder) as unknown as QueryBuilder);
   } else {
     return builder;
   }
 }
 
-function addImplicitOperations(builder) {
+function addImplicitOperations(builder: QueryBuilder): QueryBuilder {
   if (builder.isFind()) {
     // If no write operations have been called at this point this query is a
     // find query and we need to call the custom find implementation.
@@ -1252,21 +1330,21 @@ function addImplicitOperations(builder) {
   return builder;
 }
 
-function addFindOperation(builder) {
+function addFindOperation(builder: QueryBuilder): void {
   if (!builder.has(FindOperation)) {
     const operation = builder._findOperationFactory(builder);
     builder.addOperationToFront(operation, []);
   }
 }
 
-function moveEagerOperationToEnd(builder) {
+function moveEagerOperationToEnd(builder: QueryBuilder): void {
   const eagerOp = builder.findOperation(EagerOperation);
 
   builder.clear(EagerOperation);
-  builder.addOperation(eagerOp);
+  builder.addOperation(eagerOp!);
 }
 
-function callOnBuildHooks(builder) {
+function callOnBuildHooks(builder: QueryBuilder): QueryBuilder {
   callOnBuildFuncs(builder, builder.context().onBuild);
   callOnBuildFuncs(builder, builder.internalContext().onBuild);
 
@@ -1274,15 +1352,19 @@ function callOnBuildHooks(builder) {
   return builder;
 }
 
-function callOnBuildFuncs(builder, func) {
+// `func` is a function or an array of functions and arrays.
+function callOnBuildFuncs(builder: QueryBuilder, func: unknown): void {
   if (isFunction(func)) {
-    func.call(builder, builder);
+    (func as (this: QueryBuilder, builder: QueryBuilder) => void).call(builder, builder);
   } else if (Array.isArray(func)) {
     func.forEach((func) => callOnBuildFuncs(builder, func));
   }
 }
 
-function buildKnexQuery(builder, knexBuilder = builder.knex().queryBuilder()) {
+function buildKnexQuery(
+  builder: QueryBuilder,
+  knexBuilder: KnexLike = builder.knex().queryBuilder(),
+): KnexLike {
   knexBuilder = builder.executeOnBuildKnex(knexBuilder);
 
   const fromOperation = builder.findLastOperation(QueryBuilderBase.FromSelector);
@@ -1295,7 +1377,11 @@ function buildKnexQuery(builder, knexBuilder = builder.knex().queryBuilder()) {
 
     // Only add `table.*` select if there are no explicit selects
     // and `from` is a table name and not a subquery.
-    if (!builder.hasSelects() && (!fromOperation || fromOperation.table)) {
+    // `fromRaw()` and `into()` aren't `FromOperation`s and have no `table`.
+    if (
+      !builder.hasSelects() &&
+      (!fromOperation || (fromOperation as Partial<FromOperation>).table)
+    ) {
       knexBuilder = setDefaultSelect(builder, knexBuilder);
     }
   }
@@ -1303,7 +1389,7 @@ function buildKnexQuery(builder, knexBuilder = builder.knex().queryBuilder()) {
   return knexBuilder;
 }
 
-function setDefaultTable(builder, knexBuilder) {
+function setDefaultTable(builder: QueryBuilder, knexBuilder: KnexLike): KnexLike {
   const table = builder.tableName();
   const tableRef = builder.tableRef();
 
@@ -1314,19 +1400,26 @@ function setDefaultTable(builder, knexBuilder) {
   }
 }
 
-function setDefaultSelect(builder, knexBuilder) {
+function setDefaultSelect(builder: QueryBuilder, knexBuilder: KnexLike): KnexLike {
   const tableRef = builder.tableRef();
 
   return knexBuilder.select(`${tableRef}.*`);
 }
 
-async function chainHooks(promise, builder, func) {
+// `func` is a function or an array of functions and arrays.
+async function chainHooks(
+  promise: Promise<unknown>,
+  builder: QueryBuilder,
+  func: unknown,
+): Promise<unknown> {
   return promise.then((result) => {
     let promise = Promise.resolve(result);
 
     if (isFunction(func)) {
       promise = promise.then((result) => {
-        const res = func.call(builder, result, builder);
+        const res = (
+          func as (this: QueryBuilder, result: unknown, builder: QueryBuilder) => unknown
+        ).call(builder, result, builder);
         handleReturnImmediatelyValue(builder);
         return res;
       });
@@ -1340,7 +1433,7 @@ async function chainHooks(promise, builder, func) {
   });
 }
 
-function createModels(result, builder) {
+function createModels(result: unknown, builder: QueryBuilder): unknown {
   if (result === null || result === undefined) {
     return null;
   }
@@ -1365,11 +1458,11 @@ function createModels(result, builder) {
   return result;
 }
 
-function shouldBeConvertedToModel(obj, modelClass) {
+function shouldBeConvertedToModel(obj: unknown, modelClass: ModelClass): boolean {
   return isObject(obj) && !(obj instanceof modelClass);
 }
 
-function writeOperation(builder, cb) {
+function writeOperation<T extends QueryBuilder>(builder: T, cb: () => unknown): T {
   if (!builder.isFind()) {
     return builder.reject(
       new Error(
@@ -1389,36 +1482,36 @@ function writeOperation(builder, cb) {
   }
 }
 
-function findOperationFactory() {
+function findOperationFactory(): Operation {
   return new FindOperation('find');
 }
 
-function insertOperationFactory() {
+function insertOperationFactory(): Operation {
   return new InsertOperation('insert');
 }
 
-function updateOperationFactory() {
+function updateOperationFactory(): Operation {
   return new UpdateOperation('update');
 }
 
-function patchOperationFactory() {
+function patchOperationFactory(): Operation {
   return new UpdateOperation('patch', {
     modelOptions: { patch: true },
   });
 }
 
-function relateOperationFactory() {
-  return new RelateOperation('relate', {});
+function relateOperationFactory(): Operation {
+  // A plain query has no relation: the relation queries replace this factory.
+  return new RelateOperation('relate', {} as RelationOperationOptions);
 }
 
-function unrelateOperationFactory() {
-  return new UnrelateOperation('unrelate', {});
+function unrelateOperationFactory(): Operation {
+  // A plain query has no relation: the relation queries replace this factory.
+  return new UnrelateOperation('unrelate', {} as RelationOperationOptions);
 }
 
-function deleteOperationFactory() {
+function deleteOperationFactory(): Operation {
   return new DeleteOperation('delete');
 }
 
-module.exports = {
-  QueryBuilder,
-};
+export { QueryBuilder };

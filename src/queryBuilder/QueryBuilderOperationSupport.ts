@@ -1,10 +1,49 @@
-'use strict';
+import { isString, isFunction, isRegExp, mergeMaps, last } from '../utils/objectUtils';
+import { QueryBuilderContextBase } from './QueryBuilderContextBase';
+import { QueryBuilderUserContext } from './QueryBuilderUserContext';
+import { deprecate } from '../utils/deprecate';
+import { effectiveWhereScope, createWhereGrouping } from './whereScopes';
+import type { WhereScope } from './whereScopes';
+import type { QueryBuilderOperation, HookName } from './operations/QueryBuilderOperation';
+import type { QueryBuilder } from './QueryBuilder';
+import type {
+  KnexBuilder,
+  KnexInstance,
+  ModelClass as OperationModelClass,
+  OperationClass,
+} from './operations/types';
 
-const { isString, isFunction, isRegExp, mergeMaps, last } = require('../utils/objectUtils');
-const { QueryBuilderContextBase } = require('./QueryBuilderContextBase');
-const { QueryBuilderUserContext } = require('./QueryBuilderUserContext');
-const { deprecate } = require('../utils/deprecate');
-const { effectiveWhereScope, createWhereGrouping } = require('./whereScopes');
+// A knex query builder (or join clause). Operations call whatever knex method
+// they are named after, so knex builders are used dynamically.
+type KnexLike = KnexBuilder;
+
+// A model class. The model classes are user-defined subclasses of the still
+// JavaScript `Model`, with static members of their own: `OperationModelClass`
+// has the ones the operations use, and the rest are dynamic.
+interface ModelClass extends OperationModelClass {
+  [key: string]: any;
+}
+
+// A query builder operation.
+type Operation = QueryBuilderOperation;
+
+// A model class or a table name. Only the table name of a model class is used.
+type TableSource = { getTableName(): string } | string;
+
+// An operation hook, called with the arguments the builder passes.
+type HookMethod = (...args: unknown[]) => unknown;
+
+// `true` (every operation), a regex or a string that is matched against the
+// operation name, an operation class, or a predicate.
+type OperationSelector = true | RegExp | string | OperationClass | ((op: Operation) => unknown);
+
+// Returning false stops the walk.
+type OperationCallback = (op: Operation) => boolean | void;
+
+interface ActiveOperation {
+  operation: Operation;
+  hookName: HookName;
+}
 
 const AllSelector = () => true;
 const SelectSelector =
@@ -16,11 +55,19 @@ const JoinSelector = /(join|joinRaw|joinRelated)$/i;
 const FromSelector = /^(from|fromRaw|into|table)$/;
 
 class QueryBuilderOperationSupport {
-  constructor(...args) {
-    this.constructor.init(this, ...args);
+  declare _modelClass: ModelClass;
+  declare _operations: Operation[];
+  declare _context: QueryBuilderContextBase;
+  declare _parentQuery: QueryBuilderOperationSupport | null;
+  declare _isPartialQuery: boolean;
+  declare _activeOperations: ActiveOperation[];
+  declare _whereScope: WhereScope | null;
+
+  constructor(...args: [modelClass: ModelClass]) {
+    (this.constructor as typeof QueryBuilderOperationSupport).init(this, ...args);
   }
 
-  static init(self, modelClass) {
+  static init(self: QueryBuilderOperationSupport, modelClass: ModelClass): void {
     self._modelClass = modelClass;
     self._operations = [];
     self._context = new this.QueryBuilderContext(self);
@@ -30,77 +77,87 @@ class QueryBuilderOperationSupport {
     self._whereScope = null;
   }
 
-  static forClass(modelClass) {
+  static forClass<T>(this: new (modelClass: ModelClass) => T, modelClass: ModelClass): T {
     return new this(modelClass);
   }
 
-  static get AllSelector() {
+  static get AllSelector(): () => boolean {
     return AllSelector;
   }
 
-  static get QueryBuilderContext() {
+  static get QueryBuilderContext(): typeof QueryBuilderContextBase {
     return QueryBuilderContextBase;
   }
 
-  static get QueryBuilderUserContext() {
+  static get QueryBuilderUserContext(): typeof QueryBuilderUserContext {
     return QueryBuilderUserContext;
   }
 
-  static get SelectSelector() {
+  static get SelectSelector(): RegExp {
     return SelectSelector;
   }
 
-  static get WhereSelector() {
+  static get WhereSelector(): RegExp {
     return WhereSelector;
   }
 
-  static get OnSelector() {
+  static get OnSelector(): RegExp {
     return OnSelector;
   }
 
-  static get JoinSelector() {
+  static get JoinSelector(): RegExp {
     return JoinSelector;
   }
 
-  static get FromSelector() {
+  static get FromSelector(): RegExp {
     return FromSelector;
   }
 
-  static get OrderBySelector() {
+  static get OrderBySelector(): RegExp {
     return OrderBySelector;
   }
 
-  modelClass() {
+  modelClass(): ModelClass {
     return this._modelClass;
   }
 
-  context(obj) {
+  context(): QueryBuilderUserContext;
+  context(obj: object): this;
+  context(obj?: object): QueryBuilderUserContext | this {
     const ctx = this._context;
 
     if (arguments.length === 0) {
       return ctx.userContext;
     } else {
-      ctx.userContext = ctx.userContext.newMerge(this, obj);
+      ctx.userContext = ctx.userContext.newMerge(this, obj!);
       return this;
     }
   }
 
-  clearContext() {
+  clearContext(): this {
     const ctx = this._context;
-    ctx.userContext = new this.constructor.QueryBuilderUserContext(this);
+    ctx.userContext = new (
+      this.constructor as typeof QueryBuilderOperationSupport
+    ).QueryBuilderUserContext(this);
     return this;
   }
 
-  internalContext(ctx) {
+  internalContext(): this['_context'];
+  internalContext(ctx: QueryBuilderContextBase): this;
+  internalContext(ctx?: QueryBuilderContextBase): QueryBuilderContextBase | this {
     if (arguments.length === 0) {
       return this._context;
     } else {
-      this._context = ctx;
+      this._context = ctx!;
       return this;
     }
   }
 
-  internalOptions(opt) {
+  internalOptions(): this['_context']['options'];
+  internalOptions(opt: Partial<QueryBuilderContextBase['options']>): this;
+  internalOptions(
+    opt?: Partial<QueryBuilderContextBase['options']>,
+  ): QueryBuilderContextBase['options'] | this {
     if (arguments.length === 0) {
       return this._context.options;
     } else {
@@ -110,52 +167,63 @@ class QueryBuilderOperationSupport {
     }
   }
 
-  isPartial(isPartial) {
+  isPartial(): boolean;
+  isPartial(isPartial: boolean): this;
+  isPartial(isPartial?: boolean): boolean | this {
     if (arguments.length === 0) {
       return this._isPartialQuery;
     } else {
-      this._isPartialQuery = isPartial;
+      this._isPartialQuery = isPartial!;
       return this;
     }
   }
 
-  isInternal() {
+  isInternal(): boolean {
     return this.internalOptions().isInternalQuery;
   }
 
-  tableNameFor(modelClassOrTableName, newTableName) {
+  tableNameFor(modelClassOrTableName: TableSource): string;
+  tableNameFor(modelClassOrTableName: TableSource, newTableName: string): this;
+  tableNameFor(modelClassOrTableName: TableSource, newTableName?: string): string | this;
+  tableNameFor(modelClassOrTableName: TableSource, newTableName?: string): string | this {
     const tableName = getTableName(modelClassOrTableName);
     const ctx = this.internalContext();
     const tableMap = ctx.tableMap;
 
     if (isString(newTableName)) {
       ctx.tableMap = tableMap || new Map();
-      ctx.tableMap.set(tableName, newTableName);
+      ctx.tableMap.set(tableName, newTableName!);
       return this;
     } else {
       return (tableMap && tableMap.get(tableName)) || tableName;
     }
   }
 
-  aliasFor(modelClassOrTableName, alias) {
+  aliasFor(modelClassOrTableName: TableSource): string | null;
+  aliasFor(modelClassOrTableName: TableSource, alias: string): this;
+  aliasFor(modelClassOrTableName: TableSource, alias?: string): string | null | this;
+  aliasFor(modelClassOrTableName: TableSource, alias?: string): string | null | this {
     const tableName = getTableName(modelClassOrTableName);
     const ctx = this.internalContext();
     const aliasMap = ctx.aliasMap;
 
     if (isString(alias)) {
       ctx.aliasMap = aliasMap || new Map();
-      ctx.aliasMap.set(tableName, alias);
+      ctx.aliasMap.set(tableName, alias!);
       return this;
     } else {
       return (aliasMap && aliasMap.get(tableName)) || null;
     }
   }
 
-  tableRefFor(modelClassOrTableName) {
+  tableRefFor(modelClassOrTableName: TableSource): string {
     return this.aliasFor(modelClassOrTableName) || this.tableNameFor(modelClassOrTableName);
   }
 
-  childQueryOf(query, { fork, isInternalQuery } = {}) {
+  childQueryOf(
+    query: QueryBuilderOperationSupport | null | undefined,
+    { fork, isInternalQuery }: { fork?: boolean; isInternalQuery?: boolean } = {},
+  ): this {
     if (query) {
       const currentCtx = this.context();
       let ctx = query.internalContext();
@@ -181,7 +249,7 @@ class QueryBuilderOperationSupport {
     return this;
   }
 
-  subqueryOf(query) {
+  subqueryOf(query: QueryBuilderOperationSupport | null | undefined): this {
     if (query) {
       if (this._isPartialQuery) {
         // Merge alias and table name maps for "partial" subqueries.
@@ -201,11 +269,13 @@ class QueryBuilderOperationSupport {
     return this;
   }
 
-  parentQuery() {
+  parentQuery(): QueryBuilderOperationSupport | null {
     return this._parentQuery;
   }
 
-  knex(...args) {
+  knex(): KnexInstance;
+  knex(knex: KnexInstance | null | undefined): this;
+  knex(...args: [knex?: KnexInstance | null]): KnexInstance | this {
     if (args.length === 0) {
       const knex = this.unsafeKnex();
 
@@ -222,12 +292,12 @@ class QueryBuilderOperationSupport {
     }
   }
 
-  unsafeKnex() {
+  unsafeKnex(): KnexInstance | null {
     return this._context.knex || this._modelClass.knex() || null;
   }
 
-  clear(operationSelector) {
-    const operationsToRemove = new Set();
+  clear(operationSelector: OperationSelector): this {
+    const operationsToRemove = new Set<Operation>();
 
     this.forEachOperation(operationSelector, (op) => {
       // If an ancestor operation has already been removed,
@@ -244,15 +314,16 @@ class QueryBuilderOperationSupport {
     return this;
   }
 
-  toFindQuery() {
+  toFindQuery(): this {
     const findQuery = this.clone();
-    const operationsToReplace = [];
-    const operationsToRemove = [];
+    const operationsToReplace: Array<{ op: Operation; findOp: Operation }> = [];
+    const operationsToRemove: Operation[] = [];
 
     findQuery.forEachOperation(
       (op) => op.hasToFindOperation(),
       (op) => {
-        const findOp = op.toFindOperation(findQuery);
+        // Only `QueryBuilder`s are turned into find queries.
+        const findOp = op.toFindOperation(findQuery as unknown as QueryBuilder);
 
         if (!findOp) {
           operationsToRemove.push(op);
@@ -273,20 +344,20 @@ class QueryBuilderOperationSupport {
     return findQuery;
   }
 
-  clearSelect() {
+  clearSelect(): this {
     return this.clear(SelectSelector);
   }
 
-  clearWhere() {
+  clearWhere(): this {
     return this.clear(WhereSelector);
   }
 
-  clearOrder() {
+  clearOrder(): this {
     return this.clear(OrderBySelector);
   }
 
-  copyFrom(queryBuilder, operationSelector) {
-    const operationsToAdd = new Set();
+  copyFrom(queryBuilder: QueryBuilderOperationSupport, operationSelector: OperationSelector): this {
+    const operationsToAdd = new Set<Operation>();
 
     queryBuilder.forEachOperation(operationSelector, (op) => {
       // If an ancestor operation has already been added,
@@ -315,11 +386,15 @@ class QueryBuilderOperationSupport {
     return this;
   }
 
-  has(operationSelector) {
+  has(operationSelector: OperationSelector): boolean {
     return !!this.findOperation(operationSelector);
   }
 
-  forEachOperation(operationSelector, callback, match = true) {
+  forEachOperation(
+    operationSelector: OperationSelector,
+    callback: OperationCallback,
+    match = true,
+  ): this {
     visitOperations(
       this._operations,
       selectorKind(operationSelector),
@@ -331,8 +406,12 @@ class QueryBuilderOperationSupport {
     return this;
   }
 
-  findOperation(operationSelector) {
-    let op = null;
+  findOperation<T extends Operation>(
+    operationSelector: abstract new (...args: any[]) => T,
+  ): T | null;
+  findOperation(operationSelector: OperationSelector): Operation | null;
+  findOperation(operationSelector: OperationSelector): Operation | null {
+    let op: Operation | null = null;
 
     this.forEachOperation(operationSelector, (it) => {
       op = it;
@@ -342,8 +421,12 @@ class QueryBuilderOperationSupport {
     return op;
   }
 
-  findLastOperation(operationSelector) {
-    let op = null;
+  findLastOperation<T extends Operation>(
+    operationSelector: abstract new (...args: any[]) => T,
+  ): T | null;
+  findLastOperation(operationSelector: OperationSelector): Operation | null;
+  findLastOperation(operationSelector: OperationSelector): Operation | null {
+    let op: Operation | null = null;
 
     this.forEachOperation(operationSelector, (it) => {
       op = it;
@@ -352,7 +435,7 @@ class QueryBuilderOperationSupport {
     return op;
   }
 
-  everyOperation(operationSelector) {
+  everyOperation(operationSelector: OperationSelector): boolean {
     let every = true;
 
     this.forEachOperation(
@@ -367,7 +450,8 @@ class QueryBuilderOperationSupport {
     return every;
   }
 
-  callOperationMethod(operation, hookName, args) {
+  // Returns whatever the hook returns.
+  callOperationMethod(operation: Operation, hookName: HookName, args: unknown[]): unknown {
     try {
       operation.removeChildOperationsByHookName(hookName);
 
@@ -376,13 +460,18 @@ class QueryBuilderOperationSupport {
         hookName,
       });
 
-      return operation[hookName](...args);
+      return (operation[hookName] as HookMethod)(...args);
     } finally {
       this._activeOperations.pop();
     }
   }
 
-  async callAsyncOperationMethod(operation, hookName, args) {
+  // Returns whatever the hook returns.
+  async callAsyncOperationMethod(
+    operation: Operation,
+    hookName: HookName,
+    args: unknown[],
+  ): Promise<unknown> {
     operation.removeChildOperationsByHookName(hookName);
 
     this._activeOperations.push({
@@ -391,22 +480,26 @@ class QueryBuilderOperationSupport {
     });
 
     try {
-      return await operation[hookName](...args);
+      return await (operation[hookName] as HookMethod)(...args);
     } finally {
       this._activeOperations.pop();
     }
   }
 
-  addOperation(operation, args) {
+  addOperation(operation: Operation, args?: unknown[]): this {
     const ret = this.addOperationUsingMethod('push', operation, args);
     return ret;
   }
 
-  addOperationToFront(operation, args) {
+  addOperationToFront(operation: Operation, args?: unknown[]): this {
     return this.addOperationUsingMethod('unshift', operation, args);
   }
 
-  addOperationUsingMethod(arrayMethod, operation, args) {
+  addOperationUsingMethod(
+    arrayMethod: 'push' | 'unshift',
+    operation: Operation,
+    args?: unknown[],
+  ): this {
     const shouldAdd = this.callOperationMethod(operation, 'onAdd', [this, args]);
 
     if (shouldAdd) {
@@ -425,7 +518,7 @@ class QueryBuilderOperationSupport {
     return this;
   }
 
-  removeOperation(operation) {
+  removeOperation(operation: Operation): this {
     if (operation.parentOperation) {
       operation.parentOperation.removeChildOperation(operation);
     } else {
@@ -439,7 +532,7 @@ class QueryBuilderOperationSupport {
     return this;
   }
 
-  replaceOperation(operation, newOperation) {
+  replaceOperation(operation: Operation, newOperation: Operation): this {
     if (operation.parentOperation) {
       operation.parentOperation.replaceChildOperation(operation, newOperation);
     } else {
@@ -453,11 +546,13 @@ class QueryBuilderOperationSupport {
     return this;
   }
 
-  clone() {
-    return this.baseCloneInto(new this.constructor(this.unsafeKnex()));
+  clone(): this {
+    return this.baseCloneInto(
+      new (this.constructor as new (knex: KnexInstance | null) => this)(this.unsafeKnex()),
+    );
   }
 
-  baseCloneInto(builder) {
+  baseCloneInto<T extends QueryBuilderOperationSupport>(builder: T): T {
     builder._modelClass = this._modelClass;
     builder._operations = this._operations.map((it) => it.clone());
     builder._context = this._context.clone();
@@ -471,12 +566,12 @@ class QueryBuilderOperationSupport {
     return builder;
   }
 
-  toKnexQuery(knexBuilder = this.knex().queryBuilder()) {
+  toKnexQuery(knexBuilder: KnexLike = this.knex().queryBuilder()): KnexLike {
     this.executeOnBuild();
     return this.executeOnBuildKnex(knexBuilder);
   }
 
-  executeOnBuild() {
+  executeOnBuild(): void {
     this.forEachOperation(true, (op) => {
       if (op.hasOnBuild()) {
         this.callOperationMethod(op, 'onBuild', [this]);
@@ -484,7 +579,7 @@ class QueryBuilderOperationSupport {
     });
   }
 
-  executeOnBuildKnex(knexBuilder) {
+  executeOnBuildKnex(knexBuilder: KnexLike): KnexLike {
     const whereGrouping = createWhereGrouping(this);
 
     this.forEachOperation(true, (op) => {
@@ -501,15 +596,15 @@ class QueryBuilderOperationSupport {
     return knexBuilder;
   }
 
-  toString() {
+  toString(): string {
     return this.toKnexQuery().toString();
   }
 
-  toSql() {
+  toSql(): string {
     return this.toString();
   }
 
-  skipUndefined() {
+  skipUndefined(): this {
     deprecate('skipUndefined() is deprecated and will be removed in objection 4.0');
     this.internalOptions().skipUndefined = true;
     return this;
@@ -527,7 +622,15 @@ const SELECT_CLASS = 3;
 const SELECT_PREDICATE = 4;
 const SELECT_NONE = 5;
 
-function selectorKind(operationSelector) {
+type SelectorKind =
+  | typeof SELECT_ALL
+  | typeof SELECT_REGEX
+  | typeof SELECT_NAME
+  | typeof SELECT_CLASS
+  | typeof SELECT_PREDICATE
+  | typeof SELECT_NONE;
+
+function selectorKind(operationSelector: OperationSelector): SelectorKind {
   if (operationSelector === true) {
     return SELECT_ALL;
   } else if (isRegExp(operationSelector)) {
@@ -536,7 +639,8 @@ function selectorKind(operationSelector) {
     return SELECT_NAME;
   } else if (
     isFunction(operationSelector) &&
-    operationSelector.isObjectionQueryBuilderOperationClass
+    (operationSelector as { isObjectionQueryBuilderOperationClass?: unknown })
+      .isObjectionQueryBuilderOperationClass
   ) {
     return SELECT_CLASS;
   } else if (isFunction(operationSelector)) {
@@ -546,18 +650,23 @@ function selectorKind(operationSelector) {
   }
 }
 
-function matchesSelector(op, kind, operationSelector) {
+function matchesSelector(
+  op: Operation,
+  kind: SelectorKind,
+  operationSelector: OperationSelector,
+): unknown {
   switch (kind) {
     case SELECT_ALL:
       return true;
     case SELECT_REGEX:
-      return operationSelector.test(op.name);
+      // A null name is tested as 'null', as `test()` converts it to a string.
+      return (operationSelector as RegExp).test(op.name as string);
     case SELECT_NAME:
       return op.name === operationSelector;
     case SELECT_CLASS:
-      return op.is(operationSelector);
+      return op.is(operationSelector as OperationClass);
     case SELECT_PREDICATE:
-      return operationSelector(op);
+      return (operationSelector as (op: Operation) => unknown)(op);
     default:
       return false;
   }
@@ -567,7 +676,13 @@ function matchesSelector(op, kind, operationSelector) {
 // before its children. Returns false if the callback stopped the walk by
 // returning false. The arrays are read as the walk goes, so operations that
 // the callback adds are visited too, as before.
-function visitOperations(operations, kind, operationSelector, callback, match) {
+function visitOperations(
+  operations: Operation[],
+  kind: SelectorKind,
+  operationSelector: OperationSelector,
+  callback: OperationCallback,
+  match: boolean,
+): boolean {
   for (const op of operations) {
     if (matchesSelector(op, kind, operationSelector) === match && callback(op) === false) {
       return false;
@@ -584,14 +699,21 @@ function visitOperations(operations, kind, operationSelector, callback, match) {
   return true;
 }
 
-function getTableName(modelClassOrTableName) {
+function getTableName(modelClassOrTableName: TableSource): string {
   if (isString(modelClassOrTableName)) {
-    return modelClassOrTableName;
+    return modelClassOrTableName as string;
   } else {
-    return modelClassOrTableName.getTableName();
+    return (modelClassOrTableName as ModelClass).getTableName();
   }
 }
 
-module.exports = {
-  QueryBuilderOperationSupport,
+export { QueryBuilderOperationSupport };
+export type {
+  TableSource,
+  KnexLike,
+  ModelClass,
+  Operation,
+  OperationClass,
+  OperationSelector,
+  OperationCallback,
 };

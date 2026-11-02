@@ -1,7 +1,7 @@
-'use strict';
-
-const { QueryTransformation } = require('./QueryTransformation');
-const { isMySql } = require('../../utils/knexUtils');
+import { QueryTransformation } from './QueryTransformation';
+import { isMySql } from '../../utils/knexUtils';
+import type { QueryBuilder } from '../QueryBuilder';
+import type { ObjectionToKnexConvertingOperation } from '../operations/ObjectionToKnexConvertingOperation';
 
 /**
  * Mysql doesn't allow queries like this:
@@ -16,8 +16,9 @@ const { isMySql } = require('../../utils/knexUtils');
  *   update foo set bar = 1 where id in (select * from (select id from foo))
  */
 class WrapMysqlModifySubqueryTransformation extends QueryTransformation {
-  onConvertQueryBuilderBase(query, parentQuery) {
-    const knex = parentQuery.unsafeKnex();
+  // In a join callback `parentQuery` is a `JoinBuilder`, which the loop below walks past.
+  onConvertQueryBuilderBase(query: QueryBuilder, parentQuery: QueryBuilder | null): QueryBuilder {
+    const knex = parentQuery!.unsafeKnex();
 
     // Cannot detect anything if, for whatever reason, a knex instance
     // or a transaction is not registered at this point.
@@ -32,7 +33,8 @@ class WrapMysqlModifySubqueryTransformation extends QueryTransformation {
 
     // A subquery in a join callback belongs to the query of the join.
     while (parentQuery && typeof parentQuery.isUpdate !== 'function') {
-      parentQuery = parentQuery.parentQuery();
+      // The loop stops at the first parent query that is a `QueryBuilder`.
+      parentQuery = parentQuery.parentQuery() as QueryBuilder | null;
     }
 
     // This transformation only applies to update and delete queries.
@@ -53,19 +55,21 @@ class WrapMysqlModifySubqueryTransformation extends QueryTransformation {
   }
 }
 
-function hasJoinsToTable(query, tableName) {
+function hasJoinsToTable(query: QueryBuilder, tableName: string): boolean {
   let found = false;
 
-  query.forEachOperation(query.constructor.JoinSelector, (op) => {
-    if (op.args[0] === tableName) {
-      found = true;
-      return false;
-    }
-  });
+  query.forEachOperation(
+    (query.constructor as typeof QueryBuilder).JoinSelector,
+    (op): boolean | void => {
+      // The join operations are `KnexOperation`s, which have `args`.
+      if ((op as ObjectionToKnexConvertingOperation).args![0] === tableName) {
+        found = true;
+        return false;
+      }
+    },
+  );
 
   return found;
 }
 
-module.exports = {
-  WrapMysqlModifySubqueryTransformation,
-};
+export { WrapMysqlModifySubqueryTransformation };

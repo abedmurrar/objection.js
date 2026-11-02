@@ -1,10 +1,8 @@
-'use strict';
-
-const { GraphOperation } = require('../GraphOperation');
-const { GraphPatchAction } = require('./GraphPatchAction');
+import { GraphOperation } from '../GraphOperation';
+import { GraphPatchAction } from './GraphPatchAction';
 
 class GraphPatch extends GraphOperation {
-  createActions() {
+  createActions(): GraphPatchAction[] {
     return [
       new GraphPatchAction(this.graphData, {
         nodes: this.graph.nodes.filter((node) =>
@@ -15,6 +13,4 @@ class GraphPatch extends GraphOperation {
   }
 }
 
-module.exports = {
-  GraphPatch,
-};
+export { GraphPatch };

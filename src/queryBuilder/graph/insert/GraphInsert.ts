@@ -1,22 +1,27 @@
-'use strict';
+import { JoinRowGraphInsertAction } from './JoinRowGraphInsertAction';
+import { GraphInsertAction } from './GraphInsertAction';
+import { GraphOperation } from '../GraphOperation';
+import { ModelGraphEdge } from '../../../model/graph/ModelGraphEdge';
+import type { GraphAction } from '../GraphAction';
+import type { GraphData, GraphEdge, GraphNode } from '../GraphData';
 
-const { JoinRowGraphInsertAction } = require('./JoinRowGraphInsertAction');
-const { GraphInsertAction } = require('./GraphInsertAction');
-const { GraphOperation } = require('../GraphOperation');
-const { ModelGraphEdge } = require('../../../model/graph/ModelGraphEdge');
+// The edges each node depends on.
+type Dependencies = Map<GraphNode, GraphEdge[]>;
 
 class GraphInsert extends GraphOperation {
-  constructor(...args) {
+  declare dependencies: Dependencies;
+
+  constructor(...args: [graphData: GraphData]) {
     super(...args);
     this.dependencies = this._createDependencyMap();
   }
 
-  createActions() {
+  createActions(): GraphAction[] {
     return [...this._createNormalActions(), ...this._createJoinRowActions()];
   }
 
-  _createDependencyMap() {
-    const dependencies = new Map();
+  _createDependencyMap(): Dependencies {
+    const dependencies: Dependencies = new Map();
 
     for (const edge of this.graph.edges) {
       if (edge.type == ModelGraphEdge.Type.Relation) {
@@ -29,7 +34,7 @@ class GraphInsert extends GraphOperation {
     return dependencies;
   }
 
-  _createRelationDependency(edge, dependencies) {
+  _createRelationDependency(edge: GraphEdge, dependencies: Dependencies): void {
     if (edge.relation.isObjectionHasManyRelation) {
       // In case of HasManyRelation the related node depends on the owner node
       // because the related node has the foreign key.
@@ -41,11 +46,11 @@ class GraphInsert extends GraphOperation {
     }
   }
 
-  _createReferenceDependency(edge, dependencies) {
+  _createReferenceDependency(edge: GraphEdge, dependencies: Dependencies): void {
     this._addDependency(edge.ownerNode, edge, dependencies);
   }
 
-  _addDependency(node, edge, dependencies) {
+  _addDependency(node: GraphNode, edge: GraphEdge, dependencies: Dependencies): void {
     let edges = dependencies.get(node);
 
     if (!edges) {
@@ -56,9 +61,9 @@ class GraphInsert extends GraphOperation {
     edges.push(edge);
   }
 
-  _createNormalActions() {
-    const handledNodes = new Set();
-    const actions = [];
+  _createNormalActions(): GraphInsertAction[] {
+    const handledNodes = new Set<GraphNode>();
+    const actions: GraphInsertAction[] = [];
 
     while (true) {
       // At this point, don't care if the nodes have already been inserted before
@@ -92,16 +97,16 @@ class GraphInsert extends GraphOperation {
     return actions;
   }
 
-  _isHandled(node, handledNodes) {
+  _isHandled(node: GraphNode, handledNodes: Set<GraphNode>): boolean {
     return handledNodes.has(node);
   }
 
-  _hasDependencies(node, handledNodes) {
+  _hasDependencies(node: GraphNode, handledNodes: Set<GraphNode>): boolean {
     if (!this.dependencies.has(node)) {
       return false;
     }
 
-    for (const edge of this.dependencies.get(node)) {
+    for (const edge of this.dependencies.get(node)!) {
       const dependencyNode = edge.getOtherNode(node);
 
       if (!handledNodes.has(dependencyNode) && !this.currentGraph.nodeForNode(dependencyNode)) {
@@ -112,7 +117,7 @@ class GraphInsert extends GraphOperation {
     return false;
   }
 
-  _markHandled(node, handledNodes) {
+  _markHandled(node: GraphNode, handledNodes: Set<GraphNode>): void {
     handledNodes.add(node);
 
     // The referencing nodes are all references that don't
@@ -125,7 +130,7 @@ class GraphInsert extends GraphOperation {
     }
   }
 
-  _createJoinRowActions() {
+  _createJoinRowActions(): JoinRowGraphInsertAction[] {
     return [
       new JoinRowGraphInsertAction(this.graphData, {
         nodes: this.graph.nodes.filter((node) => {
@@ -140,6 +145,4 @@ class GraphInsert extends GraphOperation {
   }
 }
 
-module.exports = {
-  GraphInsert,
-};
+export { GraphInsert };

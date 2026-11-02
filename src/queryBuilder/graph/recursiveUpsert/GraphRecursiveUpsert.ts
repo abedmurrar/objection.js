@@ -1,10 +1,9 @@
-'use strict';
-
-const { GraphOperation } = require('../GraphOperation');
-const { GraphRecursiveUpsertAction } = require('./GraphRecursiveUpsertAction');
+import { GraphOperation } from '../GraphOperation';
+import { GraphRecursiveUpsertAction } from './GraphRecursiveUpsertAction';
+import type { GraphModel } from '../GraphData';
 
 class GraphRecursiveUpsert extends GraphOperation {
-  createActions() {
+  createActions(): GraphRecursiveUpsertAction[] {
     return [
       new GraphRecursiveUpsertAction(this.graphData, {
         nodes: this.graph.nodes.filter((node) => {
@@ -16,7 +15,7 @@ class GraphRecursiveUpsert extends GraphOperation {
   }
 }
 
-function hasRelations(obj) {
+function hasRelations(obj: GraphModel): boolean {
   for (const relationName of obj.constructor.getRelationNames()) {
     if (obj[relationName] !== undefined) {
       return true;
@@ -26,6 +25,4 @@ function hasRelations(obj) {
   return false;
 }
 
-module.exports = {
-  GraphRecursiveUpsert,
-};
+export { GraphRecursiveUpsert };

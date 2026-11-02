@@ -1,6 +1,11 @@
-'use strict';
-
 class InternalOptions {
+  declare skipUndefined: boolean;
+  declare keepImplicitJoinProps: boolean;
+  declare returnImmediatelyValue: unknown;
+  declare isInternalQuery: boolean;
+  declare debug: boolean;
+  declare schema: string | undefined;
+
   constructor() {
     this.skipUndefined = false;
     this.keepImplicitJoinProps = false;
@@ -10,8 +15,8 @@ class InternalOptions {
     this.schema = undefined;
   }
 
-  clone() {
-    const copy = new this.constructor();
+  clone(): this {
+    const copy = new (this.constructor as new () => this)();
 
     copy.skipUndefined = this.skipUndefined;
     copy.keepImplicitJoinProps = this.keepImplicitJoinProps;
@@ -24,6 +29,4 @@ class InternalOptions {
   }
 }
 
-module.exports = {
-  InternalOptions,
-};
+export { InternalOptions };

@@ -1,8 +1,13 @@
-'use strict';
+import { GraphData } from './GraphData';
+import { GraphAction } from './GraphAction';
+import * as promiseUtils from '../../utils/promiseUtils';
+import type { Graph, GraphNode } from './GraphData';
+import type { GraphOptions } from './GraphOptions';
+import type { QueryBuilder } from '../QueryBuilder';
+import type { ModelClass } from '../QueryBuilderOperationSupport';
 
-const { GraphData } = require('./GraphData');
-const { GraphAction } = require('./GraphAction');
-const promiseUtils = require('../../utils/promiseUtils');
+// Model class -> id key -> id.
+type ExistenceMap = Map<ModelClass, Map<string, unknown>>;
 
 /**
  * This weird little class is responsible for checking (and maintaining information)
@@ -12,7 +17,9 @@ const promiseUtils = require('../../utils/promiseUtils');
  * option is true.
  */
 class GraphNodeDbExistence {
-  static createEveryNodeExistsExistence() {
+  declare dontExist: ExistenceMap;
+
+  static createEveryNodeExistsExistence(): GraphNodeDbExistence {
     return new GraphNodeDbExistence(new Map());
   }
 
@@ -22,7 +29,17 @@ class GraphNodeDbExistence {
    * creates an instance of GraphNodeDbExistence that can be used to
    * synchronously check if a node exist in the database.
    */
-  static async create({ builder, graph, graphOptions, currentGraph }) {
+  static async create({
+    builder,
+    graph,
+    graphOptions,
+    currentGraph,
+  }: {
+    builder: QueryBuilder;
+    graph: Graph;
+    graphOptions: GraphOptions;
+    currentGraph: Graph;
+  }): Promise<GraphNodeDbExistence> {
     if (graphOptions.isInsertOnly()) {
       // With insertGraph, we never want to do anything but inserts.
       return GraphNodeDbExistence.createEveryNodeExistsExistence();
@@ -52,11 +69,11 @@ class GraphNodeDbExistence {
     return new GraphNodeDbExistence(dontExist);
   }
 
-  constructor(dontExist) {
+  constructor(dontExist: ExistenceMap) {
     this.dontExist = dontExist;
   }
 
-  doesNodeExistInDb(node) {
+  doesNodeExistInDb(node: GraphNode): boolean {
     const idMap = this.dontExist.get(node.modelClass);
 
     if (!idMap) {
@@ -67,11 +84,14 @@ class GraphNodeDbExistence {
   }
 }
 
-function createMayNotExistMap(graphData) {
+function createMayNotExistMap(graphData: GraphData): {
+  mayNotExist: ExistenceMap;
+  mayNotExistNodes: GraphNode[];
+} {
   const { graph, currentGraph, graphOptions } = graphData;
 
-  const mayNotExist = new Map();
-  const mayNotExistNodes = [];
+  const mayNotExist: ExistenceMap = new Map();
+  const mayNotExistNodes: GraphNode[] = [];
 
   for (const node of graph.nodes) {
     if (
@@ -93,7 +113,7 @@ function createMayNotExistMap(graphData) {
         mayNotExist.set(node.modelClass, new Map());
       }
 
-      mayNotExist.get(node.modelClass).set(node.obj.$idKey(), node.obj.$id());
+      mayNotExist.get(node.modelClass)!.set(node.obj.$idKey(), node.obj.$id());
       mayNotExistNodes.push(node);
     }
   }
@@ -104,7 +124,7 @@ function createMayNotExistMap(graphData) {
   };
 }
 
-function hasNodeById(currentGraph, nodeToFind) {
+function hasNodeById(currentGraph: Graph, nodeToFind: GraphNode): boolean {
   const { modelClass } = nodeToFind;
 
   const tableToFind = modelClass.getTableName();
@@ -113,25 +133,37 @@ function hasNodeById(currentGraph, nodeToFind) {
   return currentGraph.nodes.some((node) => {
     return (
       node.modelClass.getTableName() === tableToFind &&
-      idProps.every((idProp) => node.obj[idProp] === nodeToFind.obj[idProp])
+      idProps.every((idProp: string) => node.obj[idProp] === nodeToFind.obj[idProp])
     );
   });
 }
 
-async function createDontExistMap({ builder, mayNotExist, mayNotExistNodes }) {
+async function createDontExistMap({
+  builder,
+  mayNotExist,
+  mayNotExistNodes,
+}: {
+  builder: QueryBuilder;
+  mayNotExist: ExistenceMap;
+  mayNotExistNodes: GraphNode[];
+}): Promise<ExistenceMap> {
   const dontExist = cloneExistenceMap(mayNotExist);
   const existenceCheckQueries = createExistenceCheckQueries({ builder, mayNotExist });
 
-  const results = await promiseUtils.map(existenceCheckQueries, (builder) => builder.execute(), {
-    concurrency: GraphAction.getConcurrency(builder, mayNotExistNodes),
-  });
+  const results = await promiseUtils.map(
+    existenceCheckQueries,
+    (builder: QueryBuilder) => builder.execute(),
+    {
+      concurrency: GraphAction.getConcurrency(builder, mayNotExistNodes),
+    },
+  );
 
   // Remove all items from the mayNotExist map that we have just proven to exist
   // by executing the existenceCheckQueries.
   for (const modelResult of results) {
     for (const item of modelResult) {
       const modelClass = item.constructor;
-      const idMap = dontExist.get(modelClass);
+      const idMap = dontExist.get(modelClass)!;
       // Exist, remove from the map.
       idMap.delete(item.$idKey());
     }
@@ -141,8 +173,14 @@ async function createDontExistMap({ builder, mayNotExist, mayNotExistNodes }) {
   return dontExist;
 }
 
-function createExistenceCheckQueries({ builder, mayNotExist }) {
-  const builders = [];
+function createExistenceCheckQueries({
+  builder,
+  mayNotExist,
+}: {
+  builder: QueryBuilder;
+  mayNotExist: ExistenceMap;
+}): QueryBuilder[] {
+  const builders: QueryBuilder[] = [];
 
   for (const [modelClass, idMap] of mayNotExist.entries()) {
     const ids = Array.from(idMap.values());
@@ -162,14 +200,14 @@ function createExistenceCheckQueries({ builder, mayNotExist }) {
   return builders;
 }
 
-function childQueryOptions() {
+function childQueryOptions(): { fork: boolean; isInternalQuery: boolean } {
   return {
     fork: true,
     isInternalQuery: true,
   };
 }
 
-function cloneExistenceMap(exixtenseMap) {
+function cloneExistenceMap(exixtenseMap: ExistenceMap): ExistenceMap {
   const clone = new Map(exixtenseMap);
 
   for (const modelClass of clone.keys()) {
@@ -179,6 +217,4 @@ function cloneExistenceMap(exixtenseMap) {
   return clone;
 }
 
-module.exports = {
-  GraphNodeDbExistence,
-};
+export { GraphNodeDbExistence };
