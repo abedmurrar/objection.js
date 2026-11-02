@@ -4,6 +4,8 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+## 4.0.0-beta.0 (2026-11-02)
+
 ### Breaking changes
 
 - package.json has an `exports` map, so only the package entry can be imported. Imports of files inside the package, which were never documented, throw `ERR_PACKAGE_PATH_NOT_EXPORTED`
