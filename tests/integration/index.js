@@ -14,7 +14,8 @@ describe('integration tests', () => {
       client: 'sqlite3',
       useNullAsDefault: true,
       connection: {
-        filename: path.join(os.tmpdir(), 'objection_test.db'),
+        // Separate runs at the same time need separate files.
+        filename: process.env.OBJECTION_SQLITE_FILE || path.join(os.tmpdir(), 'objection_test.db'),
       },
       pool: {
         afterCreate: (conn, cb) => {

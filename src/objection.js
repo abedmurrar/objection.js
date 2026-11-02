@@ -37,7 +37,7 @@ const { ref } = require('./queryBuilder/ReferenceBuilder');
 const { val } = require('./queryBuilder/ValueBuilder');
 const { raw } = require('./queryBuilder/RawBuilder');
 const { fn } = require('./queryBuilder/FunctionBuilder');
-const { inherit } = require('../lib/utils/classUtils');
+const { inherit } = require('./utils/classUtils');
 
 // We need to wrap the classes, that people can inherit, with ES5 classes
 // so that babel is able to use ES5 inheritance. sigh... Maybe people

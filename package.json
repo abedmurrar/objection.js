@@ -3,13 +3,34 @@
   "version": "4.0.0-alpha.0",
   "description": "An SQL-friendly ORM for Node.js. A fork of objection.js with strict TypeScript types and MySQL support.",
   "main": "lib/objection.js",
+  "type": "commonjs",
+  "types": "./typings/objection/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./typings/objection/index.d.mts",
+        "default": "./lib/index.mjs"
+      },
+      "require": {
+        "types": "./typings/objection/index.d.ts",
+        "default": "./lib/objection.js"
+      }
+    },
+    "./package.json": "./package.json"
+  },
   "license": "MIT",
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "prepare": "npm run build",
+    "pretest": "npm run build",
     "test": "npm run lint && mocha --slow 10 --timeout 15000 --reporter spec --recursive tests --exclude \"tests/unit/relations/files/**\" && npm run test:typings",
+    "pretest:fast": "npm run build",
     "test:fast": "mocha --slow 10 --timeout 15000 --reporter spec --recursive tests --bail --exclude \"tests/unit/relations/files/**\"",
-    "test:typings": "node scripts/generate-fn-typings.js --check && tsc && tsc -p tests/ts/tsconfig.loose.json && node scripts/typings-errors.js",
+    "test:typings": "npm run build && node scripts/generate-fn-typings.js --check && node scripts/generate-esm-typings.js --check && tsc && tsc -p tests/ts/tsconfig.loose.json && node scripts/typings-errors.js && attw --pack .",
     "bench:typings": "node scripts/typings-bench.js",
+    "prebench": "npm run build",
     "bench": "node bench/run.js",
+    "prebench:compare": "npm run build",
     "bench:compare": "node bench/compare.js",
     "format": "biome check --write",
     "lint": "biome check",
@@ -17,7 +38,8 @@
     "docs:build": "vitepress build doc",
     "docs:preview": "vitepress preview doc",
     "release": "node scripts/release.js",
-    "prepublishOnly": "npm run lint && npm run test:typings"
+    "prepublishOnly": "npm run build && npm run lint && npm run test:typings",
+    "sql-check": "npm run build && node bench/sql-check.js"
   },
   "publishConfig": {
     "access": "public",
@@ -58,11 +80,10 @@
   "files": [
     "README.md",
     "LICENSE",
-    "lib/*",
-    "!lib/**/*.pegjs",
+    "lib/**/*.js",
+    "lib/**/*.mjs",
     "typings/*"
   ],
-  "types": "./typings/objection/index.d.ts",
   "dependencies": {
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",
@@ -72,6 +93,7 @@
     "knex": ">=3.3.0"
   },
   "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.5",
     "@biomejs/biome": "2.6.4",
     "@types/node": "^24.19.2",
     "chai": "^6.3.0",

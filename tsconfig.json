@@ -10,5 +10,5 @@
     "experimentalDecorators": true,
     "types": ["node"]
   },
-  "include": ["tests/ts/**/*.ts"]
+  "include": ["tests/ts/**/*.ts", "tests/ts/**/*.mts"]
 }
