@@ -436,9 +436,10 @@ module.exports = (session) => {
             await BoundModel.query().whereIn(ref('jsonObject:n').castInt(), [12, 13]),
             [1],
           );
-          expectIdsEqual(await BoundModel.query().where(ref('jsonObject:s').castText(), 'Abc'), [
-            1,
-          ]);
+          expectIdsEqual(
+            await BoundModel.query().where(ref('jsonObject:s').castText(), 'Abc'),
+            [1],
+          );
         });
 
         it('should be able to patch fields using $query().patch()', () => {
@@ -1593,9 +1594,10 @@ module.exports = (session) => {
       it('whereJsonHasAny should look in keys, string items and strings', async () => {
         expectIdsEqual(await BoundModel.query().whereJsonHasAny('jsonArray', ['a']), [2]);
         expectIdsEqual(await BoundModel.query().whereJsonHasAny('jsonObject:tags', ['a']), [1, 3]);
-        expectIdsEqual(await BoundModel.query().whereJsonHasAll('jsonObject:tags', ['a', 'b']), [
-          1,
-        ]);
+        expectIdsEqual(
+          await BoundModel.query().whereJsonHasAll('jsonObject:tags', ['a', 'b']),
+          [1],
+        );
         expectIdsEqual(await BoundModel.query().whereJsonHasAny('jsonObject', ['tags']), [1, 2, 3]);
       });
 
@@ -1711,9 +1713,10 @@ module.exports = (session) => {
 
           it('whereJsonHasAny and whereJsonHasAll with the key as a value', async () => {
             expectIdsEqual(await BoundModel.query().whereJsonHasAny('jsonObject', key), [1]);
-            expectIdsEqual(await BoundModel.query().whereJsonHasAll('jsonObject', [key, 'a?b']), [
-              1,
-            ]);
+            expectIdsEqual(
+              await BoundModel.query().whereJsonHasAll('jsonObject', [key, 'a?b']),
+              [1],
+            );
           });
 
           it('patch', async () => {
