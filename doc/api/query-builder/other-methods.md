@@ -826,6 +826,20 @@ Executes the query and calls `catch(errorHandler)` for the returned promise.
 | --------- | ---------------------------------------------------------- |
 | `Promise` | Promise the will be resolved with the result of the query. |
 
+## finally()
+
+```js
+const promise = queryBuilder.finally(callback);
+```
+
+Executes the query and calls `finally(callback)` for the returned promise.
+
+##### Return value
+
+| Type      | Description                                                |
+| --------- | ---------------------------------------------------------- |
+| `Promise` | Promise the will be resolved with the result of the query. |
+
 ## bind()
 
 ```js

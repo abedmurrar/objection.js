@@ -124,6 +124,7 @@ export default defineConfig({
         mysql: 'MySQL',
         expressions: 'Expressions',
         joins: 'Joins and model classes',
+        knex: 'knex methods',
         typescript: 'TypeScript',
         performance: 'Performance',
       }),

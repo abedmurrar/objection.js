@@ -859,6 +859,64 @@ See [knex documentation](https://knexjs.org/guide/query-builder.html#havingraw)
 | ----------------------------------- | ---------------------------------- |
 | [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. |
 
+## andHaving()
+
+The same as [having](/api/query-builder/find-methods.html#having). There are also `andHavingIn()`, `andHavingNotIn()`, `andHavingNull()`, `andHavingNotNull()`, `andHavingExists()`, `andHavingNotExists()`, `andHavingBetween()` and `andHavingNotBetween()`.
+
+##### Return value
+
+| Type                                | Description                        |
+| ----------------------------------- | ---------------------------------- |
+| [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. |
+
+## clearGroup()
+
+Removes the `groupBy` and `groupByRaw` calls of the query.
+
+##### Return value
+
+| Type                                | Description                        |
+| ----------------------------------- | ---------------------------------- |
+| [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. |
+
+## clearHaving()
+
+Removes the `having` calls of the query, including `havingIn`, `orHaving` and the others.
+
+##### Return value
+
+| Type                                | Description                        |
+| ----------------------------------- | ---------------------------------- |
+| [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. |
+
+## comment()
+
+```js
+queryBuilder = queryBuilder.comment('monthly report');
+```
+
+Adds an SQL comment before the query: `/* monthly report */ select ...`. See [knex documentation](https://knexjs.org/guide/query-builder.html#comment)
+
+##### Return value
+
+| Type                                | Description                        |
+| ----------------------------------- | ---------------------------------- |
+| [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. |
+
+## hintComment()
+
+```js
+queryBuilder = queryBuilder.hintComment(['NO_ICP(persons)']);
+```
+
+Adds optimizer hints to the query: `select /*+ NO_ICP(persons) */ ...`. See [knex documentation](https://knexjs.org/guide/query-builder.html#hintcomment)
+
+##### Return value
+
+| Type                                | Description                        |
+| ----------------------------------- | ---------------------------------- |
+| [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. |
+
 ## offset()
 
 See [knex documentation](https://knexjs.org/guide/query-builder.html#offset)

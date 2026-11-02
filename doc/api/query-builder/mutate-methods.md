@@ -492,6 +492,24 @@ await person
 await person.$relatedQuery('pets').delete();
 ```
 
+## using()
+
+```js
+await Person.query()
+  .delete()
+  .using('pets')
+  .where('pets.ownerId', ref('persons.id'))
+  .where('pets.species', 'snake');
+```
+
+postgres only. The tables a delete query can refer to: `delete from "persons" using "pets" where ...`. See [knex documentation](https://knexjs.org/guide/query-builder.html#using)
+
+##### Return value
+
+| Type                                | Description                        |
+| ----------------------------------- | ---------------------------------- |
+| [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. |
+
 ## deleteById()
 
 ```js

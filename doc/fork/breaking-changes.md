@@ -71,9 +71,13 @@ await Notification.query()
 
 If `payload` is `NULL`, it becomes `{ "courseName": "Physics" }`, or an array if the path starts with an index. Before, the column stayed `NULL` on postgres.
 
-## knex 3.1 or newer is required
+## knex 3.3 or newer is required
 
-The fork is only tested with knex 3.
+Older versions of knex compile some queries differently, so the queries objection builds depended on the knex version:
+
+- `delete().limit(n)` on MySQL ignores the limit on knex 3.1 and deletes every matching row. knex 3.3 adds the limit, which only MySQL supports for deletes.
+- `updateFrom()` with a raw query gets its bindings in the wrong order before knex 3.3.
+- knex 3.2 and newer reject a limit on deletes on the databases that don't support it. That includes `page()` and `range()` on a delete query on postgres and SQLite, which used to ignore the limit.
 
 ## Graph operations run one query at a time on MySQL
 
