@@ -71,6 +71,14 @@ await Notification.query()
 
 If `payload` is `NULL`, it becomes `{ "courseName": "Physics" }`, or an array if the path starts with an index. Before, the column stayed `NULL` on postgres.
 
+## Node.js 24 or newer is required
+
+The fork supports the Node.js versions that are still maintained: 24 and 26, the two current LTS lines. Node.js 20 reached its end of life in April 2026 and 22 is close to it.
+
+## MySQL 8.0.17 or newer is required
+
+objection.js 3.1.5 didn't say which MySQL versions it supported. The fork is tested on MySQL 8.4, and its MySQL features (the JSON field expressions, the `whereJson*` methods, `fn.jsonValue()` and the JSON patches) need 8.0.17 or newer. MySQL 5.7 reached its end of life in October 2023 and isn't supported.
+
 ## knex 3.3 or newer is required
 
 Older versions of knex compile some queries differently, so the queries objection builds depended on the knex version:

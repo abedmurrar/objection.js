@@ -6,7 +6,7 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ### Breaking changes
 
-- Node.js 20.19 or newer is required. Node.js 18 reached its end of life, and the tools the fork is tested with (mocha 12, sqlite3 6) no longer support it.
+- Node.js 24 or newer is required, the two LTS lines that are still maintained (24 and 26). Node.js 20 reached its end of life in April 2026.
 - knex 3.3 or newer is required. Older versions compile some queries differently: `delete().limit(n)` on MySQL ignores the limit and deletes every matching row on knex 3.1, and `updateFrom()` with a raw query gets its bindings in the wrong order before knex 3.3. knex 3.2 also rejects queries that combine `delete()` with a limit on databases that don't support it, which includes `page()` and `range()` on deletes on postgres and SQLite.
 
 ### What's new
@@ -14,10 +14,11 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 - Faster queries: objection's own work for a small query takes 13% to 19% less time, `toJSON()` 44% less, validating models 55% less, and a class bound to a transaction with `bindKnex()` no longer creates and compiles a validator of its own (91% less for a validated insert in a new transaction). `withGraphJoined()` parses the joined rows 20% faster and graph inserts and upserts take 12% to 15% less time. The generated SQL and the results are the same. See `bench/README.md` in the repository
 - On MySQL, `withGraphFetched()` and `fetchGraph()` run their queries 4 at a time again, like on the other databases. 4.0.0-alpha.0 ran every query of graph operations one at a time to stop the deadlocks of concurrent `upsertGraph()` updates, which only writes need. A concurrency set on the model still applies to all queries
 - The documentation has a [Fork additions](/fork/) section that covers only what the fork adds to objection.js 3.1.5.
-- MariaDB support, tested on 10.6 and 11.4: objection recognizes knex 3.3's `mariadb` client, or a `version` like `'11.4-MariaDB'` in the knex config with mysql2, and generates SQL that MariaDB accepts for the MySQL features (JSON field expressions, the `whereJson*` methods, `val()` and casts of JSON). The `fn` helpers of functions MariaDB doesn't have throw a clear error. See [MariaDB](/fork/mysql#mariadb)
+- MariaDB support, tested on 10.6 and 11.4: objection recognizes knex 3.3's `mariadb` client, or a `version` like `'11.4.0-MariaDB'` in the knex config with mysql2, and generates SQL that MariaDB accepts for the MySQL features (JSON field expressions, the `whereJson*` methods, `val()` and casts of JSON). The `fn` helpers of functions MariaDB doesn't have throw a clear error. See [MariaDB](/fork/mysql#mariadb)
 - Add the knex methods objection didn't have: `andHaving()` (which was typed but threw), `andHavingIn()`, `andHavingNotIn()`, `andHavingNull()`, `andHavingNotNull()`, `andHavingExists()`, `andHavingNotExists()`, `andHavingBetween()` and `andHavingNotBetween()`, `comment()`, `hintComment()`, `using()` for postgres `delete ... using`, `finally()`, and `or` in join callbacks: `join.on(a, b).or.on(c, d)`
 - Types: `updateFrom()`, `clearGroup()`, `clearHaving()` and `options()`, which worked but weren't typed
 - `clearGroup()` and `clearHaving()` remove the operations, like `clearSelect()` and `clearWhere()`, so `has()` sees them as cleared
+- The tests no longer use bluebird. The native promises and `node:timers/promises` cover what they used it for, and the test of unhandled rejections now sees the rejections of objection's own promises, which bluebird's handler never did
 - No more lodash: the package shipped a copy of lodash's `cloneDeep`, which is replaced by a native clone with the same results, and the tests no longer use lodash. The package is 59 kB smaller, and `toJSON()` of models whose JSON attributes hold class instances, Maps or Sets takes 87% less time
 
 ### Bug fixes

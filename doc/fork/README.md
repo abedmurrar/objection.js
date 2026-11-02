@@ -22,10 +22,10 @@ Until 4.0 is final, releases are prereleases (`4.0.0-alpha.0`, ...) and are publ
 | ---------- | ---------------------------------------------------------------------------------------------------- |
 | knex       | 3.3 or newer                                                                                         |
 | ajv        | 8.20 or newer (comes as a dependency)                                                                |
-| MySQL      | 8.0.17 or newer for the JSON features (tested on 8.4 with the `mysql2` driver)                       |
+| MySQL      | 8.0.17 or newer (tested on 8.4 with the `mysql2` driver). MySQL 5.7 and older aren't supported       |
 | MariaDB    | 10.6 or newer (tested on 10.6 and 11.4 with the `mariadb` driver). See [MariaDB](./mysql.md#mariadb) |
 | SQLite     | 3.35 or newer for batch inserts, 3.25 or newer for window functions                                  |
-| Node.js    | 20.19 or newer (20, 22 and 24 are tested)                                                            |
+| Node.js    | 24 or newer (24 and 26 are tested)                                                                   |
 
 ## What the fork adds
 

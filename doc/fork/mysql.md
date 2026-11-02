@@ -1,6 +1,6 @@
 # MySQL
 
-Objection 3.1.5 treated a lot of features as postgres-only. On MySQL 8.0.17 or newer (tested on 8.4 with `mysql2`), the fork supports them too.
+Objection 3.1.5 treated a lot of features as postgres-only. On MySQL 8.0.17 or newer (tested on 8.4 with `mysql2`), the fork supports them too. MySQL 5.7 and older, which reached their end of life, aren't supported.
 
 ## JSON field expressions
 
@@ -188,8 +188,9 @@ objection recognizes MariaDB in two ways:
 const knex = Knex({
   client: 'mariadb',
   // Optional with the mariadb client. objection uses it for the features
-  // that need a newer MariaDB.
-  version: '11.4-MariaDB',
+  // that need a newer MariaDB. knex needs all three parts of the version:
+  // '11.4-MariaDB' makes it warn and assume the latest version.
+  version: '11.4.0-MariaDB',
   connection: {
     host: '127.0.0.1',
     user: 'app',
