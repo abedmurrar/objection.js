@@ -44,7 +44,7 @@ describe('integration tests', () => {
       name: 'mariadb10',
       client: 'mariadb',
       // The server version, which objection uses for MariaDB's differences.
-      version: '10.6-MariaDB',
+      version: '10.6.0-MariaDB',
       connection: {
         host: '127.0.0.1',
         port: 3307,
@@ -72,7 +72,7 @@ describe('integration tests', () => {
       name: 'mariadb11',
       client: 'mariadb',
       // The server version, which objection uses for MariaDB's differences.
-      version: '11.4-MariaDB',
+      version: '11.4.0-MariaDB',
       connection: {
         host: '127.0.0.1',
         port: 3308,
