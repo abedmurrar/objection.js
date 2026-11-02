@@ -10,6 +10,8 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 - The site and the guide link to this package's repository, examples and issues instead of objection.js's. The links to the v1 and v2 documentation of objection.js are gone.
 - The npm package has a homepage (the documentation site), a longer description and more keywords.
 
+## 4.0.2 (2026-11-02)
+
 ### What's new
 
 - Every link in the README goes to the documentation site, including the badges. The README no longer links to files on GitHub.
