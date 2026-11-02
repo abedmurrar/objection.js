@@ -18,7 +18,7 @@ npm install @abedmurrar/objection@next knex
 - **MySQL and MariaDB as first-class databases**, not only postgres: JSON field expressions, the `whereJson*` methods, batch inserts and an `fn.*` helper for every MySQL 8.4 function. MariaDB 10.6 and 11.4 are tested in CI. See [MySQL and MariaDB](doc/fork/mysql.md).
 - **Expressions without raw SQL**, like `Pet.ref('age').gte(3)`, `fn.count().filter(...)`, `fn.case()` and window functions. See [Expressions](doc/fork/expressions.md).
 - **Safer.** JSON field keys are escaped (in objection.js 3.1.5 they allowed SQL injection), an `orWhere()` can no longer match the rows of other relation owners, and `for()` is no longer silently ignored. See [Breaking changes](doc/fork/breaking-changes.md).
-- **Modern.** Node.js 24+, ES modules and CommonJS from one package, knex 3.3, the knex methods objection didn't have, TypeScript 7, no lodash and no bluebird, and `npm audit` reports nothing. The source is moving to TypeScript.
+- **Modern.** Node.js 24+, ES modules and CommonJS from one package, knex 3.3, the knex methods objection didn't have, no lodash and no bluebird, and `npm audit` reports nothing. The source is written in strict TypeScript and compiled with TypeScript 7.
 
 ## A quick look
 

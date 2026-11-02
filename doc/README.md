@@ -31,7 +31,7 @@ features:
     details: Escaped JSON field keys (an SQL injection in objection.js 3.1.5), orWhere() that can't match other owners' rows, and a for() that is no longer ignored.
     link: /fork/breaking-changes
   - title: Modern
-    details: Node.js 24+, ES modules and CommonJS from one package, knex 3.3, TypeScript 7, no lodash and no bluebird.
+    details: Written in strict TypeScript. Node.js 24+, ES modules and CommonJS from one package, knex 3.3, no lodash and no bluebird.
     link: /fork/
 ---
 

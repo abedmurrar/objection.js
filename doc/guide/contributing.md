@@ -46,7 +46,7 @@ git clone git@github.com:<your-account>/objection.js.git objection
 
 5. **Create test users and databases by running `node setup-test-db` at the root of the repo**
 
-6. **Run `npm test` in objection's root to see if everything works.** The source is in `src/` and is compiled into `lib/` by `npm run build`, which `npm test` runs first. The tests and the package use `lib/`.
+6. **Run `npm test` in objection's root to see if everything works.** The source is TypeScript in `src/` and is compiled into `lib/` by `npm run build` (`tsc -p tsconfig.build.json`), which `npm test` runs first. The tests and the package use `lib/`. The package entry `src/objection.js` stays a small JavaScript file on purpose, so that `require()` returns exactly the same object as before, and the PEG.js parsers in `src/queryBuilder/parsers/` are generated JavaScript.
 
 7. **Run `npm run docs:dev` and go to `http://localhost:5173/objection.js/` to see the generated documentation site when you change the markdown files in the `doc` folder.**
 
