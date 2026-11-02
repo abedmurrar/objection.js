@@ -8,7 +8,6 @@ class ManyToManyDeleteOperationBase extends DeleteOperation {
   declare owner: RelationOwner;
 
   constructor(name: string, opt: RelationOperationOptions<ManyToManyRelation>) {
-    // @ts-expect-error The JavaScript QueryBuilderOperation's `name` is inferred as null.
     super(name, opt);
 
     this.relation = opt.relation;

@@ -18,7 +18,6 @@ class RelationFindOperation extends FindOperation {
   declare alias: string | null;
 
   constructor(name: string, opt: RelationOperationOptions) {
-    // @ts-expect-error The JavaScript QueryBuilderOperation's `name` is inferred as null.
     super(name, opt);
 
     this.relation = opt.relation;

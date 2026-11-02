@@ -20,7 +20,6 @@ class RelationUpdateOperation extends UpdateOperation {
     this.relation.findQuery(builder, this.owner);
   }
 
-  // @ts-expect-error The JavaScript base class's toFindOperation() is inferred to return null.
   toFindOperation(): RelationFindOperation {
     return new RelationFindOperation('find', {
       relation: this.relation,

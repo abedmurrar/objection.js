@@ -8,7 +8,6 @@ class RelationDeleteOperation extends DeleteOperation {
   declare owner: RelationOwner;
 
   constructor(name: string, opt: RelationOperationOptions) {
-    // @ts-expect-error The JavaScript QueryBuilderOperation's `name` is inferred as null.
     super(name, opt);
 
     this.relation = opt.relation;
@@ -20,7 +19,6 @@ class RelationDeleteOperation extends DeleteOperation {
     this.relation.findQuery(builder, this.owner);
   }
 
-  // @ts-expect-error The JavaScript base class's toFindOperation() is inferred to return null.
   toFindOperation(): RelationFindOperation {
     return new RelationFindOperation('find', {
       relation: this.relation,
