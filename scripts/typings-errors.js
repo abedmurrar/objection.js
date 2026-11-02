@@ -6,19 +6,21 @@
 // `// @error: <text>` asserts that the next line produces a diagnostic whose
 // message contains `<text>`. Diagnostics on lines without such a comment are
 // reported as failures, as are expected errors that don't occur.
+//
+// TypeScript 7 has no stable JavaScript API, so this runs `tsc` and reads its
+// diagnostics from the output.
 
 const fs = require('fs');
 const path = require('path');
-const ts = require('typescript');
+const { spawnSync } = require('child_process');
 
 const rootDir = path.join(__dirname, '..');
 const testDir = path.join(rootDir, 'tests', 'ts-errors');
+const tsc = path.join(rootDir, 'node_modules', '.bin', 'tsc');
 
-function readCompilerOptions() {
-  const configPath = path.join(rootDir, 'tsconfig.json');
-  const { config } = ts.readConfigFile(configPath, ts.sys.readFile);
-  return ts.parseJsonConfigFileContent(config, ts.sys, rootDir).options;
-}
+// `file(line,col): error TS1234: message`, followed by indented lines that
+// elaborate on the message.
+const DIAGNOSTIC = /^(.+?)\((\d+),(\d+)\): error TS\d+: (.*)$/;
 
 function collectExpectations(fileName) {
   const lines = fs.readFileSync(fileName, 'utf8').split('\n');
@@ -28,11 +30,44 @@ function collectExpectations(fileName) {
     const match = line.match(/\/\/\s*@error:\s*(.+?)\s*$/);
 
     if (match) {
-      expectations.push({ line: i + 1, text: match[1], found: false });
+      // The error is expected on the line after the comment (1-based).
+      expectations.push({ line: i + 2, text: match[1], found: false });
     }
   });
 
   return expectations;
+}
+
+function readDiagnostics() {
+  const result = spawnSync(
+    tsc,
+    ['-p', path.join(testDir, 'tsconfig.json'), '--pretty', 'false', '--noErrorTruncation'],
+    { cwd: rootDir, encoding: 'utf8' },
+  );
+
+  if (result.error) {
+    throw result.error;
+  }
+
+  const diagnostics = [];
+
+  for (const line of result.stdout.split('\n')) {
+    const match = line.match(DIAGNOSTIC);
+
+    if (match) {
+      diagnostics.push({
+        file: path.resolve(rootDir, match[1]),
+        line: Number(match[2]),
+        message: match[4],
+      });
+    } else if (diagnostics.length && /^\s+\S/.test(line)) {
+      diagnostics[diagnostics.length - 1].message += '\n' + line.trim();
+    } else if (line.trim()) {
+      throw new Error(`unexpected output from tsc: ${line}`);
+    }
+  }
+
+  return diagnostics;
 }
 
 function main() {
@@ -41,26 +76,27 @@ function main() {
     .filter((it) => it.endsWith('.ts'))
     .map((it) => path.join(testDir, it));
 
-  const program = ts.createProgram(fileNames, readCompilerOptions());
+  const diagnostics = readDiagnostics();
   const failures = [];
   let checked = 0;
 
+  for (const diagnostic of diagnostics) {
+    if (!fileNames.includes(diagnostic.file)) {
+      failures.push(`${path.relative(rootDir, diagnostic.file)}: unexpected error:\n  ${diagnostic.message}`);
+    }
+  }
+
   for (const fileName of fileNames) {
-    const sourceFile = program.getSourceFile(fileName);
     const expectations = collectExpectations(fileName);
-    const diagnostics = ts.getPreEmitDiagnostics(program, sourceFile);
     const relativeName = path.relative(rootDir, fileName);
 
-    for (const diagnostic of diagnostics) {
-      const { line } = sourceFile.getLineAndCharacterOfPosition(diagnostic.start);
-      const message = ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n');
-      // The comment is on the line before the error (lines are 0-based here).
-      const expectation = expectations.find((it) => it.line === line);
+    for (const diagnostic of diagnostics.filter((it) => it.file === fileName)) {
+      const expectation = expectations.find((it) => it.line === diagnostic.line);
 
-      if (expectation && message.includes(expectation.text)) {
+      if (expectation && diagnostic.message.includes(expectation.text)) {
         expectation.found = true;
       } else if (!expectation || !expectation.found) {
-        failures.push(`${relativeName}:${line + 1}: unexpected error:\n  ${message}`);
+        failures.push(`${relativeName}:${diagnostic.line}: unexpected error:\n  ${diagnostic.message}`);
       }
     }
 
@@ -69,7 +105,7 @@ function main() {
 
       if (!expectation.found) {
         failures.push(
-          `${relativeName}:${expectation.line + 1}: expected an error containing "${expectation.text}"`,
+          `${relativeName}:${expectation.line}: expected an error containing "${expectation.text}"`,
         );
       }
     }

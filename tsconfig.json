@@ -1,15 +1,13 @@
 {
   "compilerOptions": {
-    "allowJs": false,
-    "experimentalDecorators": true,
-    "module": "commonjs",
-    "moduleResolution": "node",
-    "noEmit": true,
-    "noImplicitReturns": true,
-    "noImplicitUseStrict": false,
-    "noImplicitAny": true,
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "target": "es2022",
     "strict": true,
-    "target": "es6",
+    "noImplicitAny": true,
+    "noImplicitReturns": true,
+    "noEmit": true,
+    "experimentalDecorators": true,
     "types": ["node"]
   },
   "include": ["tests/ts/**/*.ts"]

@@ -7,7 +7,7 @@ class Person extends Model {
   address?: { street: string };
 }
 
-// @error: Argument of type '"middleName"' is not assignable to parameter of type '"*" | "firstName" | "lastName" | "address" |
+// @error: Argument of type '"middleName"' is not assignable to parameter of type '"*" |
 Person.ref('middleName');
 
 // @error: Argument of type '"address:zip"' is not assignable to parameter of type

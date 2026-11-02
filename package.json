@@ -8,7 +8,6 @@
     "test": "npm run eslint && mocha --slow 10 --timeout 15000 --reporter spec --recursive tests --exclude \"tests/unit/relations/files/**\" && npm run test:typings",
     "test:fast": "mocha --slow 10 --timeout 15000 --reporter spec --recursive tests --bail --exclude \"tests/unit/relations/files/**\"",
     "test:typings": "node scripts/generate-fn-typings.js --check && tsc && tsc -p tests/ts/tsconfig.loose.json && node scripts/typings-errors.js",
-    "test:typings:ts7": "npx -y -p typescript@7 tsc -p tests/ts/tsconfig.ts7.json",
     "bench:typings": "node scripts/typings-bench.js",
     "bench": "node bench/run.js",
     "bench:compare": "node bench/compare.js",
@@ -74,7 +73,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.19.2",
-    "chai": "^4.3.10",
+    "chai": "^6.3.0",
     "chai-subset": "^1.6.0",
     "eslint": "^10.14.0",
     "eslint-formatter-codeframe": "^7.32.1",
@@ -86,9 +85,9 @@
     "mocha": "^12.0.3",
     "mysql2": "^3.24.6",
     "pg": "^8.15.6",
-    "prettier": "3.5.3",
+    "prettier": "^3.9.10",
     "sqlite3": "^6.0.1",
-    "typescript": "~5.8.3",
+    "typescript": "^7.0.2",
     "vitepress": "2.0.0-alpha.21"
   },
   "overrides": {

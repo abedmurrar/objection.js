@@ -1,0 +1,6 @@
+{
+  // Type checked by scripts/typings-errors.js, which expects the errors
+  // marked with `// @error:` comments.
+  "extends": "../../tsconfig.json",
+  "include": ["./*.ts"]
+}
