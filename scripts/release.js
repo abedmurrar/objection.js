@@ -68,7 +68,7 @@ function main() {
 
   console.log('Checking lint, types and unit tests. The integration tests run in CI.');
   const checks = [
-    ['npm', ['run', 'eslint']],
+    ['npm', ['run', 'lint']],
     ['npm', ['run', 'test:typings']],
     ['npx', ['mocha', '--recursive', 'tests/unit', '--exclude', 'tests/unit/relations/files/**']],
   ];

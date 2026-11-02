@@ -4,7 +4,7 @@ Releases are published to npm by GitHub Actions when a version tag is pushed. No
 
 ## Versions
 
-The package follows [semver](https://semver.org). Until 4.0 is done, releases are prereleases: `4.0.0-alpha.0`, `4.0.0-alpha.1`, ... and then `4.0.0-beta.0` or `4.0.0`.
+The package follows [semver](https://semver.org). Until 4.0 is done, releases are prereleases. `4.0.0-alpha.0` was the first; the next release is `4.0.0-beta.0` (`npm run release -- 4.0.0-beta.0`), and later betas use `npm run release -- prerelease`, which keeps the `beta` id. Then comes `4.0.0`.
 
 | Version                      | npm dist-tag | Install with                             |
 | ---------------------------- | ------------ | ---------------------------------------- |
