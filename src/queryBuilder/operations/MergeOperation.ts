@@ -7,7 +7,7 @@ class MergeOperation extends QueryBuilderOperation {
   declare model: Model | null;
   declare args: unknown[] | null;
 
-  constructor(name: string | null, opt: OperationOptions) {
+  constructor(name: string | null, opt?: OperationOptions) {
     super(name, opt);
     this.model = null;
     this.args = null;

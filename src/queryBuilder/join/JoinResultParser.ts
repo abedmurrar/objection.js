@@ -13,12 +13,12 @@ interface ModelEntry {
 
 interface JoinResultParserArgs {
   tableTree: TableTree;
-  omitColumnAliases?: (string | null)[];
+  omitColumnAliases?: (string | null | undefined)[];
 }
 
 class JoinResultParser {
   declare tableTree: TableTree;
-  declare omitColumnAliases: Set<string | null>;
+  declare omitColumnAliases: Set<string | null | undefined>;
   declare columnsByTableNode: Map<TableNode, JoinResultColumn[]> | null;
   declare rootModelsById: Map<string, ModelEntry> | null;
   declare rootModels: JoinModel[] | null;

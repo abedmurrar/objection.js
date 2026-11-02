@@ -5,7 +5,7 @@ import type { OperationOptions, QueryBuilder } from './types';
 class FindByIdOperation extends QueryBuilderOperation {
   declare id: unknown;
 
-  constructor(name: string | null, opt: OperationOptions) {
+  constructor(name: string | null, opt?: OperationOptions) {
     super(name, opt);
     this.id = this.opt.id;
   }

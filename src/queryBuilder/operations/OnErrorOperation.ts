@@ -6,7 +6,7 @@ type OnErrorFunction = (this: QueryBuilder, error: unknown, builder: QueryBuilde
 class OnErrorOperation extends QueryBuilderOperation {
   declare func: OnErrorFunction | null;
 
-  constructor(name: string | null, opt: OperationOptions) {
+  constructor(name: string | null, opt?: OperationOptions) {
     super(name, opt);
     this.func = null;
   }

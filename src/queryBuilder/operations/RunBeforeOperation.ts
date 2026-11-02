@@ -6,7 +6,7 @@ type RunBeforeFunction = (this: QueryBuilder, result: unknown, builder: QueryBui
 class RunBeforeOperation extends QueryBuilderOperation {
   declare func: RunBeforeFunction | null;
 
-  constructor(name: string | null, opt: OperationOptions) {
+  constructor(name: string | null, opt?: OperationOptions) {
     super(name, opt);
     this.func = null;
   }

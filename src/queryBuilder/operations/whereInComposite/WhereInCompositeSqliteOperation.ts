@@ -11,7 +11,7 @@ interface WhereArgs {
 class WhereInCompositeSqliteOperation extends ObjectionToKnexConvertingOperation {
   declare prefix: string | null;
 
-  constructor(name: string | null, opt: OperationOptions) {
+  constructor(name: string | null, opt?: OperationOptions) {
     super(name, opt);
     this.prefix = this.opt.prefix || null;
   }

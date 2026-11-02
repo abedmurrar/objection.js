@@ -21,7 +21,7 @@ class UpdateOperation extends QueryBuilderOperation {
   declare model: Model;
   declare modelOptions: ModelOptions;
 
-  constructor(name: string | null, opt: OperationOptions) {
+  constructor(name: string | null, opt?: OperationOptions) {
     super(name, opt);
 
     this.model = null!;

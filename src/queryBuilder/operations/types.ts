@@ -1,13 +1,14 @@
 // Internal types for the query builder operations.
 //
-// The query builder and the model classes are still JavaScript, so these
-// interfaces only describe the parts of them that the operations use. The
+// The model classes are still JavaScript, so these interfaces only describe
+// the parts of them that the operations use. The query builder and the
 // relations are TypeScript, and their types are used here. The public types
 // are the hand-written ones in `typings/`.
 
 import type { Knex } from 'knex';
 import type { QueryBuilderOperation } from './QueryBuilderOperation';
 import type { Relation, RelationModel, RelationModelClass } from '../../relations/Relation';
+import type { QueryBuilder } from '../QueryBuilder';
 
 export type { Relation };
 
@@ -116,46 +117,6 @@ export interface QueryBuilderClass {
   forClass(modelClass: ModelClass): QueryBuilder;
 }
 
-// An objection query builder (or join builder). Awaiting one executes it, and
-// the result depends on the query, hence `PromiseLike<any>`.
-export interface QueryBuilder extends PromiseLike<any> {
-  constructor: QueryBuilderClass;
-  modelClass(): ModelClass;
-  resultModelClass(): ModelClass;
-  knex(): KnexInstance;
-  unsafeKnex(): KnexInstance | null;
-  context(): unknown;
-  internalOptions(): InternalOptions;
-  findOptions(): FindOptions;
-  findOptions(opt: FindOptions): this;
-  modifiers(): Modifiers;
-  modifiers(modifiers: Modifiers): this;
-  isFind(): boolean;
-  has(selector: string | RegExp | OperationClass): boolean;
-  hasSelectionAs(selection: string, alias: string): boolean;
-  tableRef(): string;
-  tableRefFor(modelClass: RelationModelClass): string;
-  tableName(tableName: string): this;
-  aliasFor(tableName: string, alias: string): this;
-  fullIdColumn(): string | string[];
-  isPartial(isPartial: boolean): this;
-  subqueryOf(builder: QueryBuilder): this;
-  childQueryOf(builder: QueryBuilder): this;
-  toKnexQuery(knexBuilder?: KnexBuilder): KnexBuilder;
-  clone(): this;
-  emptyInstance(): this;
-  resolve(value: unknown): this;
-  addOperation(operation: QueryBuilderOperation, args: unknown[]): this;
-  castTo(modelClass: ModelClass): this;
-  modify(modifier: (builder: this) => void): this;
-  resultSize(): Promise<number>;
-  limit(limit: number): this;
-  offset(offset: number): this;
-  select(...selections: unknown[]): this;
-  where(...args: unknown[]): this;
-  findById(id: unknown): this;
-  findByIds(ids: unknown): this;
-  whereComposite(columns: unknown, values: unknown): this;
-  whereInComposite(columns: unknown, values: unknown): this;
-  withGraphFetched(expression: unknown, options?: GraphOptions): this;
-}
+// The objection query builder. Operations added by a `JoinBuilder` get the join
+// builder instead, but only through the builder's dynamic hook calls.
+export type { QueryBuilder };

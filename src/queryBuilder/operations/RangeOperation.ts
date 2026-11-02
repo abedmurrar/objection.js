@@ -4,7 +4,7 @@ import type { OperationOptions, QueryBuilder } from './types';
 class RangeOperation extends QueryBuilderOperation {
   declare resultSizeBuilder: QueryBuilder | null;
 
-  constructor(name: string | null, opt: OperationOptions) {
+  constructor(name: string | null, opt?: OperationOptions) {
     super(name, opt);
     this.resultSizeBuilder = null;
   }

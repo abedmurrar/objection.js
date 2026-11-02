@@ -3,6 +3,7 @@ import { isPlainObject, isObject, isFunction, once } from '../../utils/objectUti
 import { isKnexQueryBuilder, isKnexJoinBuilder } from '../../utils/knexUtils';
 import { transformation } from '../transformations';
 import { isModelClass } from '../../utils/resolveModel';
+import type { QueryBuilderBase } from '../QueryBuilderBase';
 import type {
   KnexBuilder,
   ModelClass,
@@ -20,10 +21,7 @@ interface ToKnexRaw {
 }
 
 // An objection query builder base, like a `QueryBuilder` or a `JoinBuilder`.
-interface ObjectionQueryBuilderBase {
-  isObjectionQueryBuilderBase: true;
-  subqueryOf(builder: QueryBuilder): { toKnexQuery(): KnexBuilder };
-}
+type ObjectionQueryBuilderBase = QueryBuilderBase;
 
 // A function passed as an argument, like a `where` callback. It may return a
 // value or nothing (`unknown` doesn't allow a function to return nothing on

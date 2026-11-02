@@ -18,7 +18,7 @@ class FromOperation extends ObjectionToKnexConvertingOperation {
   declare table: string | null;
   declare alias: string | null;
 
-  constructor(name: string | null, opt: OperationOptions) {
+  constructor(name: string | null, opt?: OperationOptions) {
     super(name, opt);
 
     this.table = null;

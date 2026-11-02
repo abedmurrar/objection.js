@@ -22,7 +22,7 @@ class InsertOperation extends QueryBuilderOperation {
   declare modelOptions: ModelOptions;
   declare autoIncrementIncrement: number | null;
 
-  constructor(name: string | null, opt: OperationOptions) {
+  constructor(name: string | null, opt?: OperationOptions) {
     super(name, opt);
 
     this.models = null!;

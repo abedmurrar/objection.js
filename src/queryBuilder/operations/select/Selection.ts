@@ -20,10 +20,11 @@ interface RawLike {
 class Selection {
   declare table: string | null;
   declare column: string | null;
-  declare alias: string | null;
+  // Undefined when a selection is created without an alias: `new Selection(table, '*')`.
+  declare alias: string | null | undefined;
   declare readonly isObjectionSelection: true;
 
-  constructor(table: string | null, column: string | null, alias: string | null) {
+  constructor(table: string | null, column: string | null, alias?: string | null) {
     this.table = table;
     this.column = column;
     this.alias = alias;

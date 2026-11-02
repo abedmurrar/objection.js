@@ -10,7 +10,7 @@ type OnBuildKnexFunction = (
 class OnBuildKnexOperation extends QueryBuilderOperation {
   declare func: OnBuildKnexFunction | null;
 
-  constructor(name: string | null, opt: OperationOptions) {
+  constructor(name: string | null, opt?: OperationOptions) {
     super(name, opt);
     this.func = null;
   }

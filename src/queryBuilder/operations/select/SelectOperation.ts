@@ -8,7 +8,7 @@ const COUNT_REGEX = /count/i;
 class SelectOperation extends ObjectionToKnexConvertingOperation {
   declare selections: Selection[];
 
-  constructor(name: string | null, opt: OperationOptions) {
+  constructor(name: string | null, opt?: OperationOptions) {
     super(name, opt);
     this.selections = [];
   }
