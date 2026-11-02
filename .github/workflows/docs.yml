@@ -24,6 +24,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          # The full history, for the last updated date of each page.
+          fetch-depth: 0
 
       - uses: actions/setup-node@v7
         with:

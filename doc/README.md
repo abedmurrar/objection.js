@@ -1,5 +1,7 @@
 ---
 layout: home
+title: '@abedmurrar/objection: the TypeScript SQL ORM for Node.js, built on knex'
+titleTemplate: false
 hero:
   name: '@abedmurrar/objection'
   text: The SQL ORM for Node.js that knows what your queries return
@@ -37,7 +39,7 @@ features:
 
 `@abedmurrar/objection` is an [ORM](https://en.wikipedia.org/wiki/Object-relational_mapping) for [Node.js](https://nodejs.org/), or more precisely **a relational query builder**: you get everything an SQL query builder gives you, plus models, relations, eager loading, graph inserts and upserts, transactions and validation. It's built on [knex](https://knexjs.org), so every database knex supports works. Postgres, MySQL, MariaDB and SQLite are tested in CI.
 
-It started as a fork of [objection.js](https://github.com/Vincit/objection.js) 3.1.5 by Sami Koskimäki and its contributors, and keeps its API. The [guide](/guide/) and the [API reference](/api/objection/) of this site come from objection.js and apply as they are; the [fork section](/fork/) covers what this package adds and changes.
+It started as a fork of objection.js 3.1.5 by Sami Koskimäki and its contributors, and keeps its API. The [guide](/guide/) and the [API reference](/api/objection/) of this site come from objection.js and apply as they are; the [fork section](/fork/) covers what this package adds and changes.
 
 ```sh
 npm install @abedmurrar/objection knex
@@ -61,5 +63,3 @@ What you don't get:
 - **A database schema generated from the models.** That gets in the way as soon as things aren't trivial, so the schema is left to you. knex has a great [migration tool](https://knexjs.org/guide/migrations.html) for this job.
 
 The best way to get started is the [example project](https://github.com/abedmurrar/objection.js/tree/main/examples/koa). There's also a [TypeScript version](https://github.com/abedmurrar/objection.js/tree/main/examples/koa-ts).
-
-Check out [this issue](https://github.com/Vincit/objection.js/issues/1069) to see who is using objection and what they think about it.

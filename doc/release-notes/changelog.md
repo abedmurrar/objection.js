@@ -6,6 +6,12 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ### What's new
 
+- The documentation site has a sitemap, canonical URLs, a description and Open Graph and Twitter tags on every page, structured data on the home page, a social card image, a favicon and the date each page last changed. The pages are served without `.html`.
+- The site and the guide link to this package's repository, examples and issues instead of objection.js's. The links to the v1 and v2 documentation of objection.js are gone.
+- The npm package has a homepage (the documentation site), a longer description and more keywords.
+
+### What's new
+
 - Every link in the README goes to the documentation site, including the badges. The README no longer links to files on GitHub.
 
 ## 4.0.1 (2026-11-02)
