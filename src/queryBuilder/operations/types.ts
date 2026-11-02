@@ -96,6 +96,8 @@ export interface ModelClass extends RelationModelClass {
   query(): QueryBuilder;
   getIdColumnArray(): string[];
   getIdPropertyArray(): string[];
+  getRelationNames(): string[];
+  getRelationUnsafe(name: string | null): Relation | null;
   getRelation(name: string): Relation;
   ensureModel(json: unknown, modelOptions: ModelOptions): Model | null;
   ensureModelArray(json: unknown, modelOptions: ModelOptions): Model[];

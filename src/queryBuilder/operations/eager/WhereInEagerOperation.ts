@@ -20,10 +20,11 @@ import type { RelationFindOperation } from '../../../relations/RelationFindOpera
 
 // A `RelationExpression`, which is still JavaScript.
 interface ChildExpression {
-  node: { $name: string; $modify: string[] };
+  node: { $name: string | null; $modify: string[] };
   forEachChildExpression(
     modelClass: ModelClass,
-    cb: (childExpression: ChildExpression, relation: Relation) => void,
+    // `relation` is only null for a recursive relation that doesn't exist.
+    cb: (childExpression: ChildExpression, relation: Relation | null) => void,
   ): void;
 }
 
@@ -160,7 +161,7 @@ class WhereInEagerOperation extends EagerOperation {
 
     findOperation.alwaysReturnArray = true;
     findOperation.assignResultToOwner = true;
-    findOperation.relationProperty = expr.node.$name;
+    findOperation.relationProperty = expr.node.$name!;
 
     queryBuilder.addOperation(findOperation, []);
 
@@ -195,7 +196,7 @@ class WhereInEagerOperation extends EagerOperation {
       return false;
     }
 
-    if (models.some((it) => it[expr.node.$name] === undefined)) {
+    if (models.some((it) => it[expr.node.$name!] === undefined)) {
       return false;
     }
 
@@ -271,7 +272,7 @@ function findRelationsToFetch(
       relationsToFetch.push({
         childExpression,
         relation,
-      });
+      } as RelationToFetch);
     });
   } catch (err) {
     if (err instanceof RelationDoesNotExistError) {
@@ -320,7 +321,7 @@ function getRelatedModels(models: Model[], expr: ChildExpression): Model[] {
   const allRelated: Model[] = [];
 
   for (const model of models) {
-    const related = model[expr.node.$name] as Model | Model[] | undefined;
+    const related = model[expr.node.$name!] as Model | Model[] | undefined;
 
     if (related) {
       if (Array.isArray(related)) {

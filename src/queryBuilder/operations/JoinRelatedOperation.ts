@@ -18,8 +18,8 @@ interface JoinRelatedCall {
 // A node of a relation expression as a plain object (`toPojo()`). The child
 // expressions are under their names.
 interface RelationExpressionPojo {
-  $name: string;
-  $relation: string;
+  $name: string | null;
+  $relation: string | null;
   $childNames: string[];
   [childName: string]: unknown;
 }
@@ -87,7 +87,7 @@ function applyAlias(
   const childNames = expr.$childNames;
   const childName = childNames[0];
   const childExpr = expr[childName] as RelationExpressionPojo;
-  const relation = modelClass.getRelation(childExpr.$relation);
+  const relation = modelClass.getRelation(childExpr.$relation!);
 
   let alias = childName;
 
@@ -109,8 +109,8 @@ function applyAliases(
 ): void {
   for (const childName of expr.$childNames) {
     const childExpr = expr[childName] as RelationExpressionPojo;
-    const relation = modelClass.getRelation(childExpr.$relation);
-    const alias = (options.aliases as Record<string, string>)[childExpr.$relation];
+    const relation = modelClass.getRelation(childExpr.$relation!);
+    const alias = (options.aliases as Record<string, string>)[childExpr.$relation!];
 
     if (alias && alias !== childName) {
       renameRelationExpressionNode(expr, childName, alias);

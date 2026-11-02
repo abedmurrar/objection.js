@@ -37,7 +37,7 @@ type ArgumentFunction = (this: unknown, ...args: unknown[]) => ArgumentFunctionR
 class ObjectionToKnexConvertingOperation extends QueryBuilderOperation {
   declare args: unknown[] | null;
 
-  constructor(name: string | null, opt: OperationOptions) {
+  constructor(name: string | null, opt?: OperationOptions) {
     super(name, opt);
     this.args = null;
   }

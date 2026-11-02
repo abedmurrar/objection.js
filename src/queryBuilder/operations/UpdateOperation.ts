@@ -74,8 +74,8 @@ class UpdateOperation extends QueryBuilderOperation {
 
 // An item of the `access` path of a parsed field expression.
 interface JsonAccess {
-  type: 'array' | 'object';
-  ref: string | number;
+  readonly type: 'array' | 'object';
+  readonly ref: string | number;
 }
 
 async function callBeforeUpdate(
@@ -155,7 +155,7 @@ function convertFieldExpressionsToRaw(
       // `col` : raw("JSON_SET(COALESCE(`col`, JSON_OBJECT()), '$.\"attr\"', JSON_EXTRACT(`other`, '$.\"lol\"'))")
       // on mysql. A NULL column is treated as an empty object (or array).
 
-      const parsed: { column: string; parsedExpr: { access: JsonAccess[] } } = ref(key);
+      const parsed: { column: string; parsedExpr: { access: readonly JsonAccess[] } } = ref(key);
       const access = parsed.parsedExpr.access;
       const isSqlValue = isKnexQueryBuilder(val) || isKnexRaw(val);
       // When the column is set by an earlier key, that expression is used instead.
