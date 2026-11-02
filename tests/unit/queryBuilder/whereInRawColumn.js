@@ -1,6 +1,6 @@
 const Knex = require('knex');
 const expect = require('expect.js');
-const { Model, ref, fn } = require('../../../');
+const { Model, ref, fn, raw } = require('../../../');
 
 describe('whereIn with a raw column', () => {
   class Person extends Model {
@@ -43,6 +43,24 @@ describe('whereIn with a raw column', () => {
       ),
     ).to.eql({
       sql: 'select "persons".* from "persons" inner join "pets" on "pets"."ownerId" = "persons"."id" and f($1) in ($2)',
+      bindings: ['x', 1],
+    });
+  });
+
+  it('should keep the parentheses of raw values', () => {
+    expect(
+      sql(
+        Person.query(pg).join('pets', (join) =>
+          join.on('pets.ownerId', 'persons.id').andOnIn(fn('f', 'x'), raw('select ?', [1])),
+        ),
+      ),
+    ).to.eql({
+      sql: 'select "persons".* from "persons" inner join "pets" on "pets"."ownerId" = "persons"."id" and f($1) in (select $2)',
+      bindings: ['x', 1],
+    });
+
+    expect(sql(Person.query(pg).whereIn(fn('f', 'x'), raw('select ?', [1])))).to.eql({
+      sql: 'select "persons".* from "persons" where f($1) in (select $2)',
       bindings: ['x', 1],
     });
   });
