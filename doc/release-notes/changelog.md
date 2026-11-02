@@ -4,6 +4,10 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+### What's new
+
+- The relations guide no longer recommends `RelationsOf` for models whose relations lead back to them, which fails with a circularity error. It recommends `ModelInstance` instead.
+
 ## 4.0.0-beta.4 (2026-11-02)
 
 ### What's new
