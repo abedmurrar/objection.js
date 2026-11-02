@@ -47,7 +47,7 @@ class GraphUpsert {
     const modelClass = builder.modelClass();
     const graphOptions = new GraphOptions(this.upsertOpt);
 
-    const graph = ModelGraph.create(modelClass, this.objects);
+    const graph = ModelGraph.create(modelClass, this.objects) as Graph;
     assignDbRefsAsRelateProps(graph);
 
     return createGraphData(builder, graphOptions, graph)
@@ -99,7 +99,7 @@ function fetchCurrentGraph(
   graph: Graph,
 ): Promise<Graph> {
   if (graphOptions.isInsertOnly()) {
-    return Promise.resolve(ModelGraph.createEmpty());
+    return Promise.resolve(ModelGraph.createEmpty() as Graph);
   } else {
     return GraphFetcher.fetchCurrentGraph({ builder, graph, graphOptions });
   }

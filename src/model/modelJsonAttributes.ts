@@ -1,8 +1,7 @@
-'use strict';
+import { asArray, flatten, isString } from '../utils/objectUtils';
+import type { JsonSchema, ModelClass, ModelJson } from './Model';
 
-const { asArray, isObject, flatten, isString } = require('../utils/objectUtils');
-
-function parseJsonAttributes(json, modelClass) {
+function parseJsonAttributes(json: ModelJson, modelClass: ModelClass): ModelJson {
   const jsonAttr = modelClass.getJsonAttributes();
 
   if (jsonAttr.length) {
@@ -13,7 +12,7 @@ function parseJsonAttributes(json, modelClass) {
       const value = json[attr];
 
       if (isString(value)) {
-        const parsed = tryParseJson(value);
+        const parsed = tryParseJson(value as string);
 
         // tryParseJson returns undefined if parsing failed.
         if (parsed !== undefined) {
@@ -26,7 +25,7 @@ function parseJsonAttributes(json, modelClass) {
   return json;
 }
 
-function formatJsonAttributes(json, modelClass) {
+function formatJsonAttributes(json: ModelJson, modelClass: ModelClass): ModelJson {
   const jsonAttr = modelClass.getJsonAttributes();
 
   if (jsonAttr.length) {
@@ -44,7 +43,7 @@ function formatJsonAttributes(json, modelClass) {
   return json;
 }
 
-function getJsonAttributes(modelClass) {
+function getJsonAttributes(modelClass: ModelClass): string[] {
   let jsonAttributes = modelClass.jsonAttributes;
 
   if (Array.isArray(jsonAttributes)) {
@@ -54,18 +53,18 @@ function getJsonAttributes(modelClass) {
   jsonAttributes = [];
 
   if (modelClass.getJsonSchema()) {
-    const props = modelClass.getJsonSchema().properties || {};
+    const props: Record<string, JsonSchema> = modelClass.getJsonSchema()!.properties || {};
 
     for (const propName of Object.keys(props)) {
       const prop = props[propName];
-      let types = asArray(prop.type).filter((it) => !!it);
+      let types: unknown[] = asArray(prop.type).filter((it: unknown) => !!it);
 
       if (types.length === 0 && Array.isArray(prop.anyOf)) {
-        types = flatten(prop.anyOf.map((it) => it.type));
+        types = flatten(prop.anyOf.map((it: JsonSchema) => it.type));
       }
 
       if (types.length === 0 && Array.isArray(prop.oneOf)) {
-        types = flatten(prop.oneOf.map((it) => it.type));
+        types = flatten(prop.oneOf.map((it: JsonSchema) => it.type));
       }
 
       if (types.indexOf('object') !== -1 || types.indexOf('array') !== -1) {
@@ -77,7 +76,7 @@ function getJsonAttributes(modelClass) {
   return jsonAttributes;
 }
 
-function tryParseJson(maybeJsonStr) {
+function tryParseJson(maybeJsonStr: string): unknown {
   try {
     return JSON.parse(maybeJsonStr);
   } catch (err) {
@@ -85,8 +84,4 @@ function tryParseJson(maybeJsonStr) {
   }
 }
 
-module.exports = {
-  parseJsonAttributes,
-  formatJsonAttributes,
-  getJsonAttributes,
-};
+export { parseJsonAttributes, formatJsonAttributes, getJsonAttributes };

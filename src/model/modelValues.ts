@@ -1,12 +1,11 @@
-'use strict';
-
-const { isObject } = require('../utils/objectUtils');
+import { isObject } from '../utils/objectUtils';
+import type { Model } from './Model';
 
 // Property keys needs to be prefixed with a non-numeric character so that
 // they are not considered indexes when used as object keys.
 const PROP_KEY_PREFIX = 'k_';
 
-function values(model, args) {
+function values(model: Model, args: readonly string[]): unknown[] {
   switch (args.length) {
     case 1:
       return values1(model, args);
@@ -19,7 +18,7 @@ function values(model, args) {
   }
 }
 
-function propKey(model, props) {
+function propKey(model: Model, props: readonly string[]): string {
   switch (props.length) {
     case 1:
       return propKey1(model, props);
@@ -32,7 +31,7 @@ function propKey(model, props) {
   }
 }
 
-function hasProps(model, props) {
+function hasProps(model: Model, props: readonly string[]): boolean {
   for (let i = 0; i < props.length; ++i) {
     const value = model[props[i]];
 
@@ -44,19 +43,19 @@ function hasProps(model, props) {
   return true;
 }
 
-function values1(model, args) {
+function values1(model: Model, args: readonly string[]): unknown[] {
   return [model[args[0]]];
 }
 
-function values2(model, args) {
+function values2(model: Model, args: readonly string[]): unknown[] {
   return [model[args[0]], model[args[1]]];
 }
 
-function values3(model, args) {
+function values3(model: Model, args: readonly string[]): unknown[] {
   return [model[args[0]], model[args[1]], model[args[2]]];
 }
 
-function valuesN(model, args) {
+function valuesN(model: Model, args: readonly string[]): unknown[] {
   const ret = new Array(args.length);
 
   for (let i = 0, l = args.length; i < l; ++i) {
@@ -66,15 +65,15 @@ function valuesN(model, args) {
   return ret;
 }
 
-function propKey1(model, props) {
+function propKey1(model: Model, props: readonly string[]): string {
   return PROP_KEY_PREFIX + propToStr(model[props[0]]);
 }
 
-function propKey2(model, props) {
+function propKey2(model: Model, props: readonly string[]): string {
   return PROP_KEY_PREFIX + propToStr(model[props[0]]) + ',' + propToStr(model[props[1]]);
 }
 
-function propKey3(model, props) {
+function propKey3(model: Model, props: readonly string[]): string {
   return (
     PROP_KEY_PREFIX +
     propToStr(model[props[0]]) +
@@ -85,7 +84,7 @@ function propKey3(model, props) {
   );
 }
 
-function propKeyN(model, props) {
+function propKeyN(model: Model, props: readonly string[]): string {
   let key = PROP_KEY_PREFIX;
 
   for (let i = 0, l = props.length; i < l; ++i) {
@@ -99,12 +98,12 @@ function propKeyN(model, props) {
   return key;
 }
 
-function propToStr(value) {
+function propToStr(value: unknown): string {
   // Ids are almost always numbers or strings.
   const type = typeof value;
 
   if (type === 'string') {
-    return value;
+    return value as string;
   } else if (type === 'number') {
     return `${value}`;
   } else if (value === null) {
@@ -120,14 +119,8 @@ function propToStr(value) {
   }
 }
 
-function isNullOrUndefined(val) {
+function isNullOrUndefined(val: unknown): val is null | undefined {
   return val === null || val === undefined;
 }
 
-module.exports = {
-  PROP_KEY_PREFIX,
-  propToStr,
-  values,
-  hasProps,
-  propKey,
-};
+export { PROP_KEY_PREFIX, propToStr, values, hasProps, propKey };

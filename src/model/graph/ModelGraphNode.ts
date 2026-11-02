@@ -1,12 +1,35 @@
-'use strict';
+import { ModelGraphEdge } from './ModelGraphEdge';
+import { isNumber } from '../../utils/objectUtils';
+import type { Model, ModelClass } from '../Model';
 
-const { ModelGraphEdge } = require('./ModelGraphEdge');
-const { isNumber } = require('../../utils/objectUtils');
+// The marker of the lazily calculated properties that haven't been calculated
+// yet. The type is a brand so that it isn't confused with the calculated values.
+const NOT_CALCULATED = {} as { readonly notCalculated: true };
+type NotCalculated = typeof NOT_CALCULATED;
 
-const NOT_CALCULATED = {};
+type DataPath = (string | number)[];
 
 class ModelGraphNode {
-  constructor(modelClass, obj) {
+  declare modelClass: ModelClass;
+  declare obj: Model;
+  declare edges: ModelGraphEdge[];
+  declare userData: Record<string, unknown>;
+  declare hasId: boolean;
+  declare uid: unknown;
+
+  declare refEdges: ModelGraphEdge[];
+  declare parentEdge: ModelGraphEdge | null;
+
+  declare _relationPath: string[] | NotCalculated;
+  declare _relationPathKey: string | NotCalculated;
+
+  declare _dataPath: DataPath | NotCalculated;
+  declare _dataPathKey: string | NotCalculated;
+
+  declare _idPath: string[] | null | NotCalculated;
+  declare _idPathKey: string | null | NotCalculated;
+
+  constructor(modelClass: ModelClass, obj: Model) {
     this.modelClass = modelClass;
     this.obj = obj;
     this.edges = [];
@@ -30,23 +53,23 @@ class ModelGraphNode {
     this._idPathKey = NOT_CALCULATED;
   }
 
-  get isReference() {
+  get isReference(): boolean {
     return this.reference !== undefined;
   }
 
-  get isDbReference() {
+  get isDbReference(): boolean {
     return this.dbReference !== undefined;
   }
 
-  get reference() {
+  get reference(): unknown {
     return this.obj[this.modelClass.uidRefProp];
   }
 
-  get dbReference() {
+  get dbReference(): unknown {
     return this.obj[this.modelClass.dbRefProp];
   }
 
-  get parentNode() {
+  get parentNode(): ModelGraphNode | null {
     if (this.parentEdge) {
       return this.parentEdge.ownerNode;
     } else {
@@ -54,7 +77,7 @@ class ModelGraphNode {
     }
   }
 
-  get indexInRelation() {
+  get indexInRelation(): number | null {
     if (this.parentEdge) {
       return this.parentEdge.relationIndex;
     } else {
@@ -62,66 +85,66 @@ class ModelGraphNode {
     }
   }
 
-  get relationName() {
+  get relationName(): string | null {
     if (this.parentEdge) {
-      return this.parentEdge.relation.name;
+      return this.parentEdge.relation!.name;
     } else {
       return null;
     }
   }
 
-  get relationPath() {
+  get relationPath(): string[] {
     if (this._relationPath === NOT_CALCULATED) {
       this._relationPath = this._createRelationPath();
     }
 
-    return this._relationPath;
+    return this._relationPath as string[];
   }
 
-  get relationPathKey() {
+  get relationPathKey(): string {
     if (this._relationPathKey === NOT_CALCULATED) {
       this._relationPathKey = this._createRelationPathKey();
     }
 
-    return this._relationPathKey;
+    return this._relationPathKey as string;
   }
 
-  get dataPath() {
+  get dataPath(): DataPath {
     if (this._dataPath === NOT_CALCULATED) {
       this._dataPath = this._createDataPath();
     }
 
-    return this._dataPath;
+    return this._dataPath as DataPath;
   }
 
-  get dataPathKey() {
+  get dataPathKey(): string {
     if (this._dataPathKey === NOT_CALCULATED) {
       this._dataPathKey = this._createDataPathKey();
     }
 
-    return this._dataPathKey;
+    return this._dataPathKey as string;
   }
 
-  get idPath() {
+  get idPath(): string[] | null {
     if (this._idPath === NOT_CALCULATED) {
       this._idPath = this._createIdPath();
     }
 
-    return this._idPath;
+    return this._idPath as string[] | null;
   }
 
-  get idPathKey() {
+  get idPathKey(): string | null {
     if (this._idPathKey === NOT_CALCULATED) {
       this._idPathKey = this._createIdPathKey();
     }
 
-    return this._idPathKey;
+    return this._idPathKey as string | null;
   }
 
   /**
    * If this node is a reference, returns the referred node.
    */
-  get referencedNode() {
+  get referencedNode(): ModelGraphNode | null {
     for (const edge of this.refEdges) {
       if (edge.refType === ModelGraphEdge.ReferenceType.Object && edge.isOwnerNode(this)) {
         return edge.relatedNode;
@@ -134,7 +157,7 @@ class ModelGraphNode {
   /**
    * Returns all nodes that are references to this node.
    */
-  get referencingNodes() {
+  get referencingNodes(): ModelGraphNode[] {
     const nodes = [];
 
     for (const edge of this.refEdges) {
@@ -146,11 +169,11 @@ class ModelGraphNode {
     return nodes;
   }
 
-  get descendantRelationNodes() {
+  get descendantRelationNodes(): ModelGraphNode[] {
     return this._collectDescendantRelationNodes([]);
   }
 
-  removeEdge(edge) {
+  removeEdge(edge: ModelGraphEdge): void {
     // Don't allow removing parent edges for now. It would
     // cause all kinds of cache invalidation.
     if (edge === this.parentEdge) {
@@ -161,7 +184,7 @@ class ModelGraphNode {
     this.refEdges = this.refEdges.filter((it) => it !== edge);
   }
 
-  _collectDescendantRelationNodes(nodes) {
+  _collectDescendantRelationNodes(nodes: ModelGraphNode[]): ModelGraphNode[] {
     for (const edge of this.edges) {
       if (edge.type === ModelGraphEdge.Type.Relation && edge.isOwnerNode(this)) {
         nodes.push(edge.relatedNode);
@@ -172,41 +195,45 @@ class ModelGraphNode {
     return nodes;
   }
 
-  _createRelationPath() {
+  _createRelationPath(): string[] {
     if (this.parentNode === null) {
       return [];
     } else {
-      return [...this.parentNode.relationPath, this.relationName];
+      return [...this.parentNode.relationPath, this.relationName as string];
     }
   }
 
-  _createRelationPathKey() {
+  _createRelationPathKey(): string {
     return this.relationPath.join('.');
   }
 
-  _createDataPath() {
+  _createDataPath(): DataPath {
     if (this.parentEdge === null) {
       return [];
-    } else if (this.parentEdge.relation.isOneToOne()) {
-      return [...this.parentNode.dataPath, this.relationName];
+    } else if (this.parentEdge.relation!.isOneToOne()) {
+      return [...this.parentNode!.dataPath, this.relationName as string];
     } else {
-      return [...this.parentNode.dataPath, this.relationName, this.indexInRelation];
+      return [
+        ...this.parentNode!.dataPath,
+        this.relationName as string,
+        this.indexInRelation as number,
+      ];
     }
   }
 
-  _createDataPathKey() {
-    const dataPathKey = this.dataPath.reduce((key, it) => {
+  _createDataPathKey(): string {
+    const dataPathKey = this.dataPath.reduce<string>((key, it) => {
       if (isNumber(it)) {
         return `${key}[${it}]`;
       } else {
-        return key ? `${key}.${it}` : it;
+        return key ? `${key}.${it}` : (it as string);
       }
     }, '');
 
     return dataPathKey ? '.' + dataPathKey : dataPathKey;
   }
 
-  _createIdPath() {
+  _createIdPath(): string[] | null {
     if (!this.obj.$hasId()) {
       return null;
     }
@@ -214,27 +241,25 @@ class ModelGraphNode {
     if (this.parentEdge === null) {
       return [this.obj.$idKey()];
     } else {
-      const path = this.parentNode.idPath;
+      const path = this.parentNode!.idPath;
 
       if (path === null) {
         return null;
       }
 
-      return [...path, this.relationName, this.obj.$idKey()];
+      return [...path, this.relationName as string, this.obj.$idKey()];
     }
   }
 
-  _createIdPathKey() {
+  _createIdPathKey(): string | null {
     const idPath = this.idPath;
 
     if (idPath) {
-      return this.idPath.join('.');
+      return this.idPath!.join('.');
     } else {
       return null;
     }
   }
 }
 
-module.exports = {
-  ModelGraphNode,
-};
+export { ModelGraphNode };

@@ -1,19 +1,25 @@
-'use strict';
-
-const { isObject, isFunction } = require('../utils/objectUtils');
-const { defineNonEnumerableProperty } = require('./modelUtils');
-const { isKnexRaw, isKnexQueryBuilder } = require('../utils/knexUtils');
+import { isObject, isFunction } from '../utils/objectUtils';
+import { defineNonEnumerableProperty } from './modelUtils';
+import { isKnexRaw, isKnexQueryBuilder } from '../utils/knexUtils';
+import type { Model, ModelClass, ModelJson } from './Model';
+import type { QueryBuilder } from '../queryBuilder/QueryBuilder';
 
 const QUERY_PROPS_PROPERTY = '$$queryProps';
 
+// Something that converts itself into a knex raw instance, like `raw()`,
+// `ref()` and `fn()`.
+interface KnexRawConvertable {
+  toKnexRaw(builder: QueryBuilder): unknown;
+}
+
 // Removes query properties from `json` and stores them into a hidden property
 // inside `model` so that they can be later merged back to `json`.
-function splitQueryProps(model, json) {
+function splitQueryProps(model: Model, json: ModelJson): ModelJson {
   const keys = Object.keys(json);
 
   if (hasQueryProps(json, keys)) {
-    const queryProps = {};
-    const modelProps = {};
+    const queryProps: ModelJson = {};
+    const modelProps: ModelJson = {};
 
     for (let i = 0, l = keys.length; i < l; ++i) {
       const key = keys[i];
@@ -34,7 +40,7 @@ function splitQueryProps(model, json) {
   }
 }
 
-function hasQueryProps(json, keys) {
+function hasQueryProps(json: ModelJson, keys: string[]): boolean {
   for (let i = 0, l = keys.length; i < l; ++i) {
     if (isQueryProp(json[keys[i]])) {
       return true;
@@ -44,7 +50,7 @@ function hasQueryProps(json, keys) {
   return false;
 }
 
-function isQueryProp(value) {
+function isQueryProp(value: unknown): boolean | undefined {
   if (!isObject(value)) {
     return false;
   }
@@ -52,13 +58,18 @@ function isQueryProp(value) {
   return (
     isKnexQueryBuilder(value) ||
     isKnexRaw(value) ||
-    isKnexRawConvertable(value) ||
-    value.isObjectionQueryBuilderBase
+    isKnexRawConvertable(value as object) ||
+    (value as { isObjectionQueryBuilderBase?: boolean }).isObjectionQueryBuilderBase
   );
 }
 
 // Merges and converts `model`'s query properties into `json`.
-function mergeQueryProps(model, json, omitProps, builder) {
+function mergeQueryProps(
+  model: Model,
+  json: ModelJson,
+  omitProps: string[] | null,
+  builder: QueryBuilder | undefined,
+): ModelJson {
   json = convertExistingQueryProps(json, builder);
   json = convertAndMergeHiddenQueryProps(model, json, omitProps, builder);
 
@@ -68,7 +79,7 @@ function mergeQueryProps(model, json, omitProps, builder) {
 // Converts the query properties in `json` to knex raw instances.
 // `json` may have query properties even though we removed them.
 // For example they may have been added in lifecycle hooks.
-function convertExistingQueryProps(json, builder) {
+function convertExistingQueryProps(json: ModelJson, builder: QueryBuilder | undefined): ModelJson {
   const keys = Object.keys(json);
 
   for (let i = 0, l = keys.length; i < l; ++i) {
@@ -85,7 +96,12 @@ function convertExistingQueryProps(json, builder) {
 
 // Converts and merges the query props that were split from the model
 // and stored into QUERY_PROPS_PROPERTY.
-function convertAndMergeHiddenQueryProps(model, json, omitProps, builder) {
+function convertAndMergeHiddenQueryProps(
+  model: Model,
+  json: ModelJson,
+  omitProps: string[] | null,
+  builder: QueryBuilder | undefined,
+): ModelJson {
   const queryProps = model[QUERY_PROPS_PROPERTY];
 
   if (!queryProps) {
@@ -93,7 +109,7 @@ function convertAndMergeHiddenQueryProps(model, json, omitProps, builder) {
     return json;
   }
 
-  const modelClass = model.constructor;
+  const modelClass = model.constructor as ModelClass;
   const keys = Object.keys(queryProps);
 
   for (let i = 0, l = keys.length; i < l; ++i) {
@@ -109,25 +125,31 @@ function convertAndMergeHiddenQueryProps(model, json, omitProps, builder) {
 }
 
 // Converts a query property into a knex `raw` instance.
-function queryPropToKnexRaw(queryProp, builder) {
+function queryPropToKnexRaw(queryProp: unknown, builder: QueryBuilder | undefined): unknown {
   if (!queryProp) {
     return queryProp;
   }
 
-  if (queryProp.isObjectionQueryBuilderBase) {
-    return buildObjectionQueryBuilder(queryProp, builder);
-  } else if (isKnexRawConvertable(queryProp)) {
-    return buildKnexRawConvertable(queryProp, builder);
+  if ((queryProp as { isObjectionQueryBuilderBase?: boolean }).isObjectionQueryBuilderBase) {
+    return buildObjectionQueryBuilder(queryProp as QueryBuilder, builder);
+  } else if (isKnexRawConvertable(queryProp as object)) {
+    return buildKnexRawConvertable(queryProp as KnexRawConvertable, builder);
   } else {
     return queryProp;
   }
 }
 
-function buildObjectionQueryBuilder(builder, parentBuilder) {
+function buildObjectionQueryBuilder(
+  builder: QueryBuilder,
+  parentBuilder: QueryBuilder | undefined,
+): unknown {
   return builder.subqueryOf(parentBuilder).toKnexQuery();
 }
 
-function buildKnexRawConvertable(convertable, builder) {
+function buildKnexRawConvertable(
+  convertable: KnexRawConvertable,
+  builder: QueryBuilder | undefined,
+): unknown {
   if (!builder) {
     throw new Error(
       'toDatabaseJson called without a query builder instance for a model with query properties',
@@ -137,11 +159,8 @@ function buildKnexRawConvertable(convertable, builder) {
   return convertable.toKnexRaw(builder);
 }
 
-function isKnexRawConvertable(queryProp) {
-  return isFunction(queryProp.toKnexRaw);
+function isKnexRawConvertable(queryProp: object): boolean {
+  return isFunction((queryProp as Partial<KnexRawConvertable>).toKnexRaw);
 }
 
-module.exports = {
-  splitQueryProps,
-  mergeQueryProps,
-};
+export { splitQueryProps, mergeQueryProps };

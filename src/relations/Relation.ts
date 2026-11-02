@@ -12,57 +12,18 @@ import { mapAfterAllReturn } from '../utils/promiseUtils';
 import { createModifier } from '../utils/createModifier';
 
 import type { RelationOwner } from './RelationOwner';
+import type { Model } from '../model/Model';
+import type { QueryBuilderOperation } from '../queryBuilder/operations/QueryBuilderOperation';
 
-// The query builder is still JavaScript, and its methods are called and
-// chained dynamically.
+// The relations call and chain the query builder's methods dynamically.
 export type RelationQueryBuilder = any;
 
-// A model instance. Its properties are the columns and relations of a row.
-export interface RelationModel {
-  $hasId(): boolean;
-  $hasProps(props: string[]): boolean;
-  $id(id?: unknown): unknown;
-  $propKey(props: string[]): string;
-  $setRelated(relation: Relation, models: unknown): RelationModel;
-  $appendRelated(relation: Relation, models: unknown): RelationModel;
-  $omitFromDatabaseJson(props: string[]): RelationModel;
-  // The row's columns, which can hold anything.
-  [prop: string]: any;
-}
+// A model instance and a model class.
+export type RelationModel = Model;
+export type RelationModelClass = typeof Model;
 
-// A model class: a user's subclass of the still-JavaScript Model. These are
-// the static members the relations use.
-export interface RelationModelClass extends Function {
-  readonly name: string;
-  readonly isObjectionModelClass: boolean;
-  modelPaths?: string[];
-  tableName: string;
-  idColumn: string | string[] | null;
-  concurrency: number;
-  // Only used with `instanceof`.
-  ModifierNotFoundError: abstract new (
-    ...args: any[]
-  ) => Error;
-  getTableName(): string;
-  getIdColumn(): string | string[] | null;
-  getIdRelationProperty(): RelationProperty;
-  columnNameToPropertyName(columnName: string): string;
-  joinTableAlias(relatedTableAlias: string): string;
-  knex(): Knex;
-  bindKnex(knex: Knex): RelationModelClass;
-  query(): RelationQueryBuilder;
-  relatedQuery(relationName: string): RelationQueryBuilder;
-  fromJson(json: object): RelationModel;
-  omitImpl(model: RelationModel, prop: string): void;
-  getModifiers(): Record<string, unknown>;
-  modifierNotFound(builder: RelationQueryBuilder, modifier: unknown): unknown;
-}
-
-// The query builder operation that `find`, `insert`, `relate` etc. return.
-// The operation classes are still JavaScript.
-export interface RelationOperation {
-  onAdd(builder: RelationQueryBuilder, args: unknown[]): boolean;
-}
+// The query builder operation that `insert`, `relate` etc. return.
+export type RelationOperation = QueryBuilderOperation;
 
 // A relation's `modify` (or `filter`) after `createModifier`.
 export type RelationModifier = (builder: RelationQueryBuilder, ...args: unknown[]) => void;
@@ -293,7 +254,7 @@ class Relation {
     });
   }
 
-  find(_: RelationQueryBuilder, owner: RelationOwner): RelationOperation {
+  find(_: RelationQueryBuilder, owner: RelationOwner): RelationFindOperation {
     return new RelationFindOperation('find', {
       relation: this,
       owner,

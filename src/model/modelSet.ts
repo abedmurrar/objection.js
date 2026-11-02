@@ -1,11 +1,11 @@
-'use strict';
+import { isInternalProp } from '../utils/internalPropUtils';
+import { splitQueryProps } from './modelQueryProps';
+import { isFunction, isString, isPlainObject } from '../utils/objectUtils';
+import { parseRelationsIntoModelInstances } from './modelParseRelations';
+import type { Model, ModelClass, ModelJson, ModelOptions } from './Model';
+import type { Relation } from '../relations/Relation';
 
-const { isInternalProp } = require('../utils/internalPropUtils');
-const { splitQueryProps } = require('./modelQueryProps');
-const { isFunction, isString, isPlainObject } = require('../utils/objectUtils');
-const { parseRelationsIntoModelInstances } = require('./modelParseRelations');
-
-function setJson(model, json, options) {
+function setJson<M extends Model>(model: M, json: ModelJson, options: ModelOptions): M {
   json = json || {};
   options = options || {};
 
@@ -36,7 +36,7 @@ function setJson(model, json, options) {
   return model;
 }
 
-function setDatabaseJson(model, json) {
+function setDatabaseJson<M extends Model>(model: M, json: ModelJson): M {
   json = model.$parseDatabaseJson(json);
 
   if (json) {
@@ -44,24 +44,24 @@ function setDatabaseJson(model, json) {
 
     for (let i = 0, l = keys.length; i < l; ++i) {
       const key = keys[i];
-      model[key] = json[key];
+      (model as Model)[key] = json[key];
     }
   }
 
   return model;
 }
 
-function setFast(model, obj) {
+function setFast<M extends Model>(model: M, obj: ModelJson | null | undefined): M {
   if (obj) {
     // Don't try to set read-only properties. They can easily get here
     // through `fromJson` when parsing an object that was previously
     // serialized from a model instance.
-    const readOnlyAttr = model.constructor.getReadOnlyAttributes();
+    const readOnlyAttr = (model.constructor as ModelClass).getReadOnlyAttributes();
     const keys = Object.keys(obj);
 
     for (let i = 0, l = keys.length; i < l; ++i) {
       const key = keys[i];
-      const value = obj[key];
+      const value: unknown = obj[key];
 
       if (
         (value !== undefined || isPlainObject(obj)) &&
@@ -69,7 +69,7 @@ function setFast(model, obj) {
         !isFunction(value) &&
         !readOnlyAttr.includes(key)
       ) {
-        model[key] = value;
+        (model as Model)[key] = value;
       }
     }
   }
@@ -77,60 +77,62 @@ function setFast(model, obj) {
   return model;
 }
 
-function setRelated(model, relation, models) {
+function setRelated<M extends Model>(
+  model: M,
+  relation: Relation | string,
+  models: Model | Model[] | null | undefined,
+): M {
   relation = ensureRelation(model, relation);
 
   if (relation.isOneToOne()) {
     if (Array.isArray(models)) {
       if (models.length === 0) {
-        model[relation.name] = null;
+        (model as Model)[relation.name] = null;
       } else {
-        model[relation.name] = models[0] || null;
+        (model as Model)[relation.name] = models[0] || null;
       }
     } else {
-      model[relation.name] = models || null;
+      (model as Model)[relation.name] = models || null;
     }
   } else {
     if (!models) {
-      model[relation.name] = [];
+      (model as Model)[relation.name] = [];
     } else if (Array.isArray(models)) {
-      model[relation.name] = models;
+      (model as Model)[relation.name] = models;
     } else {
-      model[relation.name] = [models];
+      (model as Model)[relation.name] = [models];
     }
   }
 
   return model;
 }
 
-function appendRelated(model, relation, models) {
+function appendRelated<M extends Model>(
+  model: M,
+  relation: Relation | string,
+  models: Model | Model[] | null | undefined,
+): M {
   relation = ensureRelation(model, relation);
 
-  if (!model[relation.name] || relation.isOneToOne()) {
+  if (!(model as Model)[relation.name] || relation.isOneToOne()) {
     return model.$setRelated(relation, models);
   } else {
     if (Array.isArray(models)) {
-      models.forEach((it) => model[relation.name].push(it));
+      models.forEach((it) => ((model as Model)[relation.name] as Model[]).push(it));
     } else if (models) {
-      model[relation.name].push(models);
+      ((model as Model)[relation.name] as Model[]).push(models);
     }
   }
 
   return model;
 }
 
-function ensureRelation(model, relation) {
+function ensureRelation(model: Model, relation: Relation | string): Relation {
   if (isString(relation)) {
-    return model.constructor.getRelation(relation);
+    return (model.constructor as ModelClass).getRelation(relation as string);
   } else {
-    return relation;
+    return relation as Relation;
   }
 }
 
-module.exports = {
-  setFast,
-  setJson,
-  setDatabaseJson,
-  setRelated,
-  appendRelated,
-};
+export { setFast, setJson, setDatabaseJson, setRelated, appendRelated };

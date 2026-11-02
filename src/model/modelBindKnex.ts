@@ -1,10 +1,18 @@
-'use strict';
+import { inheritModel } from './inheritModel';
+import { staticHiddenProps } from './modelUtils';
+import { defineNonEnumerableProperty } from './modelUtils';
+import type { Knex } from 'knex';
+import type { ModelClass } from './Model';
+import type { Relation } from '../relations/Relation';
 
-const { inheritModel } = require('./inheritModel');
-const { staticHiddenProps } = require('./modelUtils');
-const { defineNonEnumerableProperty } = require('./modelUtils');
+// The knex instance (or transaction) with the cache of the model classes bound to it.
+type KnexWithCache = Knex & {
+  $$objection?: {
+    boundModels: Map<string, ModelClass>;
+  };
+};
 
-function bindKnex(modelClass, knex) {
+function bindKnex<M extends ModelClass>(modelClass: M, knex: Knex): M {
   let BoundModelClass = getBoundModelFromCache(modelClass, knex);
 
   if (BoundModelClass === null) {
@@ -20,28 +28,28 @@ function bindKnex(modelClass, knex) {
   return BoundModelClass;
 }
 
-function getBoundModelFromCache(modelClass, knex) {
+function getBoundModelFromCache<M extends ModelClass>(modelClass: M, knex: Knex): M | null {
   const cache = getCache(knex);
   const cacheKey = modelClass.uniqueTag();
 
-  return cache.get(cacheKey) || null;
+  return (cache.get(cacheKey) as M | undefined) || null;
 }
 
-function getCache(knex) {
+function getCache(knex: KnexWithCache): Map<string, ModelClass> {
   if (!knex.$$objection) {
     createCache(knex);
   }
 
-  return knex.$$objection.boundModels;
+  return knex.$$objection!.boundModels;
 }
 
-function createCache(knex) {
+function createCache(knex: KnexWithCache): void {
   defineNonEnumerableProperty(knex, '$$objection', {
     boundModels: new Map(),
   });
 }
 
-function copyHiddenProperties(modelClass, BoundModelClass) {
+function copyHiddenProperties<M extends ModelClass>(modelClass: M, BoundModelClass: M): M {
   // Bound classes share the validator of the class they are bound from, which
   // is copied below. Create it first, so that a class bound to a new knex
   // instance, like every transaction, doesn't create and compile a validator
@@ -53,14 +61,22 @@ function copyHiddenProperties(modelClass, BoundModelClass) {
   for (const prop of staticHiddenProps) {
     // $$relations and $$relationArray are handled in separately.
     if (Object.hasOwn(modelClass, prop) && prop !== '$$relations' && prop !== '$$relationArray') {
-      defineNonEnumerableProperty(BoundModelClass, prop, modelClass[prop]);
+      defineNonEnumerableProperty(
+        BoundModelClass,
+        prop,
+        (modelClass as unknown as Record<string, unknown>)[prop],
+      );
     }
   }
 
   return BoundModelClass;
 }
 
-function putBoundModelToCache(modelClass, BoundModelClass, knex) {
+function putBoundModelToCache<M extends ModelClass>(
+  modelClass: M,
+  BoundModelClass: M,
+  knex: Knex,
+): M {
   const cache = getCache(knex);
   const cacheKey = modelClass.uniqueTag();
 
@@ -68,9 +84,9 @@ function putBoundModelToCache(modelClass, BoundModelClass, knex) {
   return BoundModelClass;
 }
 
-function bindRelations(modelClass, BoundModelClass, knex) {
-  const boundRelations = Object.create(null);
-  const boundRelationArray = [];
+function bindRelations<M extends ModelClass>(modelClass: M, BoundModelClass: M, knex: Knex): M {
+  const boundRelations: Record<string, Relation> = Object.create(null);
+  const boundRelationArray: Relation[] = [];
 
   for (const relationName of modelClass.getRelationNames()) {
     const relation = modelClass.getRelation(relationName);
@@ -86,6 +102,4 @@ function bindRelations(modelClass, BoundModelClass, knex) {
   return BoundModelClass;
 }
 
-module.exports = {
-  bindKnex,
-};
+export { bindKnex };

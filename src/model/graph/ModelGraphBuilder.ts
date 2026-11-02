@@ -1,24 +1,39 @@
-'use strict';
+import { isObject, isString, asArray, asSingle } from '../../utils/objectUtils';
+import { ValidationErrorType } from '../../model/ValidationError';
+import { ModelGraphNode } from './ModelGraphNode';
+import { ModelGraphEdge } from './ModelGraphEdge';
+import type { Model, ModelClass } from '../Model';
+import type { Relation } from '../../relations/Relation';
 
-const { isObject, isString, asArray, asSingle } = require('../../utils/objectUtils');
-const { ValidationErrorType } = require('../../model/ValidationError');
-const { ModelGraphNode } = require('./ModelGraphNode');
-const { ModelGraphEdge } = require('./ModelGraphEdge');
+type DataPath = (string | number)[];
+
+interface PropertyReference {
+  path: DataPath;
+  refMatch: string;
+  ref: string;
+  refPath: string[];
+}
 
 class ModelGraphBuilder {
+  declare nodes: ModelGraphNode[];
+  declare edges: ModelGraphEdge[];
+
   constructor() {
     this.nodes = [];
     this.edges = [];
   }
 
-  static buildGraph(rootModelClass, roots) {
+  static buildGraph(
+    rootModelClass: ModelClass,
+    roots: Model | Model[] | null | undefined,
+  ): ModelGraphBuilder {
     const builder = new this();
     builder._buildGraph(rootModelClass, roots);
 
     return builder;
   }
 
-  _buildGraph(rootModelClass, roots) {
+  _buildGraph(rootModelClass: ModelClass, roots: Model | Model[] | null | undefined): void {
     if (roots) {
       if (Array.isArray(roots)) {
         this._buildNodes(rootModelClass, roots);
@@ -32,16 +47,27 @@ class ModelGraphBuilder {
     this._buildReferences();
   }
 
-  _buildNodes(modelClass, objs, parentNode = null, relation = null) {
-    objs = asArray(objs);
+  _buildNodes(
+    modelClass: ModelClass,
+    objs: Model | Model[],
+    parentNode: ModelGraphNode | null = null,
+    relation: Relation | null = null,
+  ): void {
+    objs = asArray(objs) as Model[];
 
     objs.forEach((obj, index) => {
       this._buildNode(modelClass, obj, parentNode, relation, index);
     });
   }
 
-  _buildNode(modelClass, obj, parentNode = null, relation = null, index = null) {
-    obj = asSingle(obj);
+  _buildNode(
+    modelClass: ModelClass,
+    obj: Model | Model[],
+    parentNode: ModelGraphNode | null = null,
+    relation: Relation | null = null,
+    index: number | null = null,
+  ): void {
+    obj = asSingle(obj) as Model;
 
     if (!isObject(obj) || !obj.$isObjectionModel) {
       throw createNotModelError(modelClass, obj);
@@ -66,9 +92,9 @@ class ModelGraphBuilder {
     this._buildRelationNodes(node);
   }
 
-  _buildRelationNodes(node) {
+  _buildRelationNodes(node: ModelGraphNode): void {
     for (const relationName of node.modelClass.getRelationNames()) {
-      const relatedObjects = node.obj[relationName];
+      const relatedObjects = node.obj[relationName] as Model | Model[] | null | undefined;
 
       if (!relatedObjects) {
         continue;
@@ -84,15 +110,15 @@ class ModelGraphBuilder {
     }
   }
 
-  _buildReferences() {
+  _buildReferences(): void {
     const nodesByUid = this._nodesByUid();
 
     this._buildObjectReferences(nodesByUid);
     this._buildPropertyReferences(nodesByUid);
   }
 
-  _nodesByUid() {
-    const nodesByUid = new Map();
+  _nodesByUid(): Map<unknown, ModelGraphNode> {
+    const nodesByUid = new Map<unknown, ModelGraphNode>();
 
     for (const node of this.nodes) {
       const uid = node.uid;
@@ -107,7 +133,7 @@ class ModelGraphBuilder {
     return nodesByUid;
   }
 
-  _buildObjectReferences(nodesByUid) {
+  _buildObjectReferences(nodesByUid: Map<unknown, ModelGraphNode>): void {
     for (const node of this.nodes) {
       const ref = node.reference;
 
@@ -128,7 +154,7 @@ class ModelGraphBuilder {
     }
   }
 
-  _buildPropertyReferences(nodesByUid) {
+  _buildPropertyReferences(nodesByUid: Map<unknown, ModelGraphNode>): void {
     for (const node of this.nodes) {
       forEachPropertyReference(node.obj, ({ path, refMatch, ref, refPath }) => {
         const refNode = nodesByUid.get(ref);
@@ -149,7 +175,7 @@ class ModelGraphBuilder {
     }
   }
 
-  _addEdge(ownerNode, relatedNode, edge) {
+  _addEdge(ownerNode: ModelGraphNode, relatedNode: ModelGraphNode, edge: ModelGraphEdge): void {
     this.edges.push(edge);
 
     ownerNode.edges.push(edge);
@@ -162,8 +188,11 @@ class ModelGraphBuilder {
   }
 }
 
-function forEachPropertyReference(obj, callback) {
-  const modelClass = obj.constructor;
+function forEachPropertyReference(
+  obj: Model,
+  callback: (reference: PropertyReference) => void,
+): void {
+  const modelClass = obj.constructor as ModelClass;
   const relationNames = modelClass.getRelationNames();
 
   for (const prop of Object.keys(obj)) {
@@ -180,17 +209,19 @@ function forEachPropertyReference(obj, callback) {
   }
 }
 
-function visitStrings(value, path, visit) {
+type StringVisitor = (str: string, path: DataPath) => void;
+
+function visitStrings(value: unknown, path: DataPath, visit: StringVisitor): void {
   if (Array.isArray(value)) {
     visitStringsInArray(value, path, visit);
   } else if (isObject(value) && !Buffer.isBuffer(value)) {
-    visitStringsInObject(value, path, visit);
+    visitStringsInObject(value as Record<string, unknown>, path, visit);
   } else if (isString(value)) {
-    visit(value, path);
+    visit(value as string, path);
   }
 }
 
-function visitStringsInArray(value, path, visit) {
+function visitStringsInArray(value: unknown[], path: DataPath, visit: StringVisitor): void {
   for (let i = 0; i < value.length; ++i) {
     path.push(i);
     visitStrings(value[i], path, visit);
@@ -198,7 +229,11 @@ function visitStringsInArray(value, path, visit) {
   }
 }
 
-function visitStringsInObject(value, path, visit) {
+function visitStringsInObject(
+  value: Record<string, unknown>,
+  path: DataPath,
+  visit: StringVisitor,
+): void {
   for (const prop of Object.keys(value)) {
     path.push(prop);
     visitStrings(value[prop], path, visit);
@@ -206,7 +241,7 @@ function visitStringsInObject(value, path, visit) {
   }
 }
 
-function forEachMatch(regex, str, cb) {
+function forEachMatch(regex: RegExp, str: string, cb: (match: RegExpExecArray) => void): void {
   let matchResult = regex.exec(str);
 
   while (matchResult) {
@@ -215,7 +250,7 @@ function forEachMatch(regex, str, cb) {
   }
 }
 
-function createReferenceNotFoundError(ref) {
+function createReferenceNotFoundError(ref: unknown): Error {
   return new Error(
     [
       `could not resolve reference ${ref} in a graph.`,
@@ -227,15 +262,11 @@ function createReferenceNotFoundError(ref) {
   );
 }
 
-function createNotModelError(modelClass, value) {
+function createNotModelError(modelClass: ModelClass, value: unknown): never {
   throw modelClass.createValidationError({
     type: ValidationErrorType.InvalidGraph,
     message: `expected value "${value}" to be an instance of ${modelClass.name}`,
   });
 }
 
-module.exports = {
-  ModelGraphBuilder,
-  createNotModelError,
-  forEachPropertyReference,
-};
+export { ModelGraphBuilder, createNotModelError, forEachPropertyReference };

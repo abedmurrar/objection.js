@@ -1,14 +1,35 @@
-'use strict';
-
-const { defineNonEnumerableProperty } = require('./modelUtils');
-const { isPromise } = require('../utils/promiseUtils');
+import { defineNonEnumerableProperty } from './modelUtils';
+import { isPromise } from '../utils/promiseUtils';
+import type { Knex } from 'knex';
+import type { ModelClass } from './Model';
+import type { QueryBuilder } from '../queryBuilder/QueryBuilder';
 
 const TABLE_METADATA = '$$tableMetadata';
 
+interface TableMetadata {
+  columns: string[];
+}
+
+interface FetchTableMetadataOptions {
+  parentBuilder?: QueryBuilder | null;
+  knex?: Knex | null;
+  force?: boolean;
+  table?: string | null;
+}
+
+interface TableMetadataOptions {
+  table?: string;
+}
+
 function fetchTableMetadata(
-  modelClass,
-  { parentBuilder = null, knex = null, force = false, table = null } = {},
-) {
+  modelClass: ModelClass,
+  {
+    parentBuilder = null,
+    knex = null,
+    force = false,
+    table = null,
+  }: FetchTableMetadataOptions = {},
+): Promise<TableMetadata> {
   // The table isn't necessarily same as `modelClass.getTableName()` for example if
   // a view is queried instead.
   if (!table) {
@@ -21,7 +42,8 @@ function fetchTableMetadata(
 
   // Call tableMetadata first instead of accessing the cache directly beause
   // tableMetadata may have been overriden.
-  let metadata = modelClass.tableMetadata({ table });
+  let metadata: TableMetadata | Promise<TableMetadata> | null | undefined =
+    modelClass.tableMetadata({ table });
 
   if (!force && metadata) {
     return Promise.resolve(metadata);
@@ -45,7 +67,7 @@ function fetchTableMetadata(
       .query(knex)
       .childQueryOf(parentBuilder)
       .columnInfo({ table })
-      .then((columnInfo) => {
+      .then((columnInfo: Record<string, unknown>) => {
         const metadata = {
           columns: Object.keys(columnInfo),
         };
@@ -53,7 +75,7 @@ function fetchTableMetadata(
         modelClass[TABLE_METADATA].set(table, metadata);
         return metadata;
       })
-      .catch((err) => {
+      .catch((err: unknown) => {
         modelClass[TABLE_METADATA].delete(table);
         throw err;
       });
@@ -63,21 +85,22 @@ function fetchTableMetadata(
   }
 }
 
-function tableMetadata(modelClass, { table } = {}) {
+function tableMetadata(
+  modelClass: ModelClass,
+  { table }: TableMetadataOptions = {},
+): TableMetadata | null | undefined {
   if (Object.hasOwn(modelClass, TABLE_METADATA)) {
     const metadata = modelClass[TABLE_METADATA].get(table || modelClass.getTableName());
 
     if (isPromise(metadata)) {
       return null;
     } else {
-      return metadata;
+      return metadata as TableMetadata | undefined;
     }
   } else {
     return null;
   }
 }
 
-module.exports = {
-  fetchTableMetadata,
-  tableMetadata,
-};
+export { fetchTableMetadata, tableMetadata };
+export type { TableMetadata, FetchTableMetadataOptions, TableMetadataOptions };

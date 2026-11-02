@@ -1,14 +1,23 @@
-'use strict';
+import { isInternalProp } from '../utils/internalPropUtils';
+import { mergeQueryProps } from './modelQueryProps';
+import { isObject, cloneDeep, isFunction } from '../utils/objectUtils';
+import type { Model, ModelClass, ModelJson, ToJsonOptions } from './Model';
+import type { QueryBuilder } from '../queryBuilder/QueryBuilder';
+const EMPTY_ARRAY: string[] = [];
 
-const { isInternalProp } = require('../utils/internalPropUtils');
-const { mergeQueryProps } = require('./modelQueryProps');
-const { isObject, cloneDeep, isFunction } = require('../utils/objectUtils');
-const EMPTY_ARRAY = [];
+interface ToJsonImplOptions {
+  virtuals: boolean | string[];
+  shallow: boolean;
+  omit: string[] | null;
+  pick: Record<string, unknown> | null;
+  omitFromJson: string[] | null;
+  cloneObjects: boolean;
+}
 
-function toJson(model, optIn) {
-  const modelClass = model.constructor;
+function toJson(model: Model, optIn: ToJsonOptions | undefined): ModelJson {
+  const modelClass = model.constructor as ModelClass;
 
-  const opt = {
+  const opt: ToJsonImplOptions = {
     virtuals: getVirtuals(optIn),
     shallow: isShallow(optIn),
     omit: getOmit(optIn, modelClass),
@@ -23,10 +32,10 @@ function toJson(model, optIn) {
   return json;
 }
 
-function toDatabaseJson(model, builder) {
-  const modelClass = model.constructor;
+function toDatabaseJson(model: Model, builder: QueryBuilder | undefined): ModelJson {
+  const modelClass = model.constructor as ModelClass;
 
-  const opt = {
+  const opt: ToJsonImplOptions = {
     virtuals: false,
     shallow: true,
     omit: modelClass.getRelationNames(),
@@ -41,7 +50,7 @@ function toDatabaseJson(model, builder) {
   return mergeQueryProps(model, json, opt.omitFromJson, builder);
 }
 
-function getVirtuals(opt) {
+function getVirtuals(opt: ToJsonOptions | undefined): boolean | string[] {
   if (!opt) {
     return true;
   } else if (Array.isArray(opt.virtuals)) {
@@ -51,21 +60,21 @@ function getVirtuals(opt) {
   }
 }
 
-function isShallow(opt) {
+function isShallow(opt: ToJsonOptions | ToJsonImplOptions | undefined): boolean {
   return !!opt && !!opt.shallow;
 }
 
-function getOmit(opt, modelClass) {
+function getOmit(opt: ToJsonOptions | undefined, modelClass: ModelClass): string[] | null {
   return isShallow(opt) ? modelClass.getRelationNames() : null;
 }
 
-function getPick(modelClass) {
+function getPick(modelClass: ModelClass): Record<string, unknown> | null {
   const jsonSchema = modelClass.getJsonSchema();
   return (jsonSchema && modelClass.pickJsonSchemaProperties && jsonSchema.properties) || null;
 }
 
-function toExternalJsonImpl(model, opt) {
-  const json = {};
+function toExternalJsonImpl(model: Model, opt: ToJsonImplOptions): ModelJson {
+  const json: ModelJson = {};
   const keys = Object.keys(model);
   const vAttr = getVirtualAttributes(model, opt);
 
@@ -83,18 +92,18 @@ function toExternalJsonImpl(model, opt) {
   return json;
 }
 
-function getVirtualAttributes(model, opt) {
+function getVirtualAttributes(model: Model, opt: ToJsonImplOptions): string[] {
   if (Array.isArray(opt.virtuals)) {
     return opt.virtuals;
   } else if (opt.virtuals === true) {
-    return model.constructor.getVirtualAttributes();
+    return (model.constructor as ModelClass).getVirtualAttributes();
   } else {
     return EMPTY_ARRAY;
   }
 }
 
-function toDatabaseJsonImpl(model, opt) {
-  const json = {};
+function toDatabaseJsonImpl(model: Model, opt: ToJsonImplOptions): ModelJson {
+  const json: ModelJson = {};
   const keys = Object.keys(model);
 
   for (let i = 0, l = keys.length; i < l; ++i) {
@@ -107,7 +116,12 @@ function toDatabaseJsonImpl(model, opt) {
   return json;
 }
 
-function assignJsonValue(json, key, value, opt) {
+function assignJsonValue(
+  json: ModelJson,
+  key: string,
+  value: unknown,
+  opt: ToJsonImplOptions,
+): void {
   const type = typeof value;
 
   if (
@@ -118,44 +132,49 @@ function assignJsonValue(json, key, value, opt) {
     shouldPick(opt, key)
   ) {
     if (isObject(value)) {
-      json[key] = toJsonObject(value, opt);
+      json[key] = toJsonObject(value as object, opt);
     } else {
       json[key] = value;
     }
   }
 }
 
-function shouldOmit(opt, key) {
+function shouldOmit(opt: ToJsonImplOptions, key: string): boolean {
   return (
     (opt.omit !== null && opt.omit.includes(key)) ||
     (opt.omitFromJson !== null && opt.omitFromJson.includes(key))
   );
 }
 
-function shouldPick(opt, key) {
+function shouldPick(opt: ToJsonImplOptions, key: string): boolean {
   return opt.pick === null || key in opt.pick;
 }
 
-function assignVirtualAttributes(json, model, vAttr, opt) {
+function assignVirtualAttributes(
+  json: ModelJson,
+  model: Model,
+  vAttr: string[],
+  opt: ToJsonImplOptions,
+): void {
   for (let i = 0, l = vAttr.length; i < l; ++i) {
     const key = vAttr[i];
     let value = model[key];
 
     if (isFunction(value)) {
-      value = value.call(model);
+      value = (value as (this: Model) => unknown).call(model);
     }
 
     assignJsonValue(json, key, value, opt);
   }
 }
 
-function toJsonObject(value, opt) {
+function toJsonObject(value: object, opt: ToJsonImplOptions): unknown {
   if (Array.isArray(value)) {
     return toJsonArray(value, opt);
-  } else if (value.$isObjectionModel) {
+  } else if ((value as Partial<Model>).$isObjectionModel) {
     // No branch for $toDatabaseJson here since there is never a need
     // to have nested models in database rows.
-    return value.$toJson(opt);
+    return (value as Model).$toJson(opt);
   } else if (Buffer.isBuffer(value)) {
     return value;
   } else if (opt.cloneObjects) {
@@ -165,14 +184,14 @@ function toJsonObject(value, opt) {
   }
 }
 
-function toJsonArray(value, opt) {
+function toJsonArray(value: unknown[], opt: ToJsonImplOptions): unknown[] {
   const ret = new Array(value.length);
 
   for (let i = 0, l = ret.length; i < l; ++i) {
     const item = value[i];
 
     if (isObject(item)) {
-      ret[i] = toJsonObject(item, opt);
+      ret[i] = toJsonObject(item as object, opt);
     } else {
       ret[i] = item;
     }
@@ -181,7 +200,4 @@ function toJsonArray(value, opt) {
   return ret;
 }
 
-module.exports = {
-  toJson,
-  toDatabaseJson,
-};
+export { toJson, toDatabaseJson };

@@ -29,7 +29,7 @@ class GraphFetcher {
     const modelClass = builder.modelClass();
 
     if (rootIds.length === 0) {
-      return Promise.resolve(ModelGraph.create(modelClass, []));
+      return Promise.resolve(ModelGraph.create(modelClass, []) as Graph);
     }
 
     const eagerExpr = RelationExpression.fromModelGraph(rootObjects);
@@ -42,7 +42,7 @@ class GraphFetcher {
       .withGraphFetched(eagerExpr)
       .internalOptions(fetchQueryInternalOptions());
 
-    return ModelGraph.create(modelClass, models);
+    return ModelGraph.create(modelClass, models) as Graph;
   }
 }
 

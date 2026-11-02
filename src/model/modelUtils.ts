@@ -1,4 +1,4 @@
-'use strict';
+import type { Model } from './Model';
 
 const hiddenProps = ['$$queryProps'];
 
@@ -19,7 +19,7 @@ const staticHiddenProps = [
   '$$virtualAttributes',
 ];
 
-function defineNonEnumerableProperty(obj, prop, value) {
+function defineNonEnumerableProperty(obj: object, prop: PropertyKey, value: unknown): void {
   Object.defineProperty(obj, prop, {
     enumerable: false,
     writable: true,
@@ -28,8 +28,11 @@ function defineNonEnumerableProperty(obj, prop, value) {
   });
 }
 
-function keyByProps(models, props) {
-  const map = new Map();
+function keyByProps<M extends Model>(
+  models: readonly M[],
+  props: readonly string[],
+): Map<string, M> {
+  const map = new Map<string, M>();
 
   for (let i = 0, l = models.length; i < l; ++i) {
     const model = models[i];
@@ -39,9 +42,4 @@ function keyByProps(models, props) {
   return map;
 }
 
-module.exports = {
-  hiddenProps,
-  staticHiddenProps,
-  defineNonEnumerableProperty,
-  keyByProps,
-};
+export { hiddenProps, staticHiddenProps, defineNonEnumerableProperty, keyByProps };

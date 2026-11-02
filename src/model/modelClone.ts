@@ -1,12 +1,11 @@
-'use strict';
+import { isObject, cloneDeep } from '../utils/objectUtils';
+import { hiddenProps } from './modelUtils';
+import { defineNonEnumerableProperty } from './modelUtils';
+import { isInternalProp } from '../utils/internalPropUtils';
+import type { Model, ModelClass } from './Model';
 
-const { isObject, cloneDeep } = require('../utils/objectUtils');
-const { hiddenProps } = require('./modelUtils');
-const { defineNonEnumerableProperty } = require('./modelUtils');
-const { isInternalProp } = require('../utils/internalPropUtils');
-
-function clone(model, shallow, stripInternal) {
-  let clone = null;
+function clone<M extends Model>(model: M, shallow: boolean, stripInternal: boolean): M {
+  let clone: M | null = null;
 
   const omitFromJson = model.$omitFromJson();
   const omitFromDatabaseJson = model.$omitFromDatabaseJson();
@@ -29,36 +28,36 @@ function clone(model, shallow, stripInternal) {
   return clone;
 }
 
-function cloneSimple(model) {
-  const clone = new model.constructor();
+function cloneSimple<M extends Model>(model: M): M {
+  const clone = new model.constructor() as M;
   const keys = Object.keys(model);
 
   for (let i = 0, l = keys.length; i < l; ++i) {
     const key = keys[i];
-    const value = model[key];
+    const value = (model as Model)[key];
 
     if (isObject(value)) {
-      clone[key] = cloneObject(value);
+      (clone as Model)[key] = cloneObject(value as object);
     } else {
-      clone[key] = value;
+      (clone as Model)[key] = value;
     }
   }
 
   return clone;
 }
 
-function cloneWithOpt(model, shallow, stripInternal) {
-  const clone = new model.constructor();
+function cloneWithOpt<M extends Model>(model: M, shallow: boolean, stripInternal: boolean): M {
+  const clone = new model.constructor() as M;
   const keys = Object.keys(model);
-  const relationNames = model.constructor.getRelationNames();
+  const relationNames = (model.constructor as ModelClass).getRelationNames();
 
   for (let i = 0, l = keys.length; i < l; ++i) {
     const key = keys[i];
-    const value = model[key];
+    const value = (model as Model)[key];
 
     if (shallow && relationNames.includes(key)) {
       // The constructor may have given default values for relations.
-      delete clone[key];
+      delete (clone as Model)[key];
       continue;
     }
 
@@ -67,20 +66,20 @@ function cloneWithOpt(model, shallow, stripInternal) {
     }
 
     if (isObject(value)) {
-      clone[key] = cloneObject(value);
+      (clone as Model)[key] = cloneObject(value as object);
     } else {
-      clone[key] = value;
+      (clone as Model)[key] = value;
     }
   }
 
   return clone;
 }
 
-function cloneObject(value) {
+function cloneObject(value: object): unknown {
   if (Array.isArray(value)) {
     return cloneArray(value);
-  } else if (value.$isObjectionModel) {
-    return clone(value, false, false);
+  } else if ((value as Partial<Model>).$isObjectionModel) {
+    return clone(value as Model, false, false);
   } else if (Buffer.isBuffer(value)) {
     return Buffer.from(value);
   } else {
@@ -88,14 +87,14 @@ function cloneObject(value) {
   }
 }
 
-function cloneArray(value) {
+function cloneArray(value: unknown[]): unknown[] {
   const ret = new Array(value.length);
 
   for (let i = 0, l = ret.length; i < l; ++i) {
     const item = value[i];
 
     if (isObject(item)) {
-      ret[i] = cloneObject(item);
+      ret[i] = cloneObject(item as object);
     } else {
       ret[i] = item;
     }
@@ -104,18 +103,16 @@ function cloneArray(value) {
   return ret;
 }
 
-function copyHiddenProps(model, clone) {
+function copyHiddenProps<M extends Model>(model: M, clone: M): M {
   for (let i = 0, l = hiddenProps.length; i < l; ++i) {
     const prop = hiddenProps[i];
 
     if (Object.hasOwn(model, prop)) {
-      defineNonEnumerableProperty(clone, prop, model[prop]);
+      defineNonEnumerableProperty(clone, prop, (model as Model)[prop]);
     }
   }
 
   return clone;
 }
 
-module.exports = {
-  clone,
-};
+export { clone };

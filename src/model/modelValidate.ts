@@ -1,8 +1,12 @@
-'use strict';
+import { clone } from './modelClone';
+import type { Model, ModelClass, ModelJson, ModelOptions } from './Model';
+import type { ValidatorArgs } from './Validator';
 
-const { clone } = require('./modelClone');
-
-function validate(model, json, options = {}) {
+function validate(
+  model: Model,
+  json: ModelJson | null | undefined,
+  options: ModelOptions = {},
+): ModelJson {
   json = json || model;
 
   const inputJson = json;
@@ -17,14 +21,14 @@ function validate(model, json, options = {}) {
     // TODO 1: This should use `json.$toJson()` since we always validate the input representation!
     // TODO 2: This should also keep the relations in the object because some validators may
     //         depend on the relations.
-    json = clone(json, true, true);
+    json = clone(json as Model, true, true);
     // We can mutate `json` now that we took a copy of it.
     options = Object.assign({}, options, { mutable: true });
   }
 
-  const modelClass = model.constructor;
+  const modelClass = model.constructor as ModelClass;
   const validator = modelClass.getValidator();
-  const args = {
+  const args: ValidatorArgs = {
     options,
     model,
     json,
@@ -37,12 +41,10 @@ function validate(model, json, options = {}) {
 
   if (validatingModelInstance) {
     // If we cloned `json`, we need to copy the possible default values.
-    return inputJson.$set(json);
+    return (inputJson as Model).$set(json);
   } else {
     return json;
   }
 }
 
-module.exports = {
-  validate,
-};
+export { validate };

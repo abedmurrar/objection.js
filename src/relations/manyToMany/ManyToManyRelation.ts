@@ -108,7 +108,7 @@ class ManyToManyRelation extends Relation {
     const joinTable = builder.tableNameFor(this.joinTable);
     const joinTableAlias = builder.tableRefFor(this.joinTable);
 
-    let joinTableSelect = this.joinTableModelClass
+    let joinTableSelect: RelationQueryBuilder = this.joinTableModelClass
       .query()
       .childQueryOf(builder)
       .modify(this.joinTableModify)
@@ -151,7 +151,7 @@ class ManyToManyRelation extends Relation {
       relatedJoinSelect = aliasedTableName(relatedTable, relatedTableAlias);
     }
 
-    let joinTableSelect = this.joinTableModelClass
+    let joinTableSelect: RelationQueryBuilder = this.joinTableModelClass
       .query()
       .childQueryOf(builder)
       .modify(this.joinTableModify)

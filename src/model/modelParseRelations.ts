@@ -1,9 +1,17 @@
-'use strict';
+import { isObject } from '../utils/objectUtils';
+import type { Model, ModelClass, ModelJson, ModelOptions } from './Model';
+import type { Relation } from '../relations/Relation';
 
-const { isObject } = require('../utils/objectUtils');
+// The options with the cache of the objects that were already converted into
+// models, so that an object that appears many times in a graph becomes one model.
+type ParseOptions = ModelOptions & { cache: Map<unknown, Model> };
 
-function parseRelationsIntoModelInstances(model, json, options = {}) {
-  const relationNames = model.constructor.getRelationNames();
+function parseRelationsIntoModelInstances<M extends Model>(
+  model: M,
+  json: ModelJson,
+  options: ModelOptions = {},
+): M {
+  const relationNames = (model.constructor as ModelClass).getRelationNames();
 
   if (!options.cache && !hasRelation(json, relationNames)) {
     // Nothing to parse. The cache would only be used for the relations.
@@ -16,17 +24,17 @@ function parseRelationsIntoModelInstances(model, json, options = {}) {
     });
   }
 
-  options.cache.set(json, model);
+  (options as ParseOptions).cache.set(json, model);
 
   for (const relationName of relationNames) {
     const relationJson = json[relationName];
 
     if (relationJson !== undefined) {
-      const relation = model.constructor.getRelation(relationName);
-      const relationModel = parseRelation(relationJson, relation, options);
+      const relation = (model.constructor as ModelClass).getRelation(relationName);
+      const relationModel = parseRelation(relationJson, relation, options as ParseOptions);
 
       if (relationModel !== relationJson) {
-        model[relation.name] = relationModel;
+        (model as Model)[relation.name] = relationModel;
       }
     }
   }
@@ -34,7 +42,7 @@ function parseRelationsIntoModelInstances(model, json, options = {}) {
   return model;
 }
 
-function hasRelation(json, relationNames) {
+function hasRelation(json: ModelJson, relationNames: string[]): boolean {
   for (let i = 0, l = relationNames.length; i < l; ++i) {
     if (json[relationNames[i]] !== undefined) {
       return true;
@@ -44,7 +52,7 @@ function hasRelation(json, relationNames) {
   return false;
 }
 
-function parseRelation(json, relation, options) {
+function parseRelation(json: unknown, relation: Relation, options: ParseOptions): unknown {
   if (Array.isArray(json)) {
     return parseRelationArray(json, relation, options);
   } else if (json) {
@@ -54,7 +62,7 @@ function parseRelation(json, relation, options) {
   }
 }
 
-function parseRelationArray(json, relation, options) {
+function parseRelationArray(json: unknown[], relation: Relation, options: ParseOptions): unknown[] {
   const models = new Array(json.length);
   let didChange = false;
 
@@ -75,7 +83,7 @@ function parseRelationArray(json, relation, options) {
   }
 }
 
-function parseRelationObject(json, relation, options) {
+function parseRelationObject(json: unknown, relation: Relation, options: ParseOptions): unknown {
   if (isObject(json)) {
     const modelClass = relation.relatedModelClass;
     let model = options.cache.get(json);
@@ -84,7 +92,7 @@ function parseRelationObject(json, relation, options) {
       if (json instanceof modelClass) {
         model = parseRelationsIntoModelInstances(json, json, options);
       } else {
-        model = modelClass.fromJson(json, options);
+        model = modelClass.fromJson(json as ModelJson, options);
       }
     }
 
@@ -94,6 +102,4 @@ function parseRelationObject(json, relation, options) {
   }
 }
 
-module.exports = {
-  parseRelationsIntoModelInstances,
-};
+export { parseRelationsIntoModelInstances };

@@ -1,6 +1,6 @@
-'use strict';
+import type { Model, ModelClass } from './Model';
 
-function getSetId(model, maybeId) {
+function getSetId(model: Model, maybeId: unknown): unknown {
   if (maybeId !== undefined) {
     return setId(model, maybeId);
   } else {
@@ -8,12 +8,12 @@ function getSetId(model, maybeId) {
   }
 }
 
-function hasId(model) {
-  return model.$hasProps(model.constructor.getIdPropertyArray());
+function hasId(model: Model): boolean {
+  return model.$hasProps((model.constructor as ModelClass).getIdPropertyArray());
 }
 
-function setId(model, id) {
-  const idProp = model.constructor.getIdProperty();
+function setId(model: Model, id: unknown): void {
+  const idProp = (model.constructor as ModelClass).getIdProperty();
   const isCompositeId = Array.isArray(idProp);
 
   if (Array.isArray(id)) {
@@ -45,8 +45,8 @@ function setId(model, id) {
   }
 }
 
-function getId(model) {
-  const idProp = model.constructor.getIdProperty();
+function getId(model: Model): unknown {
+  const idProp = (model.constructor as ModelClass).getIdProperty();
   const isCompositeId = Array.isArray(idProp);
 
   if (isCompositeId) {
@@ -56,7 +56,4 @@ function getId(model) {
   }
 }
 
-module.exports = {
-  getSetId,
-  hasId,
-};
+export { getSetId, hasId };

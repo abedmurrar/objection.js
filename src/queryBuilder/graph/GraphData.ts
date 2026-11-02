@@ -4,8 +4,10 @@ import type { ModelClass } from '../QueryBuilderOperationSupport';
 import type { Model } from '../operations/types';
 import type { Relation } from '../../relations/Relation';
 
-// The graph classes in model/graph/ are not converted yet. These describe what
-// the graph operations use of them.
+// What the graph operations use of the graph classes in model/graph/. An edge
+// of a `ModelGraph` has a `relation` of `Relation | null`: it's null on the
+// reference edges. The graph operations read it only on the relation edges, so
+// they cast the graphs they create to `Graph`.
 
 // A model instance.
 type GraphModel = Model;

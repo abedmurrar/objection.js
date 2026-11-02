@@ -7,7 +7,8 @@
 
 import type { Knex } from 'knex';
 import type { QueryBuilderOperation } from './QueryBuilderOperation';
-import type { Relation, RelationModel, RelationModelClass } from '../../relations/Relation';
+import type { Relation } from '../../relations/Relation';
+import type { Model as RealModel } from '../../model/Model';
 import type { QueryBuilder } from '../QueryBuilder';
 
 export type { Relation };
@@ -36,7 +37,7 @@ export interface OperationOptions {
   modelOptions?: ModelOptions;
   upsertOptions?: Record<string, unknown>;
   opt?: Record<string, unknown>;
-  defaultGraphOptions?: GraphOptions;
+  defaultGraphOptions?: GraphOptions | null;
   joinOperation?: string;
   prefix?: string | null;
   not?: boolean;
@@ -71,47 +72,9 @@ export interface InternalOptions {
 // A modifier function or the name of a named modifier.
 export type Modifiers = Record<string, unknown>;
 
-// A model instance. `RelationModel` has its properties (the columns and
-// relations of a row) and the methods the relations use.
-export interface Model extends RelationModel {
-  constructor: ModelClass;
-  $set(obj: unknown): this;
-  $setDatabaseJson(json: unknown): this;
-  $toDatabaseJson(builder?: QueryBuilder): Record<string, unknown>;
-  $beforeInsert(context: unknown): unknown;
-  $afterInsert(context: unknown): unknown;
-  $beforeUpdate(modelOptions: ModelOptions, context: unknown): unknown;
-  $afterUpdate(modelOptions: ModelOptions, context: unknown): unknown;
-  $beforeDelete(context: unknown): unknown;
-  $afterDelete(context: unknown): unknown;
-  $afterFind(context: unknown): unknown;
-  $isObjectionModel: boolean;
-  $objectionModelClass: ModelClass;
-}
-
-// A model class. `RelationModelClass` has the static members the relations
-// use. `Relation` types its model classes as `RelationModelClass`.
-export interface ModelClass extends RelationModelClass {
-  prototype: Model;
-  useLimitInFirst: boolean;
-  query(): QueryBuilder;
-  getIdColumnArray(): string[];
-  getIdPropertyArray(): string[];
-  getRelationNames(): string[];
-  getRelationUnsafe(name: string | null): Relation | null;
-  getRelation(name: string): Relation;
-  ensureModel(json: unknown, modelOptions: ModelOptions): Model | null;
-  ensureModelArray(json: unknown, modelOptions: ModelOptions): Model[];
-  createValidationError(props: { type: string; message: string }): Error;
-  beforeFind(args: unknown): unknown;
-  afterFind(args: unknown): unknown;
-  beforeInsert(args: unknown): unknown;
-  afterInsert(args: unknown): unknown;
-  beforeUpdate(args: unknown): unknown;
-  afterUpdate(args: unknown): unknown;
-  beforeDelete(args: unknown): unknown;
-  afterDelete(args: unknown): unknown;
-}
+// A model instance and a model class.
+export type Model = RealModel;
+export type ModelClass = typeof RealModel;
 
 export interface QueryBuilderClass {
   forClass(modelClass: ModelClass): QueryBuilder;

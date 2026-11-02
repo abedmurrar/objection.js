@@ -1,7 +1,7 @@
-'use strict';
-
 class RelationDoesNotExistError extends Error {
-  constructor(relationName) {
+  declare relationName: string | null;
+
+  constructor(relationName: string | null) {
     super(`unknown relation "${relationName}" in a relation expression`);
 
     this.name = this.constructor.name;
@@ -9,6 +9,4 @@ class RelationDoesNotExistError extends Error {
   }
 }
 
-module.exports = {
-  RelationDoesNotExistError,
-};
+export { RelationDoesNotExistError };

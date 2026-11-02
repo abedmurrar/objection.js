@@ -1,12 +1,10 @@
-'use strict';
-
 class ModifierNotFoundError extends Error {
-  constructor(modifierName) {
+  declare modifierName: unknown;
+
+  constructor(modifierName: unknown) {
     super(`Unable to determine modify function from provided value: "${modifierName}".`);
     this.modifierName = modifierName;
   }
 }
 
-module.exports = {
-  ModifierNotFoundError,
-};
+export { ModifierNotFoundError };

@@ -17,9 +17,8 @@ import type {
 // they are named after, so knex builders are used dynamically.
 type KnexLike = KnexBuilder;
 
-// A model class. The model classes are user-defined subclasses of the still
-// JavaScript `Model`, with static members of their own: `OperationModelClass`
-// has the ones the operations use, and the rest are dynamic.
+// A model class. The model classes are user-defined subclasses of `Model`,
+// with static members of their own, which are dynamic.
 interface ModelClass extends OperationModelClass {
   [key: string]: any;
 }
