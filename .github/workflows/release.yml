@@ -39,21 +39,13 @@ jobs:
             exit 1
           fi
           case "$version" in
-            *-*) echo "prerelease=true" >> "$GITHUB_OUTPUT" ;;
-            *) echo "prerelease=false" >> "$GITHUB_OUTPUT" ;;
+            *-*) echo "dist-tag=next" >> "$GITHUB_OUTPUT"; echo "prerelease=true" >> "$GITHUB_OUTPUT" ;;
+            *) echo "dist-tag=latest" >> "$GITHUB_OUTPUT"; echo "prerelease=false" >> "$GITHUB_OUTPUT" ;;
           esac
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
-      # Every release goes to `latest`, so a plain `npm install` gets the
-      # newest version. Prereleases are also tagged `next`.
       - name: Publish to npm
-        run: npm publish --provenance --access public --tag latest
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Tag the prerelease as next
-        if: steps.version.outputs.prerelease == 'true'
-        run: npm dist-tag add "@abedmurrar/objection@${{ steps.version.outputs.version }}" next
+        run: npm publish --provenance --access public --tag ${{ steps.version.outputs.dist-tag }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 

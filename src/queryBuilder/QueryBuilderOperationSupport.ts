@@ -604,7 +604,7 @@ class QueryBuilderOperationSupport {
   }
 
   skipUndefined(): this {
-    deprecate('skipUndefined() is deprecated and will be removed in objection 4.0');
+    deprecate('skipUndefined() is deprecated and will be removed in a future major version');
     this.internalOptions().skipUndefined = true;
     return this;
   }

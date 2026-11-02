@@ -6,7 +6,8 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ### What's new
 
-- Every release is now published under npm's `latest` dist-tag, so `npm install @abedmurrar/objection` installs the newest version. Prereleases are also tagged `next`, as before.
+- `4.0.0` is the first stable release of the fork. It's published under npm's `latest` dist-tag, so `npm install @abedmurrar/objection` installs it; `@next` is no longer needed. See [Breaking changes](/fork/breaking-changes) for what changed since objection.js 3.1.5.
+- The deprecation warning of `skipUndefined()` says it will be removed in a future major version, instead of in 4.0.
 
 ## 4.0.0-beta.11 (2026-11-02)
 
