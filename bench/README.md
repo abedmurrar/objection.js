@@ -19,6 +19,8 @@ To get a baseline checkout of another commit:
 ```sh
 git worktree add ../objection-baseline <commit>
 ln -s "$PWD/node_modules" ../objection-baseline/node_modules
+# Commits from the TypeScript move on keep their source in src/; build it.
+(cd ../objection-baseline && [ -d src ] && npm run build)
 npm run bench:compare -- --baseline ../objection-baseline
 ```
 

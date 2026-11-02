@@ -71,6 +71,10 @@ await Notification.query()
 
 If `payload` is `NULL`, it becomes `{ "courseName": "Physics" }`, or an array if the path starts with an index. Before, the column stayed `NULL` on postgres.
 
+## Only the package entry can be imported
+
+package.json has an `exports` map, so `require('@abedmurrar/objection')` and `import ... from '@abedmurrar/objection'` are the only entry points. Imports of files inside the package, like `@abedmurrar/objection/lib/utils/...`, which were never documented, now throw `ERR_PACKAGE_PATH_NOT_EXPORTED`. Everything public is exported from the entry.
+
 ## Node.js 24 or newer is required
 
 The fork supports the Node.js versions that are still maintained: 24 and 26, the two current LTS lines. Node.js 20 reached its end of life in April 2026 and 22 is close to it.

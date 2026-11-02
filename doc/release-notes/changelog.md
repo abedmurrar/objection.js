@@ -6,10 +6,14 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ### Breaking changes
 
+- package.json has an `exports` map, so only the package entry can be imported. Imports of files inside the package, which were never documented, throw `ERR_PACKAGE_PATH_NOT_EXPORTED`
+
 - Node.js 24 or newer is required, the two LTS lines that are still maintained (24 and 26). Node.js 20 reached its end of life in April 2026.
 - knex 3.3 or newer is required. Older versions compile some queries differently: `delete().limit(n)` on MySQL ignores the limit and deletes every matching row on knex 3.1, and `updateFrom()` with a raw query gets its bindings in the wrong order before knex 3.3. knex 3.2 also rejects queries that combine `delete()` with a limit on databases that don't support it, which includes `page()` and `range()` on deletes on postgres and SQLite.
 
 ### What's new
+
+- An ES module entry: `import { Model } from '@abedmurrar/objection'` works without CommonJS interop, with its own types. It re-exports the CommonJS build, so `import` and `require()` give the same classes and objection is loaded once
 
 - Faster queries: objection's own work for a small query takes 13% to 19% less time, `toJSON()` 44% less, validating models 55% less, and a class bound to a transaction with `bindKnex()` no longer creates and compiles a validator of its own (91% less for a validated insert in a new transaction). `withGraphJoined()` parses the joined rows 20% faster and graph inserts and upserts take 12% to 15% less time. The generated SQL and the results are the same. See `bench/README.md` in the repository
 - On MySQL, `withGraphFetched()` and `fetchGraph()` run their queries 4 at a time again, like on the other databases. 4.0.0-alpha.0 ran every query of graph operations one at a time to stop the deadlocks of concurrent `upsertGraph()` updates, which only writes need. A concurrency set on the model still applies to all queries

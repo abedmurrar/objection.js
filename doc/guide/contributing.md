@@ -46,7 +46,7 @@ git clone git@github.com:<your-account>/objection.js.git objection
 
 5. **Create test users and databases by running `node setup-test-db` at the root of the repo**
 
-6. **Run `npm test` in objection's root to see if everything works.**
+6. **Run `npm test` in objection's root to see if everything works.** The source is in `src/` and is compiled into `lib/` by `npm run build`, which `npm test` runs first. The tests and the package use `lib/`.
 
 7. **Run `npm run docs:dev` and go to `http://localhost:5173/objection.js/` to see the generated documentation site when you change the markdown files in the `doc` folder.**
 
