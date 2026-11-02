@@ -4,6 +4,10 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+### What's new
+
+- Every release is now published under npm's `latest` dist-tag, so `npm install @abedmurrar/objection` installs the newest version. Prereleases are also tagged `next`, as before.
+
 ## 4.0.0-beta.11 (2026-11-02)
 
 ### What's new

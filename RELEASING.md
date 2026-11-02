@@ -6,10 +6,12 @@ Releases are published to npm by GitHub Actions when a version tag is pushed. No
 
 The package follows [semver](https://semver.org). Until 4.0 is done, releases are prereleases. `4.0.0-alpha.0` was the first; the next release is `4.0.0-beta.0` (`npm run release -- 4.0.0-beta.0`), and later betas use `npm run release -- prerelease`, which keeps the `beta` id. Then comes `4.0.0`.
 
-| Version                      | npm dist-tag | Install with                             |
-| ---------------------------- | ------------ | ---------------------------------------- |
-| prerelease (`4.0.0-alpha.1`) | `next`       | `npm install @abedmurrar/objection@next` |
-| release (`4.0.0`)            | `latest`     | `npm install @abedmurrar/objection`      |
+| Version                     | npm dist-tags      |
+| --------------------------- | ------------------ |
+| prerelease (`4.0.0-beta.1`) | `latest` and `next` |
+| release (`4.0.0`)           | `latest`           |
+
+Every release goes to `latest`, so `npm install @abedmurrar/objection` always installs the newest version. `@next` keeps pointing to the newest prerelease.
 
 Breaking changes need a major version, including breaking changes to the TypeScript types.
 
@@ -45,6 +47,6 @@ Provenance needs the GitHub repository to be public.
    git push origin main --follow-tags
    ```
 
-4. The `release` workflow runs all tests (SQLite, Postgres, MySQL 8.4 and MariaDB 10.6 and 11.4, on Node.js 24 and 26), checks that the tag matches `package.json`, publishes to npm with provenance under the dist-tag from the table above, and creates the GitHub release.
+4. The `release` workflow runs all tests (SQLite, Postgres, MySQL 8.4 and MariaDB 10.6 and 11.4, on Node.js 24 and 26), checks that the tag matches `package.json`, publishes to npm with provenance under the dist-tags from the table above, and creates the GitHub release.
 
 If the workflow fails before publishing, fix the problem on `main`, delete the tag (`git push origin :refs/tags/v<version>` and `git tag -d v<version>`), and release the next version. A published version can't be republished.

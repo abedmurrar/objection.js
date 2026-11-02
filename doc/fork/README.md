@@ -14,7 +14,7 @@ Existing code imports from `'objection'`. To keep those imports working, install
 npm install objection@npm:@abedmurrar/objection@next
 ```
 
-Until 4.0 is final, releases are prereleases (`4.0.0-alpha.0`, ...) and are published under the `next` dist-tag.
+Until 4.0 is final, releases are prereleases (`4.0.0-beta.0`, ...). Each one is published under both the `latest` and `next` dist-tags, so `@next` is optional.
 
 ## Requirements
 
