@@ -1,5 +1,5 @@
 [![Tests](https://github.com/abedmurrar/objection.js/actions/workflows/test.yml/badge.svg)](https://github.com/abedmurrar/objection.js/actions/workflows/test.yml)
-[![npm](https://img.shields.io/npm/v/@abedmurrar/objection/next)](https://www.npmjs.com/package/@abedmurrar/objection)
+[![npm](https://img.shields.io/npm/v/@abedmurrar/objection)](https://www.npmjs.com/package/@abedmurrar/objection)
 
 # @abedmurrar/objection
 
@@ -8,7 +8,7 @@
 It started as a fork of [objection.js](https://github.com/Vincit/objection.js) 3.1.5 and keeps its API, so objection.js code runs on it apart from the [breaking changes](doc/fork/breaking-changes.md), most of which fix queries that read or changed the wrong rows.
 
 ```sh
-npm install @abedmurrar/objection@next knex
+npm install @abedmurrar/objection knex
 ```
 
 ## Why this one
@@ -80,7 +80,7 @@ Postgres is tested on the current release.
 Install the package under the name `objection`, and existing `import { Model } from 'objection'` code keeps working:
 
 ```sh
-npm install objection@npm:@abedmurrar/objection@next
+npm install objection@npm:@abedmurrar/objection
 ```
 
 Then read the [breaking changes](doc/fork/breaking-changes.md) and the [migration guide](doc/release-notes/migration.md). Most changes make queries do what they look like they do. The stricter types can flag code that only compiled because the old types were loose; the [TypeScript page](doc/fork/typescript.md) lists an opt-out for every check.

@@ -40,10 +40,10 @@ features:
 It started as a fork of [objection.js](https://github.com/Vincit/objection.js) 3.1.5 by Sami Koskimäki and its contributors, and keeps its API. The [guide](/guide/) and the [API reference](/api/objection/) of this site come from objection.js and apply as they are; the [fork section](/fork/) covers what this package adds and changes.
 
 ```sh
-npm install @abedmurrar/objection@next knex
+npm install @abedmurrar/objection knex
 ```
 
-Coming from objection.js? Install it as `objection@npm:@abedmurrar/objection@next` and existing imports keep working. Then read the [breaking changes](/fork/breaking-changes) and the [migration guide](/release-notes/migration).
+Coming from objection.js? Install it as `objection@npm:@abedmurrar/objection` and existing imports keep working. Then read the [breaking changes](/fork/breaking-changes) and the [migration guide](/release-notes/migration).
 
 What you get:
 
