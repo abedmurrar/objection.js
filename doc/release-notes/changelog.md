@@ -4,6 +4,8 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+## 4.0.2 (2026-11-02)
+
 ### What's new
 
 - Every link in the README goes to the documentation site, including the badges. The README no longer links to files on GitHub.
