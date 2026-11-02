@@ -395,6 +395,10 @@ class TestSession {
     return knexUtils.isMySql(this.knex);
   }
 
+  isMariaDb() {
+    return knexUtils.isMariaDb(this.knex);
+  }
+
   isSqlite() {
     return knexUtils.isSqlite(this.knex);
   }

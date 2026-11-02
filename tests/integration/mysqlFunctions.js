@@ -1,6 +1,7 @@
 const expect = require('expect.js');
 const { Model, fn, ref } = require('../../');
-const { FUNCTIONS } = require('../../lib/queryBuilder/functions/mysql');
+const { FUNCTIONS, MARIADB_UNSUPPORTED } = require('../../lib/queryBuilder/functions/mysql');
+const { isMariaDb, getMariaDbVersion } = require('../../lib/utils/knexUtils');
 
 // Functions that can't be called with NULL arguments in a test.
 const SKIP = new Set([
@@ -12,8 +13,22 @@ const SKIP = new Set([
   'default',
 ]);
 
+// Functions MariaDB 11.4 has but 10.6 doesn't.
+const NEWER_ON_MARIADB = new Set([
+  'formatPicoTime',
+  'jsonSchemaValid',
+  'jsonOverlaps',
+  'randomBytes',
+]);
+// Functions whose optional arguments MariaDB 10.6 doesn't take.
+const FEWER_ARGS_ON_OLD_MARIADB = new Set(['aesEncrypt', 'aesDecrypt']);
+
 module.exports = (session) => {
   describe('MySQL fn helpers', () => {
+    const mariaDb = isMariaDb(session.knex);
+    const mariaDbVersion = getMariaDbVersion(session.knex);
+    const oldMariaDb = mariaDb && mariaDbVersion && mariaDbVersion[0] < 11;
+
     class Event extends Model {
       static get tableName() {
         return 'MysqlFunctionsEvent';
@@ -60,11 +75,33 @@ module.exports = (session) => {
         const hasRest = list.some((it) => it.startsWith('...'));
         let error = null;
 
+        if (mariaDb && MARIADB_UNSUPPORTED[name] && MARIADB_UNSUPPORTED[name]([])) {
+          // The helper throws instead of sending SQL that MariaDB rejects.
+          const err = await value(fn[name](...new Array(required).fill(null))).catch((err) => err);
+
+          if (!(err instanceof Error) || !err.message.includes('on MariaDB')) {
+            failures.push(`${name}: should throw on MariaDB`);
+          }
+
+          continue;
+        }
+
+        if (oldMariaDb && NEWER_ON_MARIADB.has(name)) {
+          continue;
+        }
+
+        let counts = hasRest ? [required + 1, required + 2] : [required];
+
+        if (oldMariaDb && FEWER_ARGS_ON_OLD_MARIADB.has(name)) {
+          counts = [required];
+        }
+
         // Functions with a rest parameter need one or two arguments for it.
-        for (const count of hasRest ? [required + 1, required + 2] : [required]) {
+        for (const count of counts) {
           try {
             const builder = fn[name](...new Array(count).fill(null));
-            await value(options.window ? builder.over() : builder);
+            // MariaDB needs an ORDER BY for ranking functions.
+            await value(options.window ? builder.over({ orderBy: 'id' }) : builder);
             error = null;
             break;
           } catch (err) {
@@ -116,10 +153,14 @@ module.exports = (session) => {
       expect(await value(fn.trim('xxaxx', { remove: 'x' }))).to.equal('a');
       expect(await value(fn.trim('  a ', { side: 'leading' }))).to.equal('a ');
       expect(await value(fn.convert(fn.char([77, 121]), { using: 'utf8mb4' }))).to.equal('My');
-      expect(
-        await value(fn.jsonValue(fn.jsonObject({ a: '5' }), '$.a', { returning: 'unsigned' })),
-      ).to.equal(5);
-      expect(await value(fn.memberOf('a', ref('tags')))).to.equal(1);
+      if (mariaDb) {
+        expect(await value(fn.jsonValue(fn.jsonObject({ a: '5' }), '$.a'))).to.equal('5');
+      } else {
+        expect(
+          await value(fn.jsonValue(fn.jsonObject({ a: '5' }), '$.a', { returning: 'unsigned' })),
+        ).to.equal(5);
+        expect(await value(fn.memberOf('a', ref('tags')))).to.equal(1);
+      }
     });
 
     it('aggregates', async () => {
@@ -145,7 +186,9 @@ module.exports = (session) => {
 
     it('JSON functions should cast objects and arrays', async () => {
       expect(await value(fn.jsonContains(ref('tags'), ['a']))).to.equal(1);
-      expect(await value(fn.jsonOverlaps(ref('tags'), ['x', 'b']))).to.equal(1);
+      if (!oldMariaDb) {
+        expect(await value(fn.jsonOverlaps(ref('tags'), ['x', 'b']))).to.equal(1);
+      }
       expect(await value(fn.jsonLength(ref('tags')))).to.equal(2);
       expect(await value(fn.jsonSet({ a: 1 }, '$.b', { c: [2] }))).to.eql({ a: 1, b: { c: [2] } });
       expect(await value(fn.jsonMergePatch({ a: 1, b: 2 }, { b: null }))).to.eql({ a: 1 });

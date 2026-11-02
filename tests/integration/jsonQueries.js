@@ -2,6 +2,7 @@ const _ = require('lodash');
 const expect = require('expect.js');
 const Promise = require('bluebird');
 const { Model, ref, val, raw } = require('../../');
+const { getMariaDbVersion } = require('../../lib/utils/knexUtils');
 
 function expectIdsEqual(resultArray, expectedIds) {
   expectArraysEqual(_(resultArray).map('id').sort().value(), expectedIds);
@@ -1599,7 +1600,23 @@ module.exports = (session) => {
         expectIdsEqual(await BoundModel.query().whereJsonHasAny('jsonObject', ['tags']), [1, 2, 3]);
       });
 
-      if (session.isMySql()) {
+      const mariaDbVersion = getMariaDbVersion(session.knex);
+      const hasJsonOverlaps =
+        !mariaDbVersion ||
+        mariaDbVersion[0] > 10 ||
+        (mariaDbVersion[0] === 10 && mariaDbVersion[1] >= 9);
+
+      if (session.isMySql() && !hasJsonOverlaps) {
+        it('whereJsonOverlaps should throw on MariaDB before 10.9', async () => {
+          const err = await BoundModel.query()
+            .whereJsonOverlaps('jsonArray', ['a'])
+            .catch((err) => err);
+
+          expect(err.message).to.equal(
+            'whereJsonOverlaps needs MariaDB 10.9 or newer, which has JSON_OVERLAPS().',
+          );
+        });
+      } else if (session.isMySql()) {
         it('whereJsonOverlaps', async () => {
           expectIdsEqual(
             await BoundModel.query().whereJsonOverlaps('jsonObject:tags', ['b', 'c']),

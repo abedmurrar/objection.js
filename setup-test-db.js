@@ -5,7 +5,12 @@ const knex = require('knex');
 const DATABASES = (process.env.DATABASES && process.env.DATABASES.split(',')) || [
   'postgres',
   'mysql',
+  'mariadb10',
+  'mariadb11',
 ];
+
+// The MariaDB versions, on the ports of docker-compose.yml.
+const MARIADB_PORTS = { mariadb10: 3307, mariadb11: 3308 };
 
 async function setup() {
   if (DATABASES.includes('postgres')) {
@@ -44,6 +49,30 @@ async function setup() {
     await mysql.raw('CREATE DATABASE objection_test');
 
     await mysql.destroy();
+  }
+
+  for (const [name, port] of Object.entries(MARIADB_PORTS)) {
+    if (!DATABASES.includes(name)) {
+      continue;
+    }
+
+    const mariadb = await createKnex({
+      client: 'mariadb',
+
+      connection: {
+        user: 'root',
+        host: '127.0.0.1',
+        port,
+      },
+    });
+
+    await mariadb.raw('DROP DATABASE IF EXISTS objection_test');
+    await mariadb.raw("DROP USER IF EXISTS objection@'%'");
+    await mariadb.raw("CREATE USER objection@'%'");
+    await mariadb.raw("GRANT ALL PRIVILEGES ON *.* TO objection@'%'");
+    await mariadb.raw('CREATE DATABASE objection_test');
+
+    await mariadb.destroy();
   }
 }
 

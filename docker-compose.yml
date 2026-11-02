@@ -15,3 +15,27 @@ services:
       - '3306:3306'
     environment:
       - 'MYSQL_ALLOW_EMPTY_PASSWORD=yes'
+  mariadb10:
+    image: 'mariadb:10.6'
+    container_name: 'objection_mariadb10'
+    ports:
+      - '3307:3306'
+    environment:
+      - 'MARIADB_ALLOW_EMPTY_ROOT_PASSWORD=yes'
+    healthcheck:
+      test: ['CMD', 'healthcheck.sh', '--connect', '--innodb_initialized']
+      interval: 2s
+      timeout: 5s
+      retries: 30
+  mariadb11:
+    image: 'mariadb:11.4'
+    container_name: 'objection_mariadb11'
+    ports:
+      - '3308:3306'
+    environment:
+      - 'MARIADB_ALLOW_EMPTY_ROOT_PASSWORD=yes'
+    healthcheck:
+      test: ['CMD', 'healthcheck.sh', '--connect', '--innodb_initialized']
+      interval: 2s
+      timeout: 5s
+      retries: 30

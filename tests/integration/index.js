@@ -43,6 +43,62 @@ describe('integration tests', () => {
       },
     },
     {
+      name: 'mariadb10',
+      client: 'mariadb',
+      // The server version, which objection uses for MariaDB's differences.
+      version: '10.6-MariaDB',
+      connection: {
+        host: '127.0.0.1',
+        port: 3307,
+        user: 'objection',
+        database: 'objection_test',
+        // The mariadb driver returns BIGINT values and insert ids as BigInt
+        // by default.
+        insertIdAsNumber: true,
+        bigIntAsNumber: true,
+        // Queries like `select t.*, t.a + 1 as a` return two columns with the same
+        // name, which the mariadb driver rejects by default. mysql2 keeps the last.
+        checkDuplicate: false,
+      },
+      pool: {
+        min: 2,
+        max: 10,
+        afterCreate: (conn, cb) => {
+          conn.query(`SET SESSION sql_mode='NO_AUTO_VALUE_ON_ZERO'`, (err) => {
+            cb(err, conn);
+          });
+        },
+      },
+    },
+    {
+      name: 'mariadb11',
+      client: 'mariadb',
+      // The server version, which objection uses for MariaDB's differences.
+      version: '11.4-MariaDB',
+      connection: {
+        host: '127.0.0.1',
+        port: 3308,
+        user: 'objection',
+        database: 'objection_test',
+        // The mariadb driver returns BIGINT values and insert ids as BigInt
+        // by default.
+        insertIdAsNumber: true,
+        bigIntAsNumber: true,
+        // Queries like `select t.*, t.a + 1 as a` return two columns with the same
+        // name, which the mariadb driver rejects by default. mysql2 keeps the last.
+        checkDuplicate: false,
+      },
+      pool: {
+        min: 2,
+        max: 10,
+        afterCreate: (conn, cb) => {
+          conn.query(`SET SESSION sql_mode='NO_AUTO_VALUE_ON_ZERO'`, (err) => {
+            cb(err, conn);
+          });
+        },
+      },
+    },
+    {
       client: 'postgres',
       connection: {
         host: '127.0.0.1',
