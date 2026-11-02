@@ -1,4 +1,5 @@
-[![Tests](https://github.com/abedmurrar/objection.js/actions/workflows/test.yml/badge.svg)](https://github.com/abedmurrar/objection.js/actions/workflows/test.yml)
+[![Tests](https://github.com/abedmurrar/objection.js/actions/workflows/test.yml/badge.svg)](https://abedmurrar.github.io/objection.js/)
+[![Docs](https://img.shields.io/badge/docs-abedmurrar.github.io-blue)](https://abedmurrar.github.io/objection.js/)
 [![npm](https://img.shields.io/npm/v/@abedmurrar/objection)](https://www.npmjs.com/package/@abedmurrar/objection)
 
 # @abedmurrar/objection
@@ -90,7 +91,7 @@ Then read the [breaking changes](https://abedmurrar.github.io/objection.js/fork/
 - [What this package adds](https://abedmurrar.github.io/objection.js/fork/) to objection.js, page by page.
 - **[The documentation site](https://abedmurrar.github.io/objection.js/)**: the guide and the API reference for everything else (models, relations, queries, eager loading, graphs, transactions and validation), which come from objection.js.
 - [Changelog](https://abedmurrar.github.io/objection.js/release-notes/changelog) and [migration guide](https://abedmurrar.github.io/objection.js/release-notes/migration).
-- [Contributing](https://abedmurrar.github.io/objection.js/guide/contributing) and [releasing](RELEASING.md).
+- [Contributing](https://abedmurrar.github.io/objection.js/guide/contributing).
 
 ## The approach
 
@@ -103,4 +104,4 @@ Like objection.js, this is less a classic ORM than **a relational query builder*
 
 This project is built on objection.js by Sami Koskimäki and its many contributors, maintained at Vincit. Its design, its API, most of its code and much of the documentation come from there. Thank you.
 
-Released under the [MIT license](LICENSE), like objection.js.
+Released under the MIT license, like objection.js.
