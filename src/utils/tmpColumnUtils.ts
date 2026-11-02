@@ -1,11 +1,7 @@
-'use strict';
-
 const OWNER_JOIN_COLUMN_ALIAS_PREFIX = 'objectiontmpjoin';
 
-function getTempColumn(index) {
+function getTempColumn(index: number): string {
   return `${OWNER_JOIN_COLUMN_ALIAS_PREFIX}${index}`;
 }
 
-module.exports = {
-  getTempColumn,
-};
+export { getTempColumn };

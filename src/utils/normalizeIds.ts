@@ -1,13 +1,34 @@
-'use strict';
+import { isObject } from '../utils/objectUtils';
 
-const { isObject } = require('../utils/objectUtils');
+// The parts of a RelationProperty that are used here.
+interface IdProperty {
+  readonly size: number;
+  setProp(obj: object, index: number, value: unknown): void;
+  getProp(obj: object, index: number): unknown;
+  getProps(obj: object): unknown[];
+  propDescription(index: number): string;
+}
+
+interface NormalizeIdsOptions {
+  arrayOutput?: boolean;
+}
 
 // ids is of type RelationProperty.
-function normalizeIds(ids, prop, opt) {
+function normalizeIds(ids: unknown, prop: IdProperty, opt: { arrayOutput: true }): unknown[][];
+function normalizeIds(
+  ids: unknown,
+  prop: IdProperty,
+  opt?: NormalizeIdsOptions | null,
+): object[] | unknown[][];
+function normalizeIds(
+  ids: unknown,
+  prop: IdProperty,
+  opt?: NormalizeIdsOptions | null,
+): object[] | unknown[][] {
   opt = opt || {};
 
   const isComposite = prop.size > 1;
-  let ret;
+  let ret: object[];
 
   if (isComposite) {
     // For composite ids these are okay:
@@ -30,7 +51,7 @@ function normalizeIds(ids, prop, opt) {
 
         // 4.
         for (let i = 0, l = ids.length; i < l; ++i) {
-          ret[i] = ensureObject(ids[i], prop);
+          ret[i] = ensureObject(ids[i]);
         }
       } else {
         // 1.
@@ -87,7 +108,7 @@ function normalizeIds(ids, prop, opt) {
   }
 }
 
-function convertIdArrayToObject(ids, prop) {
+function convertIdArrayToObject(ids: unknown, prop: IdProperty): object {
   if (!Array.isArray(ids)) {
     throw new Error(`invalid composite key ${JSON.stringify(ids)}`);
   }
@@ -105,7 +126,7 @@ function convertIdArrayToObject(ids, prop) {
   return obj;
 }
 
-function ensureObject(ids) {
+function ensureObject(ids: unknown): object {
   if (isObject(ids)) {
     return ids;
   } else {
@@ -113,7 +134,7 @@ function ensureObject(ids) {
   }
 }
 
-function checkProperties(ret, prop) {
+function checkProperties(ret: object[], prop: IdProperty): void {
   for (let i = 0, l = ret.length; i < l; ++i) {
     const obj = ret[i];
 
@@ -129,8 +150,8 @@ function checkProperties(ret, prop) {
   }
 }
 
-function normalizedToArray(ret, prop) {
-  const arr = new Array(ret.length);
+function normalizedToArray(ret: object[], prop: IdProperty): unknown[][] {
+  const arr = new Array<unknown[]>(ret.length);
 
   for (let i = 0, l = ret.length; i < l; ++i) {
     arr[i] = prop.getProps(ret[i]);
@@ -139,6 +160,4 @@ function normalizedToArray(ret, prop) {
   return arr;
 }
 
-module.exports = {
-  normalizeIds,
-};
+export { normalizeIds };

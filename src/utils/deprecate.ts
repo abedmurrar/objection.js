@@ -1,8 +1,6 @@
-'use strict';
+const LOGGED_DEPRECATIONS = new Set<string>();
 
-const LOGGED_DEPRECATIONS = new Set();
-
-function deprecate(message) {
+function deprecate(message: string): void {
   // Only log deprecation messages once.
   if (!LOGGED_DEPRECATIONS.has(message)) {
     LOGGED_DEPRECATIONS.add(message);
@@ -10,6 +8,4 @@ function deprecate(message) {
   }
 }
 
-module.exports = {
-  deprecate,
-};
+export { deprecate };

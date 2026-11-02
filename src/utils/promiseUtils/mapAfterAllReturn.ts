@@ -1,12 +1,14 @@
-'use strict';
-
-const { isPromise } = require('./isPromise');
+import { isPromise } from './isPromise';
 
 // Map `arr` with `mapper` and after that return `returnValue`. If none of
 // the mapped values is a promise, return synchronously for performance
 // reasons.
-function mapAfterAllReturn(arr, mapper, returnValue) {
-  const results = new Array(arr.length);
+function mapAfterAllReturn<T, R>(
+  arr: ArrayLike<T>,
+  mapper: (item: T) => unknown,
+  returnValue: R,
+): R | Promise<R> {
+  const results = new Array<unknown>(arr.length);
   let containsPromise = false;
 
   for (let i = 0, l = arr.length; i < l; ++i) {
@@ -24,6 +26,4 @@ function mapAfterAllReturn(arr, mapper, returnValue) {
   }
 }
 
-module.exports = {
-  mapAfterAllReturn,
-};
+export { mapAfterAllReturn };

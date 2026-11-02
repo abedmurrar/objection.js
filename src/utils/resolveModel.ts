@@ -1,11 +1,16 @@
-'use strict';
+import path from 'node:path';
+import { isString, isFunction } from '../utils/objectUtils';
 
-const path = require('node:path');
-const { isString, isFunction } = require('../utils/objectUtils');
+// A model class, as far as it's checked here.
+type ModelClassLike = Function & { readonly isObjectionModelClass: unknown };
 
 class ResolveError extends Error {}
 
-function resolveModel(modelRef, modelPaths, errorPrefix) {
+function resolveModel(
+  modelRef: unknown,
+  modelPaths: readonly string[] | null | undefined,
+  errorPrefix: string,
+): ModelClassLike | undefined {
   try {
     if (isString(modelRef)) {
       if (isAbsolutePath(modelRef)) {
@@ -33,10 +38,13 @@ function resolveModel(modelRef, modelPaths, errorPrefix) {
       throw err;
     }
   }
+
+  // A relative path without `modelPaths` doesn't resolve to anything.
+  return undefined;
 }
 
-function requireUsingModelPaths(modelRef, modelPaths) {
-  let firstError = null;
+function requireUsingModelPaths(modelRef: string, modelPaths: readonly string[]): ModelClassLike {
+  let firstError: unknown = null;
 
   for (const modelPath of modelPaths) {
     try {
@@ -55,15 +63,16 @@ function requireUsingModelPaths(modelRef, modelPaths) {
   }
 }
 
-function requireModel(modelPath) {
+function requireModel(modelPath: string): ModelClassLike {
   /**
    * Wrap path string in template literal to prevent
    * warnings about Objection.JS being an expression
    * in webpack builds.
    * @link https://github.com/webpack/webpack/issues/196
    */
-  const mod = require(`${path.resolve(modelPath)}`);
-  let modelClass = null;
+  // The module is the user's, so its exports can be anything.
+  const mod = require(`${path.resolve(modelPath)}`) as Record<string, unknown>;
+  let modelClass: unknown = null;
 
   if (isModelClass(mod)) {
     modelClass = mod;
@@ -93,15 +102,16 @@ function requireModel(modelPath) {
   return modelClass;
 }
 
-function isAbsolutePath(pth) {
+function isAbsolutePath(pth: string): boolean {
   return path.normalize(pth + '/') === path.normalize(path.resolve(pth) + '/');
 }
 
-function isModelClass(maybeModel) {
-  return isFunction(maybeModel) && maybeModel.isObjectionModelClass;
+// The `T &` keeps an `any` argument `any`.
+function isModelClass<T>(maybeModel: T): maybeModel is T & ModelClassLike {
+  // This returns the value of `isObjectionModelClass` as is, like the
+  // JavaScript code did. It's `true` on model classes.
+  return (isFunction(maybeModel) &&
+    (maybeModel as unknown as ModelClassLike).isObjectionModelClass) as boolean;
 }
 
-module.exports = {
-  resolveModel,
-  isModelClass,
-};
+export { resolveModel, isModelClass };

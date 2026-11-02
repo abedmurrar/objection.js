@@ -1,6 +1,4 @@
-'use strict';
-
-function inherit(Constructor, BaseConstructor) {
+function inherit<C extends Function>(Constructor: C, BaseConstructor: Function): C {
   Constructor.prototype = Object.create(BaseConstructor.prototype);
   Constructor.prototype.constructor = BaseConstructor;
   Object.setPrototypeOf(Constructor, BaseConstructor);
@@ -8,6 +6,4 @@ function inherit(Constructor, BaseConstructor) {
   return Constructor;
 }
 
-module.exports = {
-  inherit,
-};
+export { inherit };

@@ -1,10 +1,32 @@
-'use strict';
+import { isObject } from './objectUtils';
 
-const { isObject } = require('./objectUtils');
+type StringMapper = (str: string) => string;
+type KeyMapper = (obj: unknown) => unknown;
+
+interface SnakeCaseOptions {
+  upperCase?: boolean;
+  underscoreBeforeDigits?: boolean;
+  underscoreBetweenUppercaseLetters?: boolean;
+}
+
+interface CamelCaseOptions {
+  upperCase?: boolean;
+}
+
+interface KnexIdentifierMappersOptions {
+  parse?: StringMapper;
+  format?: StringMapper;
+  idSeparator?: string;
+}
+
+interface KnexMappers {
+  wrapIdentifier(identifier: string, origWrap: StringMapper): string;
+  postProcessResponse(result: unknown): unknown;
+}
 
 // Super fast memoize for single argument functions.
-function memoize(func) {
-  const cache = new Map();
+function memoize<I, O>(func: (input: I) => O): (input: I) => O {
+  const cache = new Map<I, O>();
 
   return (input) => {
     let output = cache.get(input);
@@ -22,13 +44,13 @@ function memoize(func) {
 // This is needed especially so that aliases containing the `:` character,
 // objection uses internally, work.
 function snakeCase(
-  str,
+  str: string,
   {
     upperCase = false,
     underscoreBeforeDigits = false,
     underscoreBetweenUppercaseLetters = false,
-  } = {},
-) {
+  }: SnakeCaseOptions = {},
+): string {
   if (str.length === 0) {
     return str;
   }
@@ -84,7 +106,7 @@ function snakeCase(
 
 // snake_case to camelCase converter that simply reverses
 // the actions done by `snakeCase` function.
-function camelCase(str, { upperCase = false } = {}) {
+function camelCase(str: string, { upperCase = false }: CamelCaseOptions = {}): string {
   if (str.length === 0) {
     return str;
   }
@@ -114,7 +136,7 @@ function camelCase(str, { upperCase = false } = {}) {
   return out;
 }
 
-function isAllUpperCaseSnakeCase(str) {
+function isAllUpperCaseSnakeCase(str: string): boolean {
   for (let i = 1, l = str.length; i < l; ++i) {
     const char = str[i];
 
@@ -126,14 +148,14 @@ function isAllUpperCaseSnakeCase(str) {
   return true;
 }
 
-function isDigit(char) {
+function isDigit(char: string): boolean {
   return char >= '0' && char <= '9';
 }
 
 // Returns a function that splits the inputs string into pieces using `separator`,
 // only calls `mapper` for the last part and concatenates the string back together.
 // If no separators are found, `mapper` is called for the entire string.
-function mapLastPart(mapper, separator) {
+function mapLastPart(mapper: StringMapper, separator: string): StringMapper {
   return (str) => {
     if (!str) return str;
     const idx = str.lastIndexOf(separator);
@@ -144,34 +166,40 @@ function mapLastPart(mapper, separator) {
 
 // Returns a function that takes an object as an input and maps the object's keys
 // using `mapper`. If the input is not an object, the input is returned unchanged.
-function keyMapper(mapper) {
+function keyMapper(mapper: StringMapper): KeyMapper {
   return (obj) => {
     if (!isObject(obj) || Array.isArray(obj)) {
       return obj;
     }
 
     const keys = Object.keys(obj);
-    const out = {};
+    const out: Record<string, unknown> = {};
 
     for (let i = 0, l = keys.length; i < l; ++i) {
       const key = keys[i];
-      out[mapper(key)] = obj[key];
+      out[mapper(key)] = (obj as Record<string, unknown>)[key];
     }
 
     return out;
   };
 }
 
-function snakeCaseMappers(opt = {}) {
+function snakeCaseMappers(opt: SnakeCaseOptions = {}): { parse: KeyMapper; format: KeyMapper } {
   return {
     parse: keyMapper(memoize((str) => camelCase(str, opt))),
     format: keyMapper(memoize((str) => snakeCase(str, opt))),
   };
 }
 
-function knexIdentifierMappers({ parse, format, idSeparator = ':' } = {}) {
-  const formatId = memoize(mapLastPart(format, idSeparator));
-  const parseId = memoize(mapLastPart(parse, idSeparator));
+function knexIdentifierMappers({
+  parse,
+  format,
+  idSeparator = ':',
+}: KnexIdentifierMappersOptions = {}): KnexMappers {
+  // Without `parse` or `format`, the mappers throw when they're used, as they
+  // did in the JavaScript code.
+  const formatId = memoize(mapLastPart(format as StringMapper, idSeparator));
+  const parseId = memoize(mapLastPart(parse as StringMapper, idSeparator));
   const parseKeys = keyMapper(parseId);
 
   return {
@@ -181,7 +209,7 @@ function knexIdentifierMappers({ parse, format, idSeparator = ':' } = {}) {
 
     postProcessResponse(result) {
       if (Array.isArray(result)) {
-        const output = new Array(result.length);
+        const output = new Array<unknown>(result.length);
 
         for (let i = 0, l = result.length; i < l; ++i) {
           output[i] = parseKeys(result[i]);
@@ -195,15 +223,15 @@ function knexIdentifierMappers({ parse, format, idSeparator = ':' } = {}) {
   };
 }
 
-function knexSnakeCaseMappers(opt = {}) {
+function knexSnakeCaseMappers(opt: SnakeCaseOptions = {}): KnexMappers {
   return knexIdentifierMappers({
     parse: (str) => camelCase(str, opt),
     format: (str) => snakeCase(str, opt),
   });
 }
 
-function knexIdentifierMapping(colToProp) {
-  const propToCol = Object.keys(colToProp).reduce((propToCol, column) => {
+function knexIdentifierMapping(colToProp: Record<string, string>): KnexMappers {
+  const propToCol = Object.keys(colToProp).reduce<Record<string, string>>((propToCol, column) => {
     propToCol[colToProp[column]] = column;
     return propToCol;
   }, {});
@@ -214,14 +242,16 @@ function knexIdentifierMapping(colToProp) {
   });
 }
 
-module.exports = {
+const camelCaseKeys = keyMapper(memoize(camelCase));
+const snakeCaseKeys = keyMapper(memoize(snakeCase));
+
+export {
   snakeCase,
   camelCase,
   snakeCaseMappers,
   knexSnakeCaseMappers,
   knexIdentifierMappers,
   knexIdentifierMapping,
-
-  camelCaseKeys: keyMapper(memoize(camelCase)),
-  snakeCaseKeys: keyMapper(memoize(snakeCase)),
+  camelCaseKeys,
+  snakeCaseKeys,
 };

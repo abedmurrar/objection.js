@@ -1,6 +1,5 @@
-'use strict';
-
-const { getDialect } = require('./knexUtils');
+import { getDialect } from './knexUtils';
+import type { FieldExpressionAccess } from './parseFieldExpression';
 
 // Characters that force an element of a postgres text array literal to be
 // double quoted: the array syntax characters, whitespace and control chars.
@@ -16,7 +15,7 @@ const MYSQL_DIALECTS = ['mysql', 'mysql2'];
  * text array literal like `{a,b,1}`. Elements are quoted and escaped so that
  * keys containing array syntax characters can't change the path.
  */
-function toPgTextArray(access) {
+function toPgTextArray(access: readonly FieldExpressionAccess[]): string {
   const elements = access.map((it) => {
     if (it.type === 'array' && Number.isInteger(it.ref)) {
       return String(it.ref);
@@ -44,7 +43,7 @@ function toPgTextArray(access) {
  * is the same regardless of `standard_conforming_strings` and no literal
  * backslash ever ends up next to a `?` (knex would eat it).
  */
-function toPgStringLiteral(str) {
+function toPgStringLiteral(str: string): string {
   let sql = str.replace(/'/g, "''");
 
   if (NEEDS_ESCAPE_STRING.test(sql)) {
@@ -65,7 +64,7 @@ function toPgStringLiteral(str) {
  * literal that can be used as the right hand side of `#>`, `#>>` and as the
  * path argument of `jsonb_set`.
  */
-function toPgJsonPathLiteral(access) {
+function toPgJsonPathLiteral(access: readonly FieldExpressionAccess[]): string {
   return toPgStringLiteral(toPgTextArray(access));
 }
 
@@ -73,7 +72,7 @@ function toPgJsonPathLiteral(access) {
  * Quotes a (possibly table qualified) column name like `Table.column` as
  * `"Table"."column"` for postgres.
  */
-function toPgQuotedColumn(columnName) {
+function toPgQuotedColumn(columnName: string): string {
   return columnName
     .split('.')
     .map((part) => `"${part.replace(/"/g, '""')}"`)
@@ -87,7 +86,7 @@ function toPgQuotedColumn(columnName) {
  * dangerous at worst there (on MySQL `#` starts a comment). `knex` can be null,
  * when the query has no knex instance bound yet, in which case postgres is used.
  */
-function getJsonDialect(knex, expression) {
+function getJsonDialect(knex: unknown, expression: string): 'postgres' | 'mysql' {
   const dialect = knex ? getDialect(knex) : null;
 
   if (dialect === null || POSTGRES_DIALECTS.includes(dialect)) {
@@ -101,10 +100,4 @@ function getJsonDialect(knex, expression) {
   }
 }
 
-module.exports = {
-  toPgTextArray,
-  toPgStringLiteral,
-  toPgJsonPathLiteral,
-  toPgQuotedColumn,
-  getJsonDialect,
-};
+export { toPgTextArray, toPgStringLiteral, toPgJsonPathLiteral, toPgQuotedColumn, getJsonDialect };

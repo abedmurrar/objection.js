@@ -1,10 +1,9 @@
-'use strict';
-
-const { isMariaDb } = require('./knexUtils');
+import { isMariaDb } from './knexUtils';
+import type { FieldExpressionAccess } from './parseFieldExpression';
 
 // SQL types of `ReferenceBuilder` casts that MySQL's `CAST()` calls differently.
 // `CAST(x AS integer)` for example is a syntax error on MySQL.
-const MYSQL_CAST_TYPES = {
+const MYSQL_CAST_TYPES: Record<string, string> = {
   text: 'CHAR',
   varchar: 'CHAR',
   integer: 'SIGNED',
@@ -26,7 +25,7 @@ const MYSQL_CAST_TYPES = {
  * path like `$."a"[1]."b.c"`. Keys are always quoted, so they can contain any
  * characters. The path must be passed to MySQL as a binding.
  */
-function toMySqlJsonPath(access) {
+function toMySqlJsonPath(access: readonly FieldExpressionAccess[]): string {
   return (
     '$' +
     access
@@ -41,11 +40,11 @@ function toMySqlJsonPath(access) {
   );
 }
 
-function toMySqlCastType(sqlType) {
+function toMySqlCastType(sqlType: string): string {
   return MYSQL_CAST_TYPES[sqlType.toLowerCase()] || sqlType;
 }
 
-function isBooleanType(sqlType) {
+function isBooleanType(sqlType: string): boolean {
   const type = sqlType.toLowerCase();
   return type === 'boolean' || type === 'bool';
 }
@@ -54,7 +53,7 @@ function isBooleanType(sqlType) {
 // its JSON columns are text. `JSON_COMPACT()` returns the value as JSON, which
 // `JSON_SET()` nests instead of storing a string, and in the compact form
 // objection stores JSON in, so comparisons with columns work.
-function toJsonSql(sql, knex) {
+function toJsonSql(sql: string, knex: unknown): string {
   return isMariaDb(knex) ? `JSON_COMPACT(${sql})` : `CAST(${sql} AS JSON)`;
 }
 
@@ -64,13 +63,13 @@ const JSON_CAST = 'CAST(? AS JSON)';
 // conditions of the `whereJson*` methods: replaces `CAST(? AS JSON)` with
 // `JSON_COMPACT(?)` on MariaDB. The values are always bindings, so the text
 // only contains what objection generated.
-function jsonCastsForDialect(sql, knex) {
+function jsonCastsForDialect(sql: string, knex: unknown): string {
   return isMariaDb(knex) && sql.includes(JSON_CAST)
     ? sql.split(JSON_CAST).join('JSON_COMPACT(?)')
     : sql;
 }
 
-module.exports = {
+export {
   toMySqlJsonPath,
   toMySqlCastType,
   isBooleanType,

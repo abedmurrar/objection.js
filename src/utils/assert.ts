@@ -1,6 +1,13 @@
-'use strict';
+// The parts of a model instance that are used here.
+interface AssertableModel {
+  $hasId(): boolean;
+  constructor: {
+    name: string;
+    getIdColumnArray(): string[];
+  };
+}
 
-function assertHasId(model) {
+function assertHasId(model: AssertableModel): void {
   if (!model.$hasId()) {
     const modelClass = model.constructor;
     const ids = modelClass.getIdColumnArray().join(', ');
@@ -11,7 +18,7 @@ function assertHasId(model) {
   }
 }
 
-function assertIdNotUndefined(id, message) {
+function assertIdNotUndefined(id: unknown, message: string): void {
   if (Array.isArray(id)) {
     id.forEach((id) => assertIdNotUndefined(id, message));
   } else if (id === undefined) {
@@ -19,7 +26,4 @@ function assertIdNotUndefined(id, message) {
   }
 }
 
-module.exports = {
-  assertHasId,
-  assertIdNotUndefined,
-};
+export { assertHasId, assertIdNotUndefined };
