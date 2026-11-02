@@ -7,13 +7,85 @@ Objection 3.1.5 treated a lot of features as postgres-only. On MySQL 8.0.17 or n
 [Field expressions](../api/types/#type-fieldexpression) (`'column:path'`) now work on MySQL `json` columns: in selects, wheres, joins and orderBys, and as keys in `patch()`, `update()` and `onConflict().merge()`. The path is always sent as a binding.
 
 ```js
+// `payload` is a json column like { "courseId": 5, "course": { "name": "..." } }.
 await Notification.query()
+  // castText() returns the string without its JSON quotes.
   .select(ref('payload:course.name').castText().as('courseName'))
+  // castInt() makes the comparison numeric.
   .where(ref('payload:courseId').castInt(), 5);
 
+// Only changes the courseName key. The rest of the payload is kept.
 await Notification.query()
   .patch({ 'payload:courseName': 'Physics' })
   .where(ref('payload:courseId').castInt(), 5);
+```
+
+```sql
+select JSON_UNQUOTE(JSON_EXTRACT(`payload`, '$."course"."name"')) as `courseName`
+from `notifications`
+where CAST(JSON_UNQUOTE(JSON_EXTRACT(`payload`, '$."courseId"')) AS SIGNED) = 5
+
+update `notifications`
+set `payload` = JSON_SET(COALESCE(`payload`, JSON_OBJECT()), '$."courseName"', CAST('"Physics"' AS JSON))
+where CAST(JSON_UNQUOTE(JSON_EXTRACT(`payload`, '$."courseId"')) AS SIGNED) = 5
+```
+
+The paths, like `'$."courseId"'`, are sent as bindings. They are shown inline here.
+
+A product search on a `json` column `attributes`, which holds objects like `{ "color": "red", "inStock": true, "tags": ["outdoor"], "dimensions": { "weightKg": 2.5 } }`:
+
+```js
+const products = await Product.query()
+  .select(
+    'id',
+    'name',
+    ref('attributes:color').castText().as('color'),
+    ref('attributes:dimensions.weightKg').castDecimal().as('weightKg'),
+  )
+  .where(ref('attributes:color').castText(), 'red')
+  // JSON true and the string 'true' both count as true.
+  .where(ref('attributes:inStock').castBool(), true)
+  // The tags array contains 'outdoor'.
+  .whereJsonSupersetOf('attributes:tags', ['outdoor'])
+  // The object has a discount or a clearance key.
+  .whereJsonHasAny('attributes', ['discount', 'clearance'])
+  // Sort as numbers, not as JSON text.
+  .orderBy(ref('attributes:dimensions.weightKg').castDecimal(), 'desc');
+```
+
+```sql
+select `id`, `name`,
+  JSON_UNQUOTE(JSON_EXTRACT(`attributes`, '$."color"')) as `color`,
+  CAST(JSON_UNQUOTE(JSON_EXTRACT(`attributes`, '$."dimensions"."weightKg"')) AS DECIMAL(65,30)) as `weightKg`
+from `products`
+where JSON_UNQUOTE(JSON_EXTRACT(`attributes`, '$."color"')) = 'red'
+  and (JSON_UNQUOTE(JSON_EXTRACT(`attributes`, '$."inStock"')) IN ('true', '1')) = true
+  and JSON_CONTAINS(JSON_EXTRACT(`attributes`, '$."tags"'), CAST('["outdoor"]' AS JSON))
+  and (CASE JSON_TYPE(`attributes`)
+    WHEN 'OBJECT' THEN JSON_CONTAINS_PATH(`attributes`, 'one', '$."discount"', '$."clearance"')
+    WHEN 'ARRAY' THEN JSON_OVERLAPS(`attributes`, CAST('["discount","clearance"]' AS JSON))
+    WHEN 'STRING' THEN (JSON_UNQUOTE(`attributes`) = 'discount' OR JSON_UNQUOTE(`attributes`) = 'clearance')
+    ELSE FALSE END)
+order by CAST(JSON_UNQUOTE(JSON_EXTRACT(`attributes`, '$."dimensions"."weightKg"')) AS DECIMAL(65,30)) desc
+```
+
+One patch can set several fields. Each one becomes a `JSON_SET()` around the previous one, so they are all written in one `UPDATE`:
+
+```js
+await Product.query()
+  .patch({
+    'attributes:inStock': false,
+    'attributes:dimensions.weightKg': 2.5,
+  })
+  .findById(7);
+```
+
+```sql
+update `products`
+set `attributes` = JSON_SET(
+  JSON_SET(COALESCE(`attributes`, JSON_OBJECT()), '$."inStock"', CAST('false' AS JSON)),
+  '$."dimensions"."weightKg"', CAST('2.5' AS JSON))
+where `products`.`id` = 7
 ```
 
 | Expression          | postgres                                | MySQL                                              |
@@ -43,7 +115,9 @@ The casts of `ref()` and `val()` now use types MySQL accepts. For example, `CAST
 On MySQL, `val()` of an object or an array is cast to `JSON`. Without the cast, MySQL compares a JSON column with a string as two strings.
 
 ```js
+// Rows whose tags are exactly ["a", "b"].
 await Person.query().where('tags', val(['a', 'b']));
+// select `persons`.* from `persons` where `tags` = CAST('["a","b"]' AS JSON)
 ```
 
 ## The `whereJson*` methods
@@ -58,17 +132,24 @@ await Person.query().where('tags', val(['a', 'b']));
 These are new and MySQL-only. They use `JSON_OVERLAPS()`, which can use multi-valued indexes. Two values overlap when two arrays share an item, two objects share a key and value, or an array contains a scalar.
 
 ```js
+// Jobs open to Finland or Sweden (or both).
 const jobs = await Job.query().whereJsonOverlaps('attributes:countryCodes', [
   'FI',
   'SE',
 ]);
+// select `jobs`.* from `jobs`
+// where JSON_OVERLAPS(JSON_EXTRACT(`attributes`, '$."countryCodes"'), CAST('["FI","SE"]' AS JSON))
 
 // A NULL or missing field doesn't overlap anything, so rows without the field are found.
 const unrestricted = await Job.query().whereJsonNotOverlaps(
   'attributes:countryCodes',
   ['FI', 'SE'],
 );
+// select `jobs`.* from `jobs`
+// where NOT COALESCE(JSON_OVERLAPS(JSON_EXTRACT(`attributes`, '$."countryCodes"'), CAST('["FI","SE"]' AS JSON)), FALSE)
 ```
+
+On postgres, they throw `whereJsonOverlaps is only supported on mysql.`
 
 `orWhereJsonOverlaps()` and `orWhereJsonNotOverlaps()` are also available. The second argument can be a value or another field expression.
 
@@ -77,18 +158,38 @@ const unrestricted = await Job.query().whereJsonNotOverlaps(
 `insert([...])`, `insertAndFetch([...])` and inserts through relations now accept arrays on MySQL and SQLite. Before, they threw `batch insert only works with Postgresql and SQL Server`.
 
 ```js
+// One INSERT with two rows. The result is an array of Person models.
 const people = await Person.query().insert([
   { firstName: 'Arnold', lastName: 'Schwarzenegger' },
   { firstName: 'Sylvester', lastName: 'Stallone' },
 ]);
 
-people.map((it) => it.id); // the ids of both rows
+people.map((it) => it.id); // the ids of both rows, like [1, 2]
 ```
 
 - **SQLite** gets the ids with `returning()`, which needs SQLite 3.35 or newer.
 - **MySQL** only returns the id of the first row. InnoDB gives the rows of one multi-row insert consecutive ids, `@@auto_increment_increment` apart, so objection computes the rest. It reads `@@auto_increment_increment` once per knex config.
 - On MySQL, set the id on all rows or on none. A batch where only some rows have an id is rejected before anything is inserted: `batch insert on MySQL can't return ids when only some rows have an id. Set the id on all rows or none.`
 - On MySQL, ids aren't set with `onConflict()`, because rows can be skipped or updated.
+
+## Upserts
+
+`insert(...).onConflict(columns).merge()` compiles to `ON DUPLICATE KEY UPDATE` on MySQL. MySQL decides on its own which unique index conflicts, so the columns passed to `onConflict()` don't appear in the SQL. They are still needed for postgres and SQLite.
+
+```js
+// Insert the product, or add to its stock if a product with the sku exists.
+await Product.query()
+  .insert({ sku: 'A-1', name: 'Tent', stock: 5 })
+  .onConflict('sku')
+  .merge({ stock: Product.ref('stock').plus(fn.excluded('stock')) });
+```
+
+```sql
+insert into `products` (`name`, `sku`, `stock`) values ('Tent', 'A-1', 5)
+on duplicate key update `stock` = (`products`.`stock` + VALUES(`stock`))
+```
+
+`fn.excluded('stock')` is `VALUES(stock)` here. See [`fn.excluded()`](./expressions.md#fn-excluded) and [Upserts](./knex.md#upserts).
 
 ## Graph operations run one query at a time
 
@@ -116,6 +217,18 @@ await Event.query()
   .whereNot(fn.jsonOverlaps(Event.ref('tags'), ['hidden', 'draft']), 1)
   .groupBy('month');
 ```
+
+```sql
+select DATE_FORMAT(`events`.`startsAt`, '%Y-%m') as `month`,
+  GROUP_CONCAT(`events`.`name` ORDER BY `events`.`name` DESC SEPARATOR ', ') as `names`,
+  JSON_ARRAYAGG(`events`.`id`) as `ids`
+from `events`
+where TIMESTAMPDIFF(DAY, `events`.`createdAt`, CURRENT_TIMESTAMP(6)) < 30
+  and not JSON_OVERLAPS(`events`.`tags`, CAST('["hidden","draft"]' AS JSON)) = 1
+group by `month`
+```
+
+This lists the events of the last 30 days per month, without the hidden and draft ones. The format string `'%Y-%m'` and the separator are bindings, and the unit `DAY` is a checked keyword.
 
 | Category                | Examples                                                                                                       |
 | ----------------------- | -------------------------------------------------------------------------------------------------------------- |
@@ -171,7 +284,7 @@ Some functions have keywords in their syntax. Their helpers take the keyword as 
 
 Helpers for functions that only exist on MySQL throw when used with another database. Standard functions like `fn.round()`, `fn.length()` and `fn.trim()` work everywhere.
 
-In TypeScript, the helpers check the number of arguments and type the result as `FunctionBuilder<T>`. `select(fn.x().as('alias'))` uses that type. See [TypeScript](./typescript.md#typed-fn-and-ref).
+In TypeScript, the helpers check the number of arguments and type the result as `FunctionBuilder<T>`. The expression methods use that type to check values: `fn.timestampDiff('day', a, b).gt('30')` is an error. See [TypeScript](./typescript.md#typed-fn-and-ref).
 
 ## MariaDB
 

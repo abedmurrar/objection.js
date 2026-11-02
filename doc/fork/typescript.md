@@ -49,9 +49,79 @@ class Person extends Model {
 
 const person = Person.fromJson({ firstName: 'Jennifer' });
 
+// fromJson() doesn't load anything, so every relation can be missing.
 person.pets; // Animal[] | undefined
 person.mom; // Person | null | undefined
+// The `extra` columns of the join table are added to each related model.
 person.movies; // (Movie & { role: PersonMovie['role'] })[] | undefined
+```
+
+::: details The other models of the examples on this page
+
+```ts
+class Animal extends Model {
+  static tableName = 'animals';
+
+  id!: number;
+  name!: string;
+  species!: string;
+  ownerId!: number | null;
+
+  static relationMappings = defineRelations(() => ({
+    owner: {
+      relation: Model.BelongsToOneRelation,
+      modelClass: Person,
+      join: { from: 'animals.ownerId', to: 'persons.id' },
+    },
+    toys: {
+      relation: Model.HasManyRelation,
+      modelClass: Toy,
+      join: { from: 'animals.id', to: 'toys.animalId' },
+    },
+  }));
+}
+
+class Toy extends Model {
+  static tableName = 'toys';
+
+  id!: number;
+  name!: string;
+  animalId!: number;
+}
+
+class Movie extends Model {
+  static tableName = 'movies';
+
+  id!: number;
+  title!: string;
+}
+
+class PersonMovie extends Model {
+  static tableName = 'persons_movies';
+
+  personId!: number;
+  movieId!: number;
+  role!: 'actor' | 'director';
+}
+```
+
+`Person` also has the columns `momId!: number | null`, `address!: { street: string; city: string } | null` and `tags!: string[]`, which some examples use.
+
+:::
+
+In the comments on this page, `Animal` stands for the model with its inferred relations, and `ModelRow<Animal>` for a row of it. TypeScript shows these types as `Animal & InferredRelationProps<typeof Animal, Animal>` and `Row<Animal & InferredRelationProps<...>>`. In your own code, `ModelInstance<typeof Animal>` is that type (see below).
+
+The extra columns are also on the results of relation queries:
+
+```ts
+// select "movies".*, "persons_movies"."role" as "role" from "movies"
+// inner join "persons_movies" on "movies"."id" = "persons_movies"."movieId"
+// where "persons_movies"."personId" in (1)
+const movies = await Person.relatedQuery('movies').for(1);
+
+// `role` is typed 'actor' | 'director', so a typo in 'director' is a compile error.
+const directed = movies.filter((movie) => movie.role === 'director');
+directed.map((movie) => movie.title); // string[]
 ```
 
 - To-many relations (`HasManyRelation`, `ManyToManyRelation`) are arrays. To-one relations (`BelongsToOneRelation`, `HasOneRelation`, `HasOneThroughRelation`) are `Model | null`, because objection sets them to `null` when there's no related model. The relation classes carry their cardinality as `RelationType<'one' | 'many'>`.
@@ -65,7 +135,19 @@ Inferred relations are added to the models objection creates: the results of `qu
 interface Person extends RelationsOf<typeof Person> {}
 ```
 
-`ModelInstance<typeof Person>` is the instance type with the inferred relations.
+This only works when no relation leads back to the model. `Person` above has two that do: `mom` refers to `Person` itself, and `pets` leads to `Animal`, whose `owner` refers to `Person`. For models like these, TypeScript reports a circularity error, like `Type 'Person' recursively references itself as a base type`. Use `ModelInstance<typeof Person>` instead, or declare the relation properties in the class.
+
+`ModelInstance<typeof Person>` is the instance type with the inferred relations:
+
+```ts
+import { ModelInstance } from 'objection';
+
+type PersonModel = ModelInstance<typeof Person>;
+
+// `new Person()` is a Person without the inferred relations. Annotate it to get them.
+const person: PersonModel = new Person();
+person.pets; // Animal[] | undefined
+```
 
 ### Checked relation names in `relatedQuery()`
 
@@ -73,16 +155,42 @@ interface Person extends RelationsOf<typeof Person> {}
 
 `$relatedQuery()` of a to-one relation resolves to `Model | undefined`, because that's what it returns when there's no related model. Add `throwIfNotFound()` if you expect one.
 
+```ts
+// The pets of persons 1 and 2. `where()` checks the columns of Animal.
+// select "animals".* from "animals" where "animals"."ownerId" in (1, 2) and "species" = 'dog'
+const dogs = await Person.relatedQuery('pets').for([1, 2]).where('species', 'dog');
+dogs; // ModelRow<Animal>[]
+
+Person.relatedQuery('pet'); // Error: ... not assignable to parameter of type 'UnknownRelationName'
+
+const person = await Person.query().findById(1).throwIfNotFound();
+
+const mom = await person.$relatedQuery('mom'); // ModelRow<Person> | undefined
+// Rejects with a NotFoundError when the person has no mom.
+const surelyMom = await person.$relatedQuery('mom').throwIfNotFound(); // ModelRow<Person>
+
+// A relation name only known at runtime: give the related model yourself.
+const related = await person.$relatedQuery<Animal>(relationName); // ModelRow<Animal>[]
+```
+
 ## Results only contain the relations the query loaded
 
 `await Person.query()` is `ModelRow<Person>[]`, which is the model without its relation properties. Reading a relation the query didn't load is a compile error:
 
 ```ts
 const person = await Person.query().findById(1).throwIfNotFound();
-person.pets; // Error: Property 'pets' does not exist on type 'Row<Person>'
+person.pets; // Error: Property 'pets' does not exist on type 'Row<Person & ...>'
 ```
 
-Rows can still be used anywhere a `Person` is expected.
+Rows can still be used anywhere a `Person` is expected:
+
+```ts
+function greet(person: Person) {
+  return `Hello, ${person.firstName}`;
+}
+
+greet(person); // OK: a row is a Person without the relation properties
+```
 
 ### Graph methods add what they load
 
@@ -98,19 +206,71 @@ withPets.pets[0].owner; // ModelRow<Person> | null
 withPets.mom; // ModelRow<Person> | null
 withPets.movies; // Error: not loaded
 
-const fetched = await person.$fetchGraph('pets'); // use the returned value
+// $fetchGraph() can't change the type of `person`, so use the returned value.
+const fetched = await person.$fetchGraph('pets');
+fetched.pets; // ModelRow<Animal>[]
 ```
 
 To-many relations are arrays. To-one relations are `| null`, or `| undefined` for relations declared as optional without `| null` (`mom?: Person`).
 
-`Loaded<M, E>` is the type of a model with the relations of expression `E` loaded, which is handy in annotations:
+`modifyGraph()` keeps the loaded relations, and `withGraphJoined()` adds them the same way as `withGraphFetched()`:
 
 ```ts
+const owners = await Person.query()
+  .withGraphFetched('pets.toys')
+  // `query` is a query builder of Animal, so 'species' and 'name' are checked.
+  .modifyGraph('pets', (query) => query.where('species', 'dog').orderBy('name'))
+  // objection still selects toys.animalId, which it needs to match toys to pets.
+  .modifyGraph('pets.toys', (query) => query.select('id', 'name'));
+
+owners[0].pets[0].toys; // ModelRow<Toy>[]
+
+// One query with a join. Only the persons who own a dog are returned, and
+// `pets` only contains their dogs.
+const dogOwners = await Person.query()
+  .withGraphJoined('pets')
+  .where('pets.species', 'dog')
+  .orderBy('persons.id');
+
+dogOwners[0].pets; // ModelRow<Animal>[]
+```
+
+### `Loaded<M, E>`
+
+`Loaded<M, E>` is the type of a model with the relations of expression `E` loaded, which is handy in annotations. For models with inferred relations, pass `ModelInstance<typeof Person>` as `M`. `Person` itself has no relation properties, so `Loaded<Person, 'pets'>` would type `pets` as `unknown`.
+
+```ts
+import { Loaded, ModelInstance } from 'objection';
+
+type PersonModel = ModelInstance<typeof Person>;
+
 async function findWithPets(
   id: number,
-): Promise<Loaded<Person, 'pets.toys'> | undefined> {
+): Promise<Loaded<PersonModel, 'pets.toys'> | undefined> {
   return Person.query().findById(id).withGraphFetched('pets.toys');
 }
+
+const found = await findWithPets(1);
+found?.pets[0].toys; // ModelRow<Toy>[] | undefined
+```
+
+Functions that need some relations can say so in their parameter types. Callers then have to load them:
+
+```ts
+// A person with their pets, the toys of the pets, and their mom.
+type PersonWithFamily = Loaded<PersonModel, '[pets.toys, mom]'>;
+
+function toyNames(person: PersonWithFamily): string[] {
+  // No `?.` or `!` needed: the type says that pets and toys were loaded.
+  return person.pets.flatMap((pet) => pet.toys.map((toy) => toy.name));
+}
+
+const people = await Person.query().withGraphFetched('[pets.toys, mom]');
+people.map(toyNames); // string[][]
+
+const withPetsOnly = await Person.query().withGraphFetched('pets');
+withPetsOnly.map(toyNames);
+// Error: ... Property 'mom' is missing in type 'Row<Person & ...> & { pets: Row<Animal & ...>[]; }'
 ```
 
 ### When all relations are optional again
@@ -123,7 +283,22 @@ The types can't see everything that loads relations. In these cases, the result 
 - On query builders whose type is written out explicitly: `const query: QueryBuilder<Person> = ...`.
 - On models with `private` or `protected` members, and models that declare a relation as required (`pets!: Pet[]`). Rows of these models couldn't be used where the model is expected otherwise.
 
-Query builders change in place, but their types don't. A call like `query.withGraphFetched('pets')` whose return value isn't used doesn't change the type of `query`. Chain the calls instead, or give `query` an explicit type.
+Query builders change in place, but their types don't. A call like `query.withGraphFetched('pets')` whose return value isn't used doesn't change the type of `query`. Chain the calls instead, or give `query` an explicit type. An explicit type is what you want when a relation is only loaded sometimes:
+
+```ts
+// With the explicit type, the result has all relations as optional properties.
+const query: QueryBuilder<PersonModel> = Person.query();
+
+if (includePets) {
+  query.withGraphFetched('pets');
+}
+
+const people = await query;
+people[0].pets; // Animal[] | undefined
+
+// Without it, `query` keeps the type of Person.query(), which loads nothing,
+// and `people[0].pets` is a compile error even when includePets is true.
+```
 
 ## Relation expressions are checked
 
@@ -153,17 +328,42 @@ The fork can know a model's modifiers when the static `modifiers` is an object w
 
 ```ts
 class Person extends Model {
+  static tableName = 'persons';
+
+  id!: number;
+  firstName!: string;
+  gender!: 'male' | 'female';
+  parentId!: number | null;
+
+  static relationMappings = defineRelations(() => ({
+    children: {
+      relation: Model.HasManyRelation,
+      modelClass: Person,
+      join: { from: 'persons.id', to: 'persons.parentId' },
+    },
+  }));
+
+  // No type annotation here, so the names and the parameters are known.
   static modifiers = {
     filterGender(query: QueryBuilder<Person>, gender: 'male' | 'female') {
       query.where(Person.ref('gender'), gender);
+    },
+    // Modifiers in relation expressions are called without arguments.
+    orderByName(query: QueryBuilder<Person>) {
+      query.orderBy('firstName');
     },
   };
 }
 
 Person.query().modify('filterGender', 'female');
-Person.query().modify('filterGender', 'x'); // Error
+Person.query().modify('filterGender', 'x'); // Error: 'x' isn't 'male' | 'female'
 Person.query().modify('filterGendr'); // Error: Unknown modifier "filterGendr"
 Person.query().withGraphFetched('children(filterGendr)'); // Error
+
+// The children are loaded, but the types can't see what a named modifier
+// does, so each child has all of its relations as optional properties.
+const people = await Person.query().withGraphFetched('children(orderByName)');
+people[0].children; // Person[]
 ```
 
 **Opt out:** annotate the property, as in `static modifiers: Modifiers = { ... }`. Names added with `modifiers()`, or by a modifier the types can't see, aren't known, so names aren't checked after them.
@@ -189,6 +389,25 @@ Person.ref('address:street').castInt(); // ReferenceBuilder<number | null>
 
 `ReferenceBuilder<T>` carries the type of the referenced value, and the casts change it. The [expression methods](./expressions.md) use it to check values: `Lesson.ref('order').eq('2')` is an error when `order` is a number.
 
+`Model.ref()` adds the table name, so the columns stay unambiguous when the query joins other tables:
+
+```ts
+// `address` is typed { street: string; city: string } | null, so 'address:city'
+// is accepted and 'address:zip' isn't.
+await Person.query()
+  .select('id', Person.ref('address:city').castText().as('city'))
+  .where(Person.ref('address:city').castText(), 'Helsinki')
+  .orderBy(Person.ref('firstName'));
+```
+
+```sql
+-- postgres
+select "id", CAST("persons"."address"#>>'{city}' AS text) as "city"
+from "persons"
+where CAST("persons"."address"#>>'{city}' AS text) = 'Helsinki'
+order by "persons"."firstName" asc
+```
+
 **Opt out:** pass the expression as a type argument, as in `Person.ref<'legacy_column'>('legacy_column')`. Use `<string>` in generic code that works with any model class. Models that declare no columns accept any string.
 
 ## JSON field expressions in patches
@@ -196,15 +415,17 @@ Person.ref('address:street').castInt(); // ReferenceBuilder<number | null>
 `patch()`, `update()`, the `*AndFetch()` variants and `onConflict().merge()` accept field expression keys of JSON columns:
 
 ```ts
+// Only changes `street`. The other keys of `address` are kept.
 await Person.query().patch({ 'address:street': 'Main street' });
+// `tags` is a JSON array column: set its first item.
 await Person.query().findById(1).patch({ 'tags:[0]': 'first' });
 await Person.query().patch({ 'firstName:a': 1 }); // Error: not a JSON column
-await Person.query().insert({ 'meta:a': 1 }); // Error: insert doesn't support them
+await Person.query().insert({ 'address:street': 'x' }); // Error: insert doesn't support them
 ```
 
 ## Typed `fn` and `ref`
 
-`FunctionBuilder<T>` carries the result type of the function. `select(fn.x().as('alias'))` uses it. The [MySQL helpers](./mysql.md#fn-helpers-for-mysql-functions) also check their argument counts and keywords:
+`FunctionBuilder<T>` carries the result type of the function. The [expression methods](./expressions.md) use it to check the values a function is compared with. The [MySQL helpers](./mysql.md#fn-helpers-for-mysql-functions) also check their argument counts and keywords:
 
 ```ts
 fn.dateFormat(Event.ref('startsAt'), '%Y-%m'); // FunctionBuilder<string | null>
@@ -212,9 +433,20 @@ fn.timestampDiff('day', Event.ref('startsAt'), fn.now()); // FunctionBuilder<num
 fn.timestampDiff('days', ref('a'), ref('b')); // Error: invalid unit
 fn.rowNumber().as('rn'); // Error: window functions need over()
 fn.coalesce(ref('a')).filter(ref('b')); // Error: filter() is only on aggregates
+
+// TIMESTAMPDIFF() returns a number, so it can't be compared with a string.
+fn.timestampDiff('day', Event.ref('startsAt'), fn.now()).gt(30);
+fn.timestampDiff('day', Event.ref('startsAt'), fn.now()).gt('30'); // Error
 ```
 
-`fn.case()` results are the union of their branches.
+`fn.case()` results are the union of their branches. Without `else()`, `null` is part of the union:
+
+```ts
+fn.case().when(Event.ref('id').in(ids), 'manual').else('scraped'); // FunctionBuilder<'manual' | 'scraped'>
+fn.case().when(Event.ref('id').in(ids), 'manual'); // CaseBuilder<'manual'>, a FunctionBuilder<'manual' | null>
+```
+
+`select()` doesn't add selected expressions to the result type: `await Event.query().select(fn.dateFormat(...).as('month'))` is still `ModelRow<Event>[]`. Use [`castTo<T>()`](#runafter-and-castto-t-set-the-result-type) to type rows with computed columns.
 
 ## Custom query builders need one declaration
 
@@ -233,6 +465,8 @@ class MyQueryBuilder<
   R = M[],
   S extends QueryBuilderState = DefaultQueryBuilderState<M, R>,
 > extends QueryBuilder<M, R, S> {
+  // Tells the types how to make a MyQueryBuilder for another model, result
+  // or state, which methods like findById() and first() need.
   declare '~rebind': MyQueryBuilder<this['~M'], this['~R'], this['~S']>;
 
   active(): this {
@@ -246,11 +480,22 @@ class MyQueryBuilder<
 }
 
 class BaseModel extends Model {
+  // `static QueryBuilder` is used at runtime, `QueryBuilderType` by the types.
   static QueryBuilder = MyQueryBuilder;
   declare QueryBuilderType: MyQueryBuilder<this>;
 }
 
-const person = await Person.query().active().findById(1).active(); // Person | undefined
+class Person extends BaseModel {
+  static tableName = 'persons';
+
+  id!: number;
+  firstName!: string;
+  deletedAt!: Date | null;
+}
+
+// active() is still available after findById(), which changed the result kind.
+const person = await Person.query().active().findById(1).active(); // ModelRow<Person> | undefined
+// patch() resolves to the number of updated rows.
 const numDeleted = await Person.query().where('id', 1).softDelete(); // number
 ```
 
@@ -272,6 +517,32 @@ const row = await Person.query().castTo<Row[]>().first();
 
 A `runAfter()` callback that returns nothing makes the result `undefined`, which is what happens at runtime. The methods that change the result kind (`first()`, `throwIfNotFound()`, ...) start from the type that `castTo<T>()` set. Union result types like `Person[] | Person | number` are preserved.
 
+`castTo<T>()` is how to type queries that select computed columns, like reports. It only changes the type: the rows are still `Animal` instances at runtime, with the selected columns as properties.
+
+```ts
+// postgres returns count(*) as a string (it's a bigint). SQLite and MySQL return a number.
+type SpeciesCount = { species: string; count: number | string };
+
+// select "species", count(*) as "count" from "animals" group by "species" order by "count" desc
+const counts = await Animal.query()
+  .select('species')
+  .count('* as count')
+  .groupBy('species')
+  .orderBy('count', 'desc')
+  .castTo<SpeciesCount[]>();
+
+counts; // SpeciesCount[], like [{ species: 'dog', count: 2 }, { species: 'cat', count: 1 }]
+
+// first() after castTo() starts from SpeciesCount[].
+const mostCommon = await Animal.query()
+  .select('species')
+  .count('* as count')
+  .groupBy('species')
+  .orderBy('count', 'desc')
+  .castTo<SpeciesCount[]>()
+  .first(); // SpeciesCount | undefined
+```
+
 ## `AnyQueryBuilder<M>`
 
 `AnyQueryBuilder<M>` is a query builder for model `M` of any result kind. Use it for functions that take query builders:
@@ -279,6 +550,7 @@ A `runAfter()` callback that returns nothing makes the result `undefined`, which
 ```ts
 import { AnyQueryBuilder } from 'objection';
 
+// Works on Person.query(), findById(), patch(), ... queries.
 export function byName(query: AnyQueryBuilder<Person>, name: string) {
   query.where('firstName', name);
 }
@@ -286,9 +558,13 @@ export function byName(query: AnyQueryBuilder<Person>, name: string) {
 await Person.query().findById(1).modify(byName, 'Jennifer');
 await Person.query().modify(byName, 1); // Error: name must be a string
 
+// Generic over the query builder, so the caller gets its own type back.
 function paginate<QB extends AnyQueryBuilder>(query: QB, page: number): QB {
   return query.limit(10).offset(page * 10);
 }
+
+// select "persons".* from "persons" order by "id" asc limit 10 offset 20
+const third = await paginate(Person.query().orderBy('id'), 2); // ModelRow<Person>[]
 ```
 
 ## `ModelProps` and `ModelRelations` recognize more relation types
@@ -315,17 +591,24 @@ function TimeStamps() {
   return function <T extends Constructor<Model>>(Base: T) {
     return class extends Base {
       createdAt?: Date;
+
+      $beforeInsert() {
+        this.createdAt = new Date();
+      }
     };
   };
 }
 
 class Person extends TimeStamps()(Model) {
+  static tableName = 'persons';
+
   name!: string;
 }
 
-const row = await Person.query().first();
+// Person.query() is still a query builder of Person.
+const row = await Person.query().where('name', 'Jennifer').first();
 row?.name; // string | undefined
-row?.createdAt; // Date | undefined
+row?.createdAt; // Date | undefined (the column added by the mixin)
 ```
 
 Set custom query builders in a shared base class rather than in a mixin. TypeScript intersects a mixin's query builder with the base class's query builder, and it can't type-check that intersection efficiently. See the [plugins recipe](../recipes/plugins.md).

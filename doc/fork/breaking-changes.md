@@ -14,6 +14,13 @@ await Person.query().delete().where(ref("data:x') or 1=1 --"), 'y');
 await Person.query().patch(req.body).findById(id);
 ```
 
+Now the key is a quoted string inside the path, and the query only compares that one key:
+
+```sql
+-- postgres
+delete from "persons" where "data"#>'{"x'') or 1=1 --"}' = 'y'
+```
+
 This affected `ref('col:key')`, `patch({ 'col:key': value })`, `update()`, `onConflict().merge()` and the `whereJson*` methods. Keys are now escaped, and the `whereJsonHas*` and `whereJsonNotObject` helpers send their values as bindings. The SQL for plain keys hasn't changed. Keys containing `,`, `{`, `}`, `"`, whitespace or `NULL` now refer to the actual key instead of being split.
 
 The fork also requires ajv 8.20, which fixes the advisories of ajv and fast-uri.
@@ -31,17 +38,26 @@ await person.$relatedQuery('pets').where('a', 1).orWhere('b', 2).delete();
 delete from "pets" where "pets"."ownerId" in (1) and "a" = 1 or "b" = 2
 
 -- Now
-delete from "pets" where "pets"."ownerId" in (1) and ("a" = 1 or "b" = 2)
+delete from "pets" where ("a" = 1 or "b" = 2) and "pets"."ownerId" in (1)
 ```
 
-Clauses from each source are now wrapped in parentheses whenever a query mixes them. This covers `$relatedQuery()`, the relation `filter`/`modify`, `joinTableModify`, `relate()`, `unrelate()`, `$query()`, `deleteById()`, `patchAndFetchById()`, `updateAndFetchById()` and subqueries of the static `relatedQuery()`. Queries without objection-generated clauses produce the same SQL as before. A `findById()` you call yourself isn't grouped, so `findById(1).orWhere(...)` still means "id = 1 or ...".
+Clauses from each source are now wrapped in parentheses whenever a query mixes them. A find puts the owner condition first: `select "pets".* from "pets" where "pets"."ownerId" in (1) and ("a" = 1 or "b" = 2)`. This covers `$relatedQuery()`, the relation `filter`/`modify`, `joinTableModify`, `relate()`, `unrelate()`, `$query()`, `deleteById()`, `patchAndFetchById()`, `updateAndFetchById()` and subqueries of the static `relatedQuery()`. Queries without objection-generated clauses produce the same SQL as before. A `findById()` you call yourself isn't grouped, so `findById(1).orWhere(...)` still means "id = 1 or ...":
+
+```js
+await Person.query().findById(1).orWhere('b', 2);
+// select "persons".* from "persons" where "persons"."id" = 1 or "b" = 2
+
+// deleteById() adds the id condition itself, so it is grouped.
+await Person.query().deleteById(1).orWhere('b', 2);
+// delete from "persons" where "persons"."id" = 1 and ("b" = 2)
+```
 
 ## `for()` is checked
 
 Before, `for()` was ignored on queries that weren't made with the static `relatedQuery()`, and it was silently dropped after write methods ([#2185](https://github.com/Vincit/objection.js/issues/2185)):
 
 ```js
-// OK
+// OK: delete from "pets" where "pets"."ownerId" in (1)
 await Person.relatedQuery('pets').for(1).delete();
 
 // Before: deleted every row in the table. Now rejected.
@@ -54,12 +70,20 @@ await Person.relatedQuery('pets').insert({ name: 'Doggo' }).for(1);
 
 The query is rejected before any hooks run, and `toKnexQuery()` throws, so no SQL is generated. The errors are:
 
-- `for() can only be used with queries created using the static relatedQuery() method`
-- `for() must be called before the write methods (insert, update, patch, delete, relate, unrelate, increment, decrement)`
+- `for() can only be used with queries created using the static relatedQuery() method`, for `for()` on a query that isn't a static `relatedQuery()`.
+- `relatedQuery(): for() must be called before delete()`, with the name of the write method, when the write method is called before `for()` or without it. The last two queries above get this error.
+- `for() must be called before the write methods (insert, update, patch, delete, relate, unrelate, increment, decrement)`, when `for()` is called again after a write method, as in `relatedQuery('pets').for(1).delete().for(2)`.
 
 ## JSON features throw on unsupported databases
 
-JSON field expressions and the `whereJson*` methods only work on postgres and [MySQL](./mysql.md#json-field-expressions). On other databases they now throw. Before, they generated invalid SQL. On MySQL, the generated `#>` started a comment, which silently dropped the rest of the `where` clause.
+JSON field expressions and the `whereJson*` methods only work on postgres and [MySQL](./mysql.md#json-field-expressions). On other databases they now throw. Before, they generated invalid SQL.
+
+```js
+// SQLite
+await Person.query().where(ref('data:a'), 1);
+// Error: JSON field expressions are only supported on postgres and mysql.
+// Tried to use "data:a" with dialect "sqlite3".
+``` On MySQL, the generated `#>` started a comment, which silently dropped the rest of the `where` clause.
 
 ## Patching a field of a `NULL` JSON column creates the object
 
@@ -69,7 +93,21 @@ await Notification.query()
   .findById(id);
 ```
 
-If `payload` is `NULL`, it becomes `{ "courseName": "Physics" }`, or an array if the path starts with an index. Before, the column stayed `NULL` on postgres.
+If `payload` is `NULL`, it becomes `{ "courseName": "Physics" }`, or an array if the path starts with an index. Before, the column stayed `NULL` on postgres. The `COALESCE()` provides the empty object:
+
+```sql
+-- postgres
+update "notifications" set "payload" = jsonb_set(COALESCE("payload", '{}'::jsonb), '{courseName}', '"Physics"', true)
+where "notifications"."id" = 3
+
+-- MySQL
+update `notifications` set `payload` = JSON_SET(COALESCE(`payload`, JSON_OBJECT()), '$."courseName"', CAST('"Physics"' AS JSON))
+where `notifications`.`id` = 3
+
+-- postgres, with the key 'payload:[0]'
+update "notifications" set "payload" = jsonb_set(COALESCE("payload", '[]'::jsonb), '{0}', '"Physics"', true)
+where "notifications"."id" = 3
+```
 
 ## Only the package entry can be imported
 
@@ -97,6 +135,7 @@ The default [`concurrency`](../api/model/static-properties.md#static-concurrency
 
 ```js
 class BaseModel extends Model {
+  // Up to 4 queries at a time, for graph writes and for eager loading.
   static concurrency = 4;
 }
 ```
