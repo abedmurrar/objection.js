@@ -4,6 +4,10 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+### What's new
+
+- The expression builders (`ref()`, `val()`, `raw()`, `fn()`, relation expressions and the join code) are TypeScript now. The compiled code and its behaviour are the same.
+
 ## 4.0.0-beta.3 (2026-11-02)
 
 ### What's new
