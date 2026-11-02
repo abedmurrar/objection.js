@@ -91,6 +91,43 @@ describe('QueryBuilder', () => {
     }
   });
 
+  it("should have the methods of knex's query builder", () => {
+    // Methods objection leaves out on purpose.
+    const ignore = {
+      pluck: 'removed in objection 3',
+      upsert: 'REPLACE INTO on MySQL; use insert().onConflict().merge()',
+      clearCounters: 'increment() and decrement() are patches in objection',
+      stream: 'no models; use toKnexQuery()',
+      pipe: 'no models; use toKnexQuery()',
+      toSQL: 'use toKnexQuery().toSQL()',
+      toQuery: 'use toKnexQuery().toQuery()',
+      asCallback: 'callbacks are not supported',
+      queryContext: 'objection has context()',
+      rank: 'use fn.rank()',
+      denseRank: 'use fn.denseRank()',
+      rowNumber: 'use fn.rowNumber()',
+      whereJsonHasNone: 'objection has its own whereJson* methods',
+      withRecursiveWrapped: 'internal to knex',
+      isValidStatementArg: 'internal to knex',
+    };
+
+    const knexProto = require('knex/lib/query/querybuilder').prototype;
+    const builder = QueryBuilder.forClass(TestModel);
+    const missing = Object.getOwnPropertyNames(knexProto).filter((name) => {
+      const descriptor = Object.getOwnPropertyDescriptor(knexProto, name);
+
+      return (
+        typeof descriptor.value === 'function' &&
+        !name.startsWith('_') &&
+        name !== 'constructor' &&
+        !(name in ignore) &&
+        typeof builder[name] !== 'function'
+      );
+    });
+
+    expect(missing).to.eql([]);
+  });
+
   it('modelClass() should return the model class', () => {
     expect(QueryBuilder.forClass(TestModel).modelClass() === TestModel).to.equal(true);
   });

@@ -2221,6 +2221,9 @@ declare namespace Objection {
 
     using(columns: string | readonly string[] | Raw | { [key: string]: string | Raw }): JoinBuilder;
     type(type: string): JoinBuilder;
+
+    /** Makes the next condition an `or`: `join.on(a, b).or.on(c, d)`. */
+    readonly or: JoinBuilder;
   }
 
   interface JoinRawMethod<QB extends AnyQueryBuilder> extends RawInterface<QB> {}
@@ -2713,6 +2716,17 @@ declare namespace Objection {
     from: FromMethod<this>;
     table: FromMethod<this>;
     into: FromMethod<this>;
+    /** The table to update from (`update ... from`), postgres only. */
+    updateFrom: FromMethod<this>;
+    /** Tables to delete using (`delete ... using`), postgres only. */
+    using(tables: string | readonly string[]): this;
+
+    /** Adds an SQL comment before the query: `/* comment *\/ select ...`. */
+    comment(comment: string): this;
+    /** Adds optimizer hints to the query: `select /*+ hint *\/ ...`. */
+    hintComment(hints: string | readonly string[]): this;
+    /** Options passed to the database driver. */
+    options(options: Readonly<{ [key: string]: any }>): this;
     fromRaw: FromRawMethod<this>;
 
     jsonExtract: JsonExtract<this>;
@@ -2831,23 +2845,31 @@ declare namespace Objection {
     orHavingRaw: WhereRawMethod<this>;
 
     havingIn: WhereInMethod<this>;
+    andHavingIn: WhereInMethod<this>;
     orHavingIn: WhereInMethod<this>;
     havingNotIn: WhereInMethod<this>;
+    andHavingNotIn: WhereInMethod<this>;
     orHavingNotIn: WhereInMethod<this>;
 
     havingNull: WhereNullMethod<this>;
+    andHavingNull: WhereNullMethod<this>;
     orHavingNull: WhereNullMethod<this>;
     havingNotNull: WhereNullMethod<this>;
+    andHavingNotNull: WhereNullMethod<this>;
     orHavingNotNull: WhereNullMethod<this>;
 
     havingExists: WhereExistsMethod<this>;
+    andHavingExists: WhereExistsMethod<this>;
     orHavingExists: WhereExistsMethod<this>;
     havingNotExists: WhereExistsMethod<this>;
+    andHavingNotExists: WhereExistsMethod<this>;
     orHavingNotExists: WhereExistsMethod<this>;
 
     havingBetween: WhereBetweenMethod<this>;
+    andHavingBetween: WhereBetweenMethod<this>;
     orHavingBetween: WhereBetweenMethod<this>;
     havingNotBetween: WhereBetweenMethod<this>;
+    andHavingNotBetween: WhereBetweenMethod<this>;
     orHavingNotBetween: WhereBetweenMethod<this>;
 
     whereComposite: WhereCompositeMethod<this>;
@@ -3057,6 +3079,8 @@ declare namespace Objection {
     clearSelect: IdentityMethod<this>;
     clearOrder: IdentityMethod<this>;
     clearWhere: IdentityMethod<this>;
+    clearGroup: IdentityMethod<this>;
+    clearHaving: IdentityMethod<this>;
     clearWithGraph: IdentityMethod<this>;
     clearAllowGraph: IdentityMethod<this>;
 
@@ -3071,6 +3095,8 @@ declare namespace Objection {
     catch<FR = never>(
       onrejected?: ((reason: any) => FR | PromiseLike<FR>) | undefined | null,
     ): Promise<R | FR>;
+
+    finally(onfinally?: (() => void) | undefined | null): Promise<R>;
   }
 
   type X<T> = Promise<T>;
