@@ -45,6 +45,6 @@ Provenance needs the GitHub repository to be public.
    git push origin main --follow-tags
    ```
 
-4. The `release` workflow runs all tests (SQLite, Postgres and MySQL 8.4, on node 20 to 24), checks that the tag matches `package.json`, publishes to npm with provenance under the dist-tag from the table above, and creates the GitHub release.
+4. The `release` workflow runs all tests (SQLite, Postgres, MySQL 8.4 and MariaDB 10.6 and 11.4, on Node.js 24 and 26), checks that the tag matches `package.json`, publishes to npm with provenance under the dist-tag from the table above, and creates the GitHub release.
 
 If the workflow fails before publishing, fix the problem on `main`, delete the tag (`git push origin :refs/tags/v<version>` and `git tag -d v<version>`), and release the next version. A published version can't be republished.
