@@ -16,3 +16,6 @@ npm-debug.log*
 /**/.vitepress/cache
 # Build output of src/ (npm run build)
 /lib
+
+# Local Claude Code state, including agent worktrees
+/.claude
