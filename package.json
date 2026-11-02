@@ -60,6 +60,7 @@
     "README.md",
     "LICENSE",
     "lib/*",
+    "!lib/**/*.pegjs",
     "typings/*"
   ],
   "types": "./typings/objection/index.d.ts",
