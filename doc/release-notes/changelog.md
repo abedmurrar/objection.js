@@ -4,6 +4,8 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+## 4.0.0-beta.8 (2026-11-02)
+
 ### What's new
 
 - The README and the documentation say that the source is TypeScript, and the contributing guide explains the build.
