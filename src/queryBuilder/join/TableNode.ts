@@ -1,7 +1,35 @@
-'use strict';
+import type { RelationExpression } from '../RelationExpression';
+import type { FlatRow, JoinModelClass, JoinQueryBuilder, JoinRelation } from './RelationJoiner';
+import type { TableTree } from './TableTree';
+
+interface TableNodeArgs {
+  tableTree: TableTree;
+  modelClass: JoinModelClass;
+  expression: RelationExpression;
+  parentNode?: TableNode | null;
+  relation?: JoinRelation | null;
+}
+
+type IdGetter = (flatRow: FlatRow) => string | null;
 
 class TableNode {
-  constructor({ tableTree, modelClass, expression, parentNode = null, relation = null }) {
+  declare tableTree: TableTree;
+  declare modelClass: JoinModelClass;
+  declare parentNode: TableNode | null;
+  // Null for the root node only.
+  declare relation: JoinRelation | null;
+  declare expression: RelationExpression;
+  declare childNodes: TableNode[];
+  declare alias: string;
+  declare idGetter: IdGetter;
+
+  constructor({
+    tableTree,
+    modelClass,
+    expression,
+    parentNode = null,
+    relation = null,
+  }: TableNodeArgs) {
     this.tableTree = tableTree;
     this.modelClass = modelClass;
     this.parentNode = parentNode;
@@ -13,7 +41,7 @@ class TableNode {
     this.idGetter = this._createIdGetter();
   }
 
-  static create(args) {
+  static create(args: TableNodeArgs) {
     const node = new TableNode(args);
 
     if (node.parentNode) {
@@ -27,15 +55,16 @@ class TableNode {
     return this.tableTree.options;
   }
 
+  // Null for the root node only.
   get relationProperty() {
     return this.expression.node.$name;
   }
 
-  getReferenceForColumn(column) {
+  getReferenceForColumn(column: string): string {
     return `${this.alias}.${column}`;
   }
 
-  getColumnAliasForColumn(column) {
+  getColumnAliasForColumn(column: string): string {
     if (this.parentNode) {
       return `${this.alias}${this.options.separator}${column}`;
     } else {
@@ -43,7 +72,7 @@ class TableNode {
     }
   }
 
-  getColumnForColumnAlias(columnAlias) {
+  getColumnForColumnAlias(columnAlias: string): string {
     const lastSepIndex = columnAlias.lastIndexOf(this.options.separator);
 
     if (lastSepIndex === -1) {
@@ -53,14 +82,14 @@ class TableNode {
     }
   }
 
-  getIdFromFlatRow(flatRow) {
+  getIdFromFlatRow(flatRow: FlatRow): string | null {
     return this.idGetter(flatRow);
   }
 
-  getJoinTableAlias(builder) {
-    if (this.relation.isObjectionManyToManyRelation) {
+  getJoinTableAlias(builder: JoinQueryBuilder): string | undefined {
+    if (this.relation!.isObjectionManyToManyRelation) {
       return (
-        builder.aliasFor(this.relation.joinTableModelClass) ||
+        builder.aliasFor(this.relation!.joinTableModelClass) ||
         this.modelClass.joinTableAlias(this.alias)
       );
     } else {
@@ -70,7 +99,8 @@ class TableNode {
 
   _calculateAlias() {
     if (this.parentNode) {
-      const relationName = this.expression.node.$name;
+      // A child node always has a name.
+      const relationName = this.expression.node.$name!;
       const alias = this.options.aliases[relationName] || relationName;
 
       if (this.options.minimize) {
@@ -97,7 +127,7 @@ class TableNode {
   }
 }
 
-function createIdGetter(columnAliases) {
+function createIdGetter(columnAliases: string[]): IdGetter {
   const columnAlias = columnAliases[0];
 
   return (flatRow) => {
@@ -111,7 +141,7 @@ function createIdGetter(columnAliases) {
   };
 }
 
-function createCompositeIdGetter(columnAliases) {
+function createCompositeIdGetter(columnAliases: string[]): IdGetter {
   if (columnAliases.length === 2) {
     return createTwoIdGetter(columnAliases);
   } else {
@@ -119,7 +149,7 @@ function createCompositeIdGetter(columnAliases) {
   }
 }
 
-function createTwoIdGetter(columnAliases) {
+function createTwoIdGetter(columnAliases: string[]): IdGetter {
   const columnAlias1 = columnAliases[0];
   const columnAlias2 = columnAliases[1];
 
@@ -135,7 +165,7 @@ function createTwoIdGetter(columnAliases) {
   };
 }
 
-function createMultiIdGetter(columnAliases) {
+function createMultiIdGetter(columnAliases: string[]): IdGetter {
   return (flatRow) => {
     let idStr = '';
 
@@ -158,6 +188,4 @@ function createMultiIdGetter(columnAliases) {
   };
 }
 
-module.exports = {
-  TableNode,
-};
+export { TableNode };

@@ -1,19 +1,31 @@
-'use strict';
+import type { Knex } from 'knex';
+import { parseFieldExpression, type ParsedFieldExpression } from '../utils/parseFieldExpression';
+import { isObject } from '../utils/objectUtils';
+import { isMySql, isMariaDb } from '../utils/knexUtils';
+import { toPgJsonPathLiteral, getJsonDialect } from '../utils/postgresJsonPath';
+import { toMySqlJsonPath, toMySqlCastType, isBooleanType, toJsonSql } from '../utils/mysqlJsonPath';
+import {
+  addExpressionMethods,
+  type ExpressionMethods,
+  type ExpressionQueryBuilder,
+  type ModelClass,
+} from './expressions';
 
-const { parseFieldExpression } = require('../utils/parseFieldExpression');
-const { isObject } = require('../utils/objectUtils');
-const { isMySql, isMariaDb } = require('../utils/knexUtils');
-const { toPgJsonPathLiteral, getJsonDialect } = require('../utils/postgresJsonPath');
-const {
-  toMySqlJsonPath,
-  toMySqlCastType,
-  isBooleanType,
-  toJsonSql,
-} = require('../utils/mysqlJsonPath');
-const { addExpressionMethods } = require('./expressions');
+// The expression methods are added to the prototype by `addExpressionMethods()`.
+interface ReferenceBuilder extends ExpressionMethods {}
 
 class ReferenceBuilder {
-  constructor(expr) {
+  declare _expr: string | null;
+  declare _parsedExpr: ParsedFieldExpression | null;
+  declare _column: string | null;
+  declare _table: string | null;
+  declare _cast: string | null;
+  declare _toJson: boolean;
+  declare _alias: string | null;
+  declare _modelClass: ModelClass | null;
+  declare readonly isObjectionReferenceBuilder: true;
+
+  constructor(expr: string | null) {
     this._expr = expr;
     this._parsedExpr = null;
     this._column = null;
@@ -31,15 +43,18 @@ class ReferenceBuilder {
     }
   }
 
+  // `_expr`, `_parsedExpr` and `_column` are only null inside `clone()`, which
+  // sets them right after creating the clone.
+
   get parsedExpr() {
-    return this._parsedExpr;
+    return this._parsedExpr!;
   }
 
   get column() {
-    return this._column;
+    return this._column!;
   }
 
-  set column(column) {
+  set column(column: string) {
     this._column = column;
   }
 
@@ -47,7 +62,7 @@ class ReferenceBuilder {
     return this._alias;
   }
 
-  set alias(alias) {
+  set alias(alias: string | null) {
     this._alias = alias;
   }
 
@@ -55,7 +70,7 @@ class ReferenceBuilder {
     return this._table;
   }
 
-  set tableName(table) {
+  set tableName(table: string | null) {
     this._table = table;
   }
 
@@ -63,7 +78,7 @@ class ReferenceBuilder {
     return this._modelClass;
   }
 
-  set modelClass(modelClass) {
+  set modelClass(modelClass: ModelClass | null) {
     this._modelClass = modelClass;
   }
 
@@ -74,14 +89,14 @@ class ReferenceBuilder {
   }
 
   get expression() {
-    return this._expr;
+    return this._expr!;
   }
 
   get cast() {
     return this._cast;
   }
 
-  fullColumn(builder) {
+  fullColumn(builder: ExpressionQueryBuilder): string {
     const table = this.tableName
       ? this.tableName
       : this.modelClass
@@ -128,33 +143,33 @@ class ReferenceBuilder {
     return this;
   }
 
-  castTo(sqlType) {
+  castTo(sqlType: string): this {
     this._cast = sqlType;
     return this;
   }
 
-  from(table) {
+  from(table: string): this {
     this._table = table;
     return this;
   }
 
-  table(table) {
+  table(table: string): this {
     this._table = table;
     return this;
   }
 
-  model(modelClass) {
+  model(modelClass: ModelClass): this {
     this._modelClass = modelClass;
     return this;
   }
 
-  as(alias) {
+  as(alias: string): this {
     this._alias = alias;
     return this;
   }
 
   clone() {
-    const clone = new this.constructor(null);
+    const clone = new (this.constructor as new (expr: string | null) => this)(null);
 
     clone._expr = this._expr;
     clone._parsedExpr = this._parsedExpr;
@@ -168,20 +183,20 @@ class ReferenceBuilder {
     return clone;
   }
 
-  toKnexRaw(builder) {
+  toKnexRaw(builder: ExpressionQueryBuilder): Knex.Raw {
     return builder.knex().raw(...this._createRawArgs(builder));
   }
 
-  _parseExpression(expr) {
+  _parseExpression(expr: string): void {
     this._parsedExpr = parseFieldExpression(expr);
     this._column = this._parsedExpr.column;
     this._table = this._parsedExpr.table;
   }
 
-  _createRawArgs(builder) {
+  _createRawArgs(builder: ExpressionQueryBuilder): [string, Knex.RawBinding[]] {
     const knex = builder.unsafeKnex();
     const mysql = isMySql(knex);
-    const bindings = [];
+    const bindings: Knex.RawBinding[] = [];
     let sql = this._createReferenceSql(builder, bindings);
 
     sql = this._maybeCast(sql, mysql, knex);
@@ -191,15 +206,15 @@ class ReferenceBuilder {
     return [sql, bindings];
   }
 
-  _createReferenceSql(builder, bindings) {
-    const access = this._parsedExpr.access;
+  _createReferenceSql(builder: ExpressionQueryBuilder, bindings: Knex.RawBinding[]): string {
+    const access = this._parsedExpr!.access;
     bindings.push(this.fullColumn(builder));
 
     if (access.length === 0) {
       return '??';
     }
 
-    if (getJsonDialect(builder.unsafeKnex(), this._expr) === 'mysql') {
+    if (getJsonDialect(builder.unsafeKnex(), this._expr!) === 'mysql') {
       bindings.push(toMySqlJsonPath(access));
       // Casts need the unquoted value: `abc` instead of the JSON string `"abc"`.
       if (this._cast) {
@@ -217,14 +232,14 @@ class ReferenceBuilder {
     return `??${extractor}${toPgJsonPathLiteral(access)}`;
   }
 
-  _maybeCast(sql, mysql, knex) {
+  _maybeCast(sql: string, mysql: boolean, knex: Knex | null): string {
     if (!this._cast) {
       return sql;
     } else if (!mysql) {
       return `CAST(${sql} AS ${this._cast})`;
     }
 
-    const isJsonField = this._parsedExpr.access.length > 0;
+    const isJsonField = this._parsedExpr!.access.length > 0;
 
     // MySQL can't cast to a boolean.
     if (isBooleanType(this._cast)) {
@@ -246,7 +261,7 @@ class ReferenceBuilder {
     return `CAST(${sql} AS ${type})`;
   }
 
-  _maybeToJsonb(sql, mysql, knex) {
+  _maybeToJsonb(sql: string, mysql: boolean, knex: Knex | null): string {
     if (!this._toJson) {
       return sql;
     } else if (mysql) {
@@ -256,7 +271,7 @@ class ReferenceBuilder {
     }
   }
 
-  _maybeAlias(sql, bindings) {
+  _maybeAlias(sql: string, bindings: Knex.RawBinding[]): string {
     if (this._shouldAlias()) {
       bindings.push(this._alias);
       return `${sql} as ??`;
@@ -288,15 +303,12 @@ Object.defineProperties(ReferenceBuilder.prototype, {
 
 addExpressionMethods(ReferenceBuilder.prototype);
 
-const ref = (reference) => {
-  if (isObject(reference) && reference.isObjectionReferenceBuilder) {
-    return reference;
+const ref = (reference: unknown): ReferenceBuilder => {
+  if (isObject(reference) && (reference as ReferenceBuilder).isObjectionReferenceBuilder) {
+    return reference as ReferenceBuilder;
   } else {
-    return new ReferenceBuilder(reference);
+    return new ReferenceBuilder(reference as string);
   }
 };
 
-module.exports = {
-  ReferenceBuilder,
-  ref,
-};
+export { ReferenceBuilder, ref };

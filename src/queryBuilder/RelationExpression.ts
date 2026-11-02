@@ -1,31 +1,89 @@
-'use strict';
+import * as parser from './parsers/relationExpressionParser';
+import { isObject, isNumber, isString, union } from '../utils/objectUtils';
+import { RelationDoesNotExistError } from '../model/RelationDoesNotExistError';
 
-const parser = require('./parsers/relationExpressionParser');
-const { isObject, isNumber, isString, union } = require('../utils/objectUtils');
-const { RelationDoesNotExistError } = require('../model/RelationDoesNotExistError');
+// A node of a relation expression. The properties that don't start with `$` are
+// the child nodes. `$childNames` is only null while `mergeNodes()` builds a node.
+interface RelationNode<ChildNames extends string[] | null = string[]> {
+  $name: string | null;
+  $relation: string | null;
+  // The names of the modifiers.
+  $modify: string[];
+  $recursive: boolean | number;
+  $allRecursive: boolean;
+  $childNames: ChildNames;
+  [childName: string]: unknown;
+}
+
+// What `normalizeNode()` takes: a node, the result of the parser, or a pojo like
+// `{ a: { b: true }, c: true }`.
+interface RelationNodeInput {
+  $name?: string | null;
+  $relation?: string | null;
+  $modify?: string | string[];
+  $recursive?: boolean | number;
+  $allRecursive?: boolean;
+  $childNames?: string[] | null;
+  [childName: string]: unknown;
+}
+
+// What `merge()` and the other methods take: a string, a pojo or another
+// RelationExpression instance.
+type RelationExpressionInput = string | RelationExpression | RelationNodeInput | null | undefined;
+
+// The parts of a model class that `forEachChildExpression()` uses. `R` is the
+// type of its relations.
+interface ModelClassWithRelations<R> {
+  getRelationNames(): string[];
+  getRelationUnsafe(relationName: string | null): R | null;
+}
+
+// A model of the graph `fromModelGraph()` takes.
+interface GraphModel {
+  constructor: Function;
+  [property: string]: unknown;
+}
+
+// The class of a `GraphModel`. The model classes are still JavaScript, and the
+// types of the operations don't list `getRelationNames()`.
+interface GraphModelClass extends Function {
+  getRelationNames(): string[];
+}
+
+// An error of the parser.
+interface ParserError {
+  message: string;
+  duplicateRelationName?: string;
+}
 
 class RelationExpressionParseError extends Error {}
 class DuplicateRelationError extends RelationExpressionParseError {
-  constructor(relationName) {
+  declare relationName: string;
+
+  constructor(relationName: string) {
     super();
     this.relationName = relationName;
   }
 }
 
 class RelationExpression {
-  constructor(node = newNode(), recursionDepth = 0) {
+  declare node: RelationNode;
+  declare recursionDepth: number;
+  declare readonly isObjectionRelationExpression: true;
+
+  constructor(node: RelationNode = newNode(), recursionDepth = 0) {
     this.node = node;
     this.recursionDepth = recursionDepth;
   }
 
   // Create a relation expression from a string, a pojo or another
   // RelationExpression instance.
-  static create(expr) {
+  static create(expr?: unknown): RelationExpression {
     if (isObject(expr)) {
-      if (expr.isObjectionRelationExpression) {
-        return expr;
+      if ((expr as RelationExpression).isObjectionRelationExpression) {
+        return expr as RelationExpression;
       } else {
-        return new RelationExpression(normalizeNode(expr));
+        return new RelationExpression(normalizeNode(expr as RelationNodeInput));
       }
     } else if (isString(expr)) {
       if (expr.trim().length === 0) {
@@ -34,10 +92,10 @@ class RelationExpression {
         try {
           return new RelationExpression(parse(expr));
         } catch (err) {
-          if (err.duplicateRelationName) {
-            throw new DuplicateRelationError(err.duplicateRelationName);
+          if ((err as ParserError).duplicateRelationName) {
+            throw new DuplicateRelationError((err as ParserError).duplicateRelationName!);
           } else {
-            throw new RelationExpressionParseError(err.message);
+            throw new RelationExpressionParseError((err as ParserError).message);
           }
         }
       }
@@ -47,7 +105,7 @@ class RelationExpression {
   }
 
   // Create a relation expression from a model graph.
-  static fromModelGraph(graph) {
+  static fromModelGraph(graph: GraphModel | GraphModel[] | null | undefined): RelationExpression {
     if (!graph) {
       return new RelationExpression();
     } else {
@@ -73,7 +131,7 @@ class RelationExpression {
 
   // Merges this relation expression with another. `expr` can be a string,
   // a pojo, or a RelationExpression instance.
-  merge(expr) {
+  merge(expr: RelationExpressionInput): RelationExpression {
     expr = RelationExpression.create(expr);
 
     if (this.isEmpty) {
@@ -86,7 +144,7 @@ class RelationExpression {
 
   // Returns true if `expr` is contained by this expression. For example
   // `a.b` is contained by `a.[b, c]`.
-  isSubExpression(expr) {
+  isSubExpression(expr: RelationExpressionInput): boolean {
     expr = RelationExpression.create(expr);
 
     if (this.node.$allRecursive) {
@@ -121,7 +179,7 @@ class RelationExpression {
 
   // Returns a RelationExpression for a child node or null if there
   // is no child with the given name `childName`.
-  childExpression(childName) {
+  childExpression(childName: string): RelationExpression | null {
     if (
       this.node.$allRecursive ||
       (childName === this.node.$name && this.recursionDepth < this.maxRecursionDepth - 1)
@@ -129,7 +187,7 @@ class RelationExpression {
       return new RelationExpression(this.node, this.recursionDepth + 1);
     }
 
-    const child = this.node[childName];
+    const child = this.node[childName] as RelationNode | undefined;
 
     if (child) {
       return new RelationExpression(child);
@@ -139,7 +197,10 @@ class RelationExpression {
   }
 
   // Loops throught all first level children.
-  forEachChildExpression(modelClass, cb) {
+  forEachChildExpression<R>(
+    modelClass: ModelClassWithRelations<R>,
+    cb: (childExpr: RelationExpression, relation: R | null) => void,
+  ): void {
     const maxRecursionDepth = this.maxRecursionDepth;
 
     if (this.node.$allRecursive) {
@@ -157,7 +218,7 @@ class RelationExpression {
       cb(childExpr, relation);
     } else if (maxRecursionDepth === 0) {
       for (const childName of this.node.$childNames) {
-        const node = this.node[childName];
+        const node = this.node[childName] as RelationNode;
         const relation = modelClass.getRelationUnsafe(node.$relation);
 
         if (!relation) {
@@ -171,7 +232,7 @@ class RelationExpression {
     }
   }
 
-  expressionsAtPath(path) {
+  expressionsAtPath(path: unknown): RelationExpression[] {
     return findExpressionsAtPath(this, RelationExpression.create(path), []);
   }
 
@@ -179,7 +240,8 @@ class RelationExpression {
     return new RelationExpression(cloneNode(this.node), this.recursionDepth);
   }
 
-  toString() {
+  // `null` for an empty expression.
+  toString(): string | null {
     return toString(this.node);
   }
 
@@ -192,14 +254,14 @@ class RelationExpression {
   }
 }
 
-const parseCache = new Map();
-function parse(str) {
+const parseCache = new Map<string, RelationNode>();
+function parse(str: string): RelationNode {
   const cachedNode = parseCache.get(str);
 
   if (cachedNode) {
     return cloneNode(cachedNode);
   } else {
-    const node = parser.parse(str);
+    const node: RelationNode = parser.parse(str);
     parseCache.set(str, cloneNode(node));
     return node;
   }
@@ -207,12 +269,12 @@ function parse(str) {
 
 // All enumerable properties of a node that don't start with `$`
 // are child nodes.
-function getChildNames(node) {
+function getChildNames(node: RelationNodeInput | null): string[] {
   if (!node) {
     return [];
   }
 
-  const childNames = [];
+  const childNames: string[] = [];
 
   for (const key of Object.keys(node)) {
     if (key[0] !== '$') {
@@ -223,10 +285,12 @@ function getChildNames(node) {
   return childNames;
 }
 
-function toString(node) {
+function toString(node: RelationNode): string | null {
   const childNames = node.$childNames;
 
-  let childExpr = childNames.map((childName) => node[childName]).map(toString);
+  let childExpr: (string | null)[] | string | null = childNames
+    .map((childName) => node[childName] as RelationNode)
+    .map(toString);
   let str = node.$relation;
 
   if (node.$recursive) {
@@ -264,11 +328,14 @@ function toString(node) {
   }
 }
 
-function cloneNode(node) {
+function cloneNode(node: RelationNode): RelationNode {
   return normalizeNode(node);
 }
 
-function modelGraphToNode(models, node) {
+function modelGraphToNode(
+  models: GraphModel | GraphModel[] | null | undefined,
+  node: RelationNode,
+): RelationNode | undefined {
   if (!models) {
     return;
   }
@@ -284,15 +351,15 @@ function modelGraphToNode(models, node) {
   return node;
 }
 
-function modelToNode(model, node) {
-  const modelClass = model.constructor;
+function modelToNode(model: GraphModel, node: RelationNode): void {
+  const modelClass = model.constructor as GraphModelClass;
   const relationNames = modelClass.getRelationNames();
 
   for (let r = 0, lr = relationNames.length; r < lr; ++r) {
     const relName = relationNames[r];
 
     if (model[relName] !== undefined) {
-      let childNode = node[relName];
+      let childNode = node[relName] as RelationNode | undefined;
 
       if (!childNode) {
         childNode = newNode(relName);
@@ -300,17 +367,21 @@ function modelToNode(model, node) {
         node.$childNames.push(relName);
       }
 
-      modelGraphToNode(model[relName], childNode);
+      modelGraphToNode(model[relName] as GraphModel | GraphModel[] | null, childNode);
     }
   }
 }
 
-function newNode(name = null, allRecusive = false) {
+function newNode(name: string | null = null, allRecusive = false): RelationNode {
   return normalizeNode(null, name, allRecusive);
 }
 
-function normalizeNode(node = null, name = null, allRecusive = false) {
-  const normalized = {
+function normalizeNode(
+  node: RelationNodeInput | null = null,
+  name: string | null = null,
+  allRecusive = false,
+): RelationNode {
+  const normalized: RelationNode = {
     $name: normalizeName(node, name),
     $relation: normalizeRelation(node, name),
     $modify: normalizeModify(node),
@@ -320,25 +391,27 @@ function normalizeNode(node = null, name = null, allRecusive = false) {
   };
 
   for (const childName of normalized.$childNames) {
-    const childNode = node[childName];
+    // `node` isn't null here, since a null node has no child names.
+    const childNode = node![childName];
 
     if (isObject(childNode) || childNode === true) {
-      normalized[childName] = normalizeNode(childNode, childName);
+      // `true` is a node without any properties, like `{}`.
+      normalized[childName] = normalizeNode(childNode as RelationNodeInput, childName);
     }
   }
 
   return normalized;
 }
 
-function normalizeName(node, name) {
+function normalizeName(node: RelationNodeInput | null, name: string | null): string | null {
   return (node && node.$name) || name || null;
 }
 
-function normalizeRelation(node, name) {
+function normalizeRelation(node: RelationNodeInput | null, name: string | null): string | null {
   return (node && node.$relation) || name || null;
 }
 
-function normalizeModify(node) {
+function normalizeModify(node: RelationNodeInput | null): string[] {
   if (!node || !node.$modify) {
     return [];
   }
@@ -346,25 +419,30 @@ function normalizeModify(node) {
   return Array.isArray(node.$modify) ? node.$modify.slice() : [node.$modify];
 }
 
-function normalizeRecursive(node) {
+function normalizeRecursive(node: RelationNodeInput | null): boolean | number {
   return (node && node.$recursive) || false;
 }
 
-function normalizeAllRecursive(node, allRecusive) {
+function normalizeAllRecursive(node: RelationNodeInput | null, allRecusive: boolean): boolean {
   return (node && node.$allRecursive) || allRecusive || false;
 }
 
-function normalizeChildNames(node) {
+function normalizeChildNames(node: RelationNodeInput | null): string[] {
   return (node && node.$childNames && node.$childNames.slice()) || getChildNames(node);
 }
 
-function findExpressionsAtPath(target, path, results) {
+function findExpressionsAtPath(
+  target: RelationExpression,
+  path: RelationExpression,
+  results: RelationExpression[],
+): RelationExpression[] {
   if (path.node.$childNames.length == 0) {
     // Path leaf reached, add target node to result set.
     results.push(target);
   } else {
     for (const childName of path.node.$childNames) {
-      const pathChild = path.childExpression(childName);
+      // Not null, since `childName` is a child of `path`.
+      const pathChild = path.childExpression(childName)!;
       const targetChild = target.childExpression(childName);
 
       if (targetChild) {
@@ -376,8 +454,8 @@ function findExpressionsAtPath(target, path, results) {
   return results;
 }
 
-function mergeNodes(node1, node2) {
-  const node = {
+function mergeNodes(node1: RelationNode, node2: RelationNode): RelationNode {
+  const node: RelationNode<string[] | null> = {
     $name: node1.$name,
     $relation: node1.$relation,
     $modify: union(node1.$modify, node2.$modify),
@@ -389,9 +467,9 @@ function mergeNodes(node1, node2) {
   if (!node.$recursive && !node.$allRecursive) {
     node.$childNames = union(node1.$childNames, node2.$childNames);
 
-    for (const childName of node.$childNames) {
-      const child1 = node1[childName];
-      const child2 = node2[childName];
+    for (const childName of node.$childNames!) {
+      const child1 = node1[childName] as RelationNode | undefined;
+      const child2 = node2[childName] as RelationNode | undefined;
 
       if (child1 && child2) {
         node[childName] = mergeNodes(child1, child2);
@@ -403,10 +481,11 @@ function mergeNodes(node1, node2) {
     node.$childNames = [];
   }
 
-  return node;
+  // `$childNames` was set above.
+  return node as RelationNode;
 }
 
-function mergeRecursion(rec1, rec2) {
+function mergeRecursion(rec1: boolean | number, rec2: boolean | number): boolean | number {
   if (rec1 === true || rec2 === true) {
     return true;
   } else if (isNumber(rec1) && isNumber(rec2)) {
@@ -424,8 +503,10 @@ Object.defineProperties(RelationExpression.prototype, {
   },
 });
 
-module.exports = {
+export {
   RelationExpression,
   RelationExpressionParseError,
   DuplicateRelationError,
+  type RelationNode,
+  type ModelClassWithRelations,
 };

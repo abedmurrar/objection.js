@@ -1,10 +1,29 @@
-'use strict';
+import { JoinResultColumn } from './JoinResultColumn';
+import { groupBy } from '../../utils/objectUtils';
+import type { FlatRow, JoinModel } from './RelationJoiner';
+import type { TableNode } from './TableNode';
+import type { TableTree } from './TableTree';
 
-const { JoinResultColumn } = require('./JoinResultColumn');
-const { groupBy } = require('../../utils/objectUtils');
+// A model that was created, and the models of its child nodes that were
+// created under it, by id. One map for each child node.
+interface ModelEntry {
+  model: JoinModel;
+  childModelsById: Map<string, ModelEntry>[];
+}
+
+interface JoinResultParserArgs {
+  tableTree: TableTree;
+  omitColumnAliases?: (string | null)[];
+}
 
 class JoinResultParser {
-  constructor({ tableTree, omitColumnAliases = [] }) {
+  declare tableTree: TableTree;
+  declare omitColumnAliases: Set<string | null>;
+  declare columnsByTableNode: Map<TableNode, JoinResultColumn[]> | null;
+  declare rootModelsById: Map<string, ModelEntry> | null;
+  declare rootModels: JoinModel[] | null;
+
+  constructor({ tableTree, omitColumnAliases = [] }: JoinResultParserArgs) {
     this.tableTree = tableTree;
     this.omitColumnAliases = new Set(omitColumnAliases);
 
@@ -13,11 +32,11 @@ class JoinResultParser {
     this.rootModels = null;
   }
 
-  static create(args) {
+  static create(args: JoinResultParserArgs) {
     return new JoinResultParser(args);
   }
 
-  parse(flatRows) {
+  parse(flatRows: unknown): unknown {
     if (!Array.isArray(flatRows) || flatRows.length === 0) {
       return flatRows;
     }
@@ -26,7 +45,7 @@ class JoinResultParser {
     this.rootModelsById = new Map();
     this.rootModels = [];
 
-    for (const flatRow of flatRows) {
+    for (const flatRow of flatRows as FlatRow[]) {
       this._parseNode(this.tableTree.rootNode, flatRow, null, this.rootModelsById);
     }
 
@@ -36,7 +55,12 @@ class JoinResultParser {
   // `modelsById` holds the models of `tableNode` that were already created
   // under `parentModel`. Every created model gets a map like it for each of
   // its child nodes.
-  _parseNode(tableNode, flatRow, parentModel, modelsById) {
+  _parseNode(
+    tableNode: TableNode,
+    flatRow: FlatRow,
+    parentModel: JoinModel | null,
+    modelsById: Map<string, ModelEntry>,
+  ): void {
     const id = tableNode.getIdFromFlatRow(flatRow);
 
     if (id === null) {
@@ -60,9 +84,9 @@ class JoinResultParser {
     }
   }
 
-  _createModel(tableNode, flatRow) {
-    const row = {};
-    const columns = this.columnsByTableNode.get(tableNode);
+  _createModel(tableNode: TableNode, flatRow: FlatRow): JoinModel {
+    const row: FlatRow = {};
+    const columns = this.columnsByTableNode!.get(tableNode);
 
     if (columns) {
       for (let i = 0, l = columns.length; i < l; ++i) {
@@ -73,31 +97,33 @@ class JoinResultParser {
 
     const model = tableNode.modelClass.fromDatabaseJson(row);
 
+    // The child nodes and the node of a parent model always have a relation
+    // and a relation property.
     for (const childNode of tableNode.childNodes) {
-      if (childNode.relation.isOneToOne()) {
-        model[childNode.relationProperty] = null;
+      if (childNode.relation!.isOneToOne()) {
+        model[childNode.relationProperty!] = null;
       } else {
-        model[childNode.relationProperty] = [];
+        model[childNode.relationProperty!] = [];
       }
     }
 
     return model;
   }
 
-  _addToParent(tableNode, model, parentModel) {
+  _addToParent(tableNode: TableNode, model: JoinModel, parentModel: JoinModel | null): void {
     if (tableNode.parentNode) {
-      if (tableNode.relation.isOneToOne()) {
-        parentModel[tableNode.relationProperty] = model;
+      if (tableNode.relation!.isOneToOne()) {
+        parentModel![tableNode.relationProperty!] = model;
       } else {
-        parentModel[tableNode.relationProperty].push(model);
+        parentModel![tableNode.relationProperty!].push(model);
       }
     } else {
       // Root model. Add to root list.
-      this.rootModels.push(model);
+      this.rootModels!.push(model);
     }
   }
 
-  _createColumns(row) {
+  _createColumns(row: FlatRow): Map<TableNode, JoinResultColumn[]> {
     const columns = Object.keys(row)
       .map((columnAlias) => JoinResultColumn.create({ tableTree: this.tableTree, columnAlias }))
       // The omitted columns are filtered here once instead of for every model.
@@ -107,20 +133,20 @@ class JoinResultParser {
   }
 }
 
-function getTableNode(column) {
+function getTableNode(column: JoinResultColumn): TableNode {
   return column.tableNode;
 }
 
-const NO_CHILD_MAPS = [];
+const NO_CHILD_MAPS: Map<string, ModelEntry>[] = [];
 
-function createChildMaps(tableNode) {
+function createChildMaps(tableNode: TableNode): Map<string, ModelEntry>[] {
   const childNodes = tableNode.childNodes;
 
   if (childNodes.length === 0) {
     return NO_CHILD_MAPS;
   }
 
-  const maps = new Array(childNodes.length);
+  const maps: Map<string, ModelEntry>[] = new Array(childNodes.length);
 
   for (let i = 0, l = childNodes.length; i < l; ++i) {
     maps[i] = new Map();
@@ -129,6 +155,4 @@ function createChildMaps(tableNode) {
   return maps;
 }
 
-module.exports = {
-  JoinResultParser,
-};
+export { JoinResultParser };

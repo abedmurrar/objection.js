@@ -1,13 +1,25 @@
-'use strict';
+import type { Knex } from 'knex';
+import { asArray, isObject } from '../utils/objectUtils';
+import { buildArg } from '../utils/buildUtils';
+import { isMySql } from '../utils/knexUtils';
+import { toMySqlCastType, isBooleanType, toJsonSql } from '../utils/mysqlJsonPath';
+import {
+  addExpressionMethods,
+  type ExpressionMethods,
+  type ExpressionQueryBuilder,
+} from './expressions';
 
-const { asArray, isObject } = require('../utils/objectUtils');
-const { buildArg } = require('../utils/buildUtils');
-const { isMySql } = require('../utils/knexUtils');
-const { toMySqlCastType, isBooleanType, toJsonSql } = require('../utils/mysqlJsonPath');
-const { addExpressionMethods } = require('./expressions');
+// The expression methods are added to the prototype by `addExpressionMethods()`.
+interface ValueBuilder extends ExpressionMethods {}
 
 class ValueBuilder {
-  constructor(value) {
+  declare _value: unknown;
+  declare _cast: string | null;
+  declare _toJson: boolean;
+  declare _toArray: boolean;
+  declare _alias: string | null;
+
+  constructor(value: unknown) {
     this._value = value;
     this._cast = null;
     // Cast objects and arrays to json by default.
@@ -55,7 +67,7 @@ class ValueBuilder {
     return this;
   }
 
-  castTo(sqlType) {
+  castTo(sqlType: string): this {
     this._cast = sqlType;
     return this;
   }
@@ -66,28 +78,29 @@ class ValueBuilder {
     return this;
   }
 
-  as(alias) {
+  as(alias: string): this {
     this._alias = alias;
     return this;
   }
 
-  toKnexRaw(builder) {
+  toKnexRaw(builder: ExpressionQueryBuilder): Knex.Raw {
     return builder.knex().raw(...this._createRawArgs(builder));
   }
 
-  _createRawArgs(builder) {
-    let sql = null;
-    const bindings = [];
+  _createRawArgs(builder: ExpressionQueryBuilder): [string, Knex.RawBinding[]] {
+    let sql: string | null = null;
+    const bindings: Knex.RawBinding[] = [];
 
     if (this._toJson) {
       bindings.push(JSON.stringify(this._value));
       sql = '?';
     } else if (this._toArray) {
       const values = asArray(this._value);
-      bindings.push(...values.map((it) => buildArg(it, builder)));
+      bindings.push(...values.map((it: unknown) => buildArg(it, builder) as Knex.RawBinding));
       sql = `ARRAY[${values.map(() => '?').join(', ')}]`;
     } else {
-      bindings.push(this._value);
+      // A value of the user, which knex binds as it is.
+      bindings.push(this._value as Knex.RawBinding);
       sql = '?';
     }
 
@@ -124,11 +137,8 @@ class ValueBuilder {
 
 addExpressionMethods(ValueBuilder.prototype);
 
-function val(val) {
+function val(val: unknown): ValueBuilder {
   return new ValueBuilder(val);
 }
 
-module.exports = {
-  ValueBuilder,
-  val,
-};
+export { ValueBuilder, val };

@@ -1,6 +1,4 @@
-'use strict';
-
-const { ref } = require('../ReferenceBuilder');
+import { ref } from '../ReferenceBuilder';
 
 // The MySQL 8.4 built-in functions, as `fn.*` helpers.
 //
@@ -33,6 +31,28 @@ const { ref } = require('../ReferenceBuilder');
 // `MASTER_POS_WAIT()`) or that need a component (`VALIDATE_PASSWORD_STRENGTH()`).
 // `fn('NAME', ...args)` calls any function.
 
+// The options of an entry. See above.
+interface FunctionOptions {
+  json?: 'all' | 'even' | 'odd' | number[];
+  portable?: boolean;
+  // A method, so that each builder can type the arguments of its helper the way
+  // the typings declare them.
+  build?(name: string, sql: string, args: unknown[]): [string, unknown[]];
+  aggregate?: true | ((args: unknown[]) => number);
+  window?: boolean;
+}
+
+type FunctionEntry = [
+  name: string,
+  sql: string,
+  params: string,
+  result: string,
+  options?: FunctionOptions,
+];
+
+// Why a helper can't be used on MariaDB with the given arguments, or null.
+type MariaDbCheck = (args: unknown[]) => string | null;
+
 const STR = 'string | null';
 const NUM = 'number | null';
 const DEC = 'FnNumeric | null';
@@ -47,9 +67,9 @@ const STRING = 'str: FnArg';
 const DATE_ARG = 'date: FnArg';
 const FSP = 'fsp?: number';
 const LAG_PARAMS = 'x: FnArg, offset?: number, defaultValue?: FnArg';
-const WINDOW = { portable: true, window: true };
+const WINDOW: FunctionOptions = { portable: true, window: true };
 
-const INTERVAL_UNITS = [
+const INTERVAL_UNITS: string[] = [
   'MICROSECOND',
   'SECOND',
   'MINUTE',
@@ -76,7 +96,7 @@ const TIMESTAMP_UNITS = INTERVAL_UNITS.slice(0, 9);
 const CAST_TYPE =
   /^((BINARY|CHAR|NCHAR)(\(\d+\))?( CHARACTER SET \w+)?|DATE|(DATETIME|TIME)(\(\d\))?|DECIMAL(\(\d+(, ?\d+)?\))?|DOUBLE|FLOAT(\(\d+\))?|JSON|REAL|(SIGNED|UNSIGNED)( INTEGER)?|YEAR)$/i;
 const CHARSET = /^\w+$/;
-const MATCH_MODES = {
+const MATCH_MODES: Record<string, string> = {
   natural: 'IN NATURAL LANGUAGE MODE',
   'natural with query expansion': 'IN NATURAL LANGUAGE MODE WITH QUERY EXPANSION',
   boolean: 'IN BOOLEAN MODE',
@@ -86,7 +106,7 @@ const TRIM_SIDES = ['BOTH', 'LEADING', 'TRAILING'];
 const DIRECTIONS = ['ASC', 'DESC'];
 const FORMAT_TYPES = ['DATE', 'TIME', 'DATETIME', 'TIMESTAMP'];
 
-const FUNCTIONS = [
+const FUNCTIONS: FunctionEntry[] = [
   // String functions.
   ['ascii', 'ASCII', STRING, NUM, { portable: true }],
   ['bin', 'BIN', 'n: FnArg', STR],
@@ -564,7 +584,11 @@ const FUNCTIONS = [
 // Builders for the functions with keywords in their syntax. They return
 // `[sql, args]`. Keywords are checked against lists, since they can't be bindings.
 
-function buildDateAdd(name, sql, [date, amount, unit]) {
+function buildDateAdd(
+  name: string,
+  sql: string,
+  [date, amount, unit]: unknown[],
+): [string, unknown[]] {
   if (unit === undefined && (sql === 'ADDDATE' || sql === 'SUBDATE')) {
     // The `ADDDATE(date, days)` form.
     return [`${sql}(?, ?)`, [date, amount]];
@@ -573,19 +597,23 @@ function buildDateAdd(name, sql, [date, amount, unit]) {
   return [`${sql}(?, INTERVAL ? ${keyword(name, 'unit', unit, INTERVAL_UNITS)})`, [date, amount]];
 }
 
-function buildTimestampFunction(name, sql, [unit, a, b]) {
+function buildTimestampFunction(
+  name: string,
+  sql: string,
+  [unit, a, b]: unknown[],
+): [string, unknown[]] {
   return [`${sql}(${keyword(name, 'unit', unit, TIMESTAMP_UNITS)}, ?, ?)`, [a, b]];
 }
 
-function buildExtract(name, sql, [unit, date]) {
+function buildExtract(name: string, sql: string, [unit, date]: unknown[]): [string, unknown[]] {
   return [`EXTRACT(${keyword(name, 'unit', unit, INTERVAL_UNITS)} FROM ?)`, [date]];
 }
 
-function buildGetFormat(name, sql, [type, locale]) {
+function buildGetFormat(name: string, sql: string, [type, locale]: unknown[]): [string, unknown[]] {
   return [`GET_FORMAT(${keyword(name, 'type', type, FORMAT_TYPES)}, ?)`, [locale]];
 }
 
-function buildCast(name, sql, [value, type]) {
+function buildCast(name: string, sql: string, [value, type]: unknown[]): [string, unknown[]] {
   if (typeof type !== 'string' || !CAST_TYPE.test(type.trim())) {
     throw new Error(`fn.cast(): invalid type ${JSON.stringify(type)}`);
   }
@@ -593,7 +621,11 @@ function buildCast(name, sql, [value, type]) {
   return [`CAST(? AS ${type.trim().toUpperCase()})`, [value]];
 }
 
-function buildConvert(name, sql, [value, type]) {
+function buildConvert(
+  name: string,
+  sql: string,
+  [value, type]: [unknown, string | { using?: unknown }],
+): [string, unknown[]] {
   if (type !== null && typeof type === 'object') {
     if (typeof type.using !== 'string' || !CHARSET.test(type.using)) {
       throw new Error(`fn.convert(): invalid character set ${JSON.stringify(type.using)}`);
@@ -609,11 +641,15 @@ function buildConvert(name, sql, [value, type]) {
   return [`CONVERT(?, ${type.trim().toUpperCase()})`, [value]];
 }
 
-function buildPosition(name, sql, [substr, str]) {
+function buildPosition(name: string, sql: string, [substr, str]: unknown[]): [string, unknown[]] {
   return ['POSITION(? IN ?)', [substr, str]];
 }
 
-function buildTrim(name, sql, [str, options = {}]) {
+function buildTrim(
+  name: string,
+  sql: string,
+  [str, options = {}]: [unknown, { side?: unknown; remove?: unknown }?],
+): [string, unknown[]] {
   if (options.side === undefined && options.remove === undefined) {
     return ['TRIM(?)', [str]];
   }
@@ -628,22 +664,31 @@ function buildTrim(name, sql, [str, options = {}]) {
   }
 }
 
-function buildChar(name, sql, [codes, options = {}]) {
+function buildChar(
+  name: string,
+  sql: string,
+  [codes, options = {}]: [unknown, { using?: unknown }?],
+): [string, unknown[]] {
+  // `codes`, `columns` and `exprs` below are arrays after the first line.
   codes = Array.isArray(codes) ? codes : [codes];
-  const placeholders = codes.map(() => '?').join(', ');
+  const placeholders = (codes as unknown[]).map(() => '?').join(', ');
 
   if (options.using === undefined) {
-    return [`CHAR(${placeholders})`, codes];
+    return [`CHAR(${placeholders})`, codes as unknown[]];
   }
 
   if (typeof options.using !== 'string' || !CHARSET.test(options.using)) {
     throw new Error(`fn.char(): invalid character set ${JSON.stringify(options.using)}`);
   }
 
-  return [`CHAR(${placeholders} USING ${options.using})`, codes];
+  return [`CHAR(${placeholders} USING ${options.using})`, codes as unknown[]];
 }
 
-function buildMatch(name, sql, [columns, search, options = {}]) {
+function buildMatch(
+  name: string,
+  sql: string,
+  [columns, search, options = {}]: [unknown, unknown, { mode?: string }?],
+): [string, unknown[]] {
   columns = Array.isArray(columns) ? columns : [columns];
   let mode = '';
 
@@ -657,18 +702,25 @@ function buildMatch(name, sql, [columns, search, options = {}]) {
     mode = ` ${mode}`;
   }
 
-  return [`MATCH(${columns.map(() => '?').join(', ')}) AGAINST(?${mode})`, [...columns, search]];
+  return [
+    `MATCH(${(columns as unknown[]).map(() => '?').join(', ')}) AGAINST(?${mode})`,
+    [...(columns as unknown[]), search],
+  ];
 }
 
-function buildCountDistinct(name, sql, exprs) {
+function buildCountDistinct(name: string, sql: string, exprs: unknown[]): [string, unknown[]] {
   return [`COUNT(DISTINCT ${exprs.map(() => '?').join(', ')})`, exprs];
 }
 
-function buildGroupConcat(name, sql, [exprs, options = {}]) {
+function buildGroupConcat(
+  name: string,
+  sql: string,
+  [exprs, options = {}]: [unknown, { distinct?: unknown; orderBy?: unknown; separator?: unknown }?],
+): [string, unknown[]] {
   exprs = Array.isArray(exprs) ? exprs : [exprs];
 
-  let text = `GROUP_CONCAT(${options.distinct ? 'DISTINCT ' : ''}${exprs.map(() => '?').join(', ')}`;
-  const args = [...exprs];
+  let text = `GROUP_CONCAT(${options.distinct ? 'DISTINCT ' : ''}${(exprs as unknown[]).map(() => '?').join(', ')}`;
+  const args = [...(exprs as unknown[])];
 
   if (options.orderBy !== undefined) {
     const [orderBySql, orderByArgs] = buildOrderBy(name, options.orderBy);
@@ -686,9 +738,9 @@ function buildGroupConcat(name, sql, [exprs, options = {}]) {
 
 // `orderBy` of `groupConcat()` and `over()`: a column, `[column, 'desc']` or a
 // list of them. Strings are column names.
-function buildOrderBy(name, orderBy) {
-  const list = Array.isArray(orderBy) && !isOrderByPair(orderBy) ? orderBy : [orderBy];
-  const args = [];
+function buildOrderBy(name: string, orderBy: unknown): [string, unknown[]] {
+  const list: unknown[] = Array.isArray(orderBy) && !isOrderByPair(orderBy) ? orderBy : [orderBy];
+  const args: unknown[] = [];
 
   const sql = list
     .map((it) => {
@@ -711,15 +763,19 @@ function buildOrderBy(name, orderBy) {
   return [sql, args];
 }
 
-function toColumn(column) {
+function toColumn(column: unknown): unknown {
   return typeof column === 'string' ? ref(column) : column;
 }
 
-function buildNtile(name, sql, [buckets]) {
+function buildNtile(name: string, sql: string, [buckets]: [number]): [string, unknown[]] {
   return [`NTILE(${integer(name, 'buckets', buckets, 1)})`, []];
 }
 
-function buildLagOrLead(name, sql, [value, offset, defaultValue]) {
+function buildLagOrLead(
+  name: string,
+  sql: string,
+  [value, offset, defaultValue]: [unknown, number?, unknown?],
+): [string, unknown[]] {
   if (offset === undefined && defaultValue === undefined) {
     return [`${sql}(?)`, [value]];
   }
@@ -733,13 +789,17 @@ function buildLagOrLead(name, sql, [value, offset, defaultValue]) {
   return [`${sql}(?, ${offset}, ?)`, [value, defaultValue]];
 }
 
-function buildNthValue(name, sql, [value, n]) {
+function buildNthValue(
+  name: string,
+  sql: string,
+  [value, n]: [unknown, number],
+): [string, unknown[]] {
   return [`NTH_VALUE(?, ${integer(name, 'n', n, 1)})`, [value]];
 }
 
 // The integer arguments of window functions are checked and written into the
 // sql, since they are part of the syntax rather than values.
-function integer(name, what, value, min) {
+function integer(name: string, what: string, value: number, min: number): number {
   if (!Number.isInteger(value) || value < min) {
     throw new Error(
       `fn.${name}(): ${what} must be an integer >= ${min}, got ${JSON.stringify(value)}`,
@@ -750,7 +810,7 @@ function integer(name, what, value, min) {
 }
 
 // `[column, 'desc']`, as opposed to a list of two columns.
-function isOrderByPair(it) {
+function isOrderByPair(it: unknown): boolean {
   return (
     Array.isArray(it) &&
     it.length === 2 &&
@@ -759,7 +819,11 @@ function isOrderByPair(it) {
   );
 }
 
-function buildJsonValue(name, sql, [doc, path, options = {}]) {
+function buildJsonValue(
+  name: string,
+  sql: string,
+  [doc, path, options = {}]: [unknown, unknown, { returning?: unknown }?],
+): [string, unknown[]] {
   if (options.returning === undefined) {
     return ['JSON_VALUE(?, ?)', [doc, path]];
   }
@@ -771,11 +835,11 @@ function buildJsonValue(name, sql, [doc, path, options = {}]) {
   return [`JSON_VALUE(?, ? RETURNING ${options.returning.trim().toUpperCase()})`, [doc, path]];
 }
 
-function buildMemberOf(name, sql, [value, array]) {
+function buildMemberOf(name: string, sql: string, [value, array]: unknown[]): [string, unknown[]] {
   return ['(? MEMBER OF(?))', [value, array]];
 }
 
-function buildJsonObject(name, sql, args) {
+function buildJsonObject(name: string, sql: string, args: unknown[]): [string, unknown[]] {
   // `fn.jsonObject({ a: ref('a'), b: 1 })` is `JSON_OBJECT('a', a, 'b', 1)`.
   if (args.length === 1 && isPlainObjectArg(args[0])) {
     args = Object.entries(args[0]).flat();
@@ -784,7 +848,7 @@ function buildJsonObject(name, sql, args) {
   return [`JSON_OBJECT(${args.map(() => '?').join(', ')})`, args];
 }
 
-function isPlainObjectArg(value) {
+function isPlainObjectArg(value: unknown): value is Record<string, unknown> {
   return (
     value !== null &&
     typeof value === 'object' &&
@@ -793,11 +857,16 @@ function isPlainObjectArg(value) {
 }
 
 // `name` is the name of an `fn` helper, or a method like `over()`.
-function label(name) {
+function label(name: string): string {
   return name.endsWith('()') ? name : `fn.${name}()`;
 }
 
-function keyword(name, what, value, allowed) {
+function keyword(
+  name: string,
+  what: string,
+  value: unknown,
+  allowed: readonly (string | null)[],
+): string | null {
   const upper = typeof value === 'string' ? value.trim().toUpperCase() : null;
 
   if (!allowed.includes(upper)) {
@@ -812,11 +881,13 @@ function keyword(name, what, value, allowed) {
 // The helpers MariaDB (10.6 and 11.4) can't run as MySQL writes them. Each
 // returns why for the given arguments, or null. A query built for MariaDB throws
 // the reason instead of sending SQL MariaDB rejects.
-const DOESNT_EXIST = () => "doesn't exist on MariaDB";
-const MAX_ARGS = (max) => (args) =>
-  args.length > max ? `takes at most ${max} arguments on MariaDB` : null;
+const DOESNT_EXIST: MariaDbCheck = () => "doesn't exist on MariaDB";
+const MAX_ARGS =
+  (max: number): MariaDbCheck =>
+  (args) =>
+    args.length > max ? `takes at most ${max} arguments on MariaDB` : null;
 
-const MARIADB_UNSUPPORTED = {
+const MARIADB_UNSUPPORTED: Partial<Record<string, MariaDbCheck>> = {
   regexpLike: DOESNT_EXIST,
   memberOf: DOESNT_EXIST,
   anyValue: DOESNT_EXIST,
@@ -842,13 +913,16 @@ const MARIADB_UNSUPPORTED = {
   regexpSubstr: MAX_ARGS(2),
   regexpReplace: MAX_ARGS(3),
   jsonValue: (args) =>
-    args[2] && args[2].returning !== undefined ? "can't use the returning option on MariaDB" : null,
+    args[2] && (args[2] as { returning?: unknown }).returning !== undefined
+      ? "can't use the returning option on MariaDB"
+      : null,
 };
 
-module.exports = {
+export {
   FUNCTIONS,
   MARIADB_UNSUPPORTED,
   buildOrderBy,
   INTERVAL_UNITS,
   TIMESTAMP_UNITS,
+  type FunctionOptions,
 };

@@ -1,15 +1,33 @@
-'use strict';
+import type { Knex } from 'knex';
+import { RawBuilder, normalizeRawArgs } from './RawBuilder';
+import { ref, type ReferenceBuilder } from './ReferenceBuilder';
+import { expression, type ExpressionQueryBuilder } from './expressions';
+import { asArray, asSingle, isNumber, isObject, isPlainObject } from '../utils/objectUtils';
+import { getDialect, isMySql, isMariaDb } from '../utils/knexUtils';
+import { jsonCastsForDialect, JSON_CAST } from '../utils/mysqlJsonPath';
+import {
+  FUNCTIONS,
+  MARIADB_UNSUPPORTED,
+  buildOrderBy,
+  type FunctionOptions,
+} from './functions/mysql';
 
-const { RawBuilder, normalizeRawArgs } = require('./RawBuilder');
-const { ref } = require('./ReferenceBuilder');
-const { expression } = require('./expressions');
-const { asArray, asSingle, isNumber, isObject, isPlainObject } = require('../utils/objectUtils');
-const { getDialect, isMySql, isMariaDb } = require('../utils/knexUtils');
-const { jsonCastsForDialect, JSON_CAST } = require('../utils/mysqlJsonPath');
-const { FUNCTIONS, MARIADB_UNSUPPORTED, buildOrderBy } = require('./functions/mysql');
+// The options of `over()`.
+interface OverOptions {
+  partitionBy?: unknown;
+  orderBy?: unknown;
+}
 
 class FunctionBuilder extends RawBuilder {
-  constructor(sql, args) {
+  declare _mysqlFunction: string | null;
+  declare _mariaDbError: string | null;
+  declare _aggregated: number | '*' | null;
+  declare _windowFunction: string | null;
+  declare _filters: unknown[];
+  declare _over: OverOptions | null;
+  declare readonly isObjectionFunctionBuilder: true;
+
+  constructor(sql: unknown, args: unknown[]) {
     super(sql, args);
     // The name of the `fn` helper of a MySQL only function.
     this._mysqlFunction = null;
@@ -30,7 +48,7 @@ class FunctionBuilder extends RawBuilder {
   //
   // is `COUNT(CASE WHEN species = 'dog' THEN 1 END)`. That works on every
   // database, unlike `FILTER (WHERE ...)`.
-  filter(condition) {
+  filter(condition: unknown): this {
     if (this._aggregated === null) {
       throw new Error(
         'filter() only works with the aggregate functions of fn, like fn.count() and fn.sum().',
@@ -42,7 +60,7 @@ class FunctionBuilder extends RawBuilder {
   }
 
   // `fn.rowNumber().over({ partitionBy: 'ownerId', orderBy: ['createdAt', 'desc'] })`.
-  over(window = {}) {
+  over(window: OverOptions = {}): this {
     for (const key of Object.keys(window)) {
       if (key !== 'partitionBy' && key !== 'orderBy') {
         throw new Error(`over(): unknown option "${key}". Use partitionBy and orderBy.`);
@@ -53,7 +71,7 @@ class FunctionBuilder extends RawBuilder {
     return this;
   }
 
-  toKnexRaw(builder) {
+  toKnexRaw(builder: ExpressionQueryBuilder): Knex.Raw {
     const knex = builder.unsafeKnex();
 
     if (this._mysqlFunction && knex && !isMySql(knex)) {
@@ -64,7 +82,7 @@ class FunctionBuilder extends RawBuilder {
 
     // The SQL of the helpers is created before the database is known.
     if (knex && isMariaDb(knex) && this._sql.includes(JSON_CAST)) {
-      const copy = Object.assign(Object.create(Object.getPrototypeOf(this)), this);
+      const copy: this = Object.assign(Object.create(Object.getPrototypeOf(this)), this);
       copy._sql = jsonCastsForDialect(this._sql, knex);
       return copy.toKnexRaw(builder);
     }
@@ -84,7 +102,7 @@ class FunctionBuilder extends RawBuilder {
     return new RawBuilder(...this._buildFilterAndOver()).as(this._as).toKnexRaw(builder);
   }
 
-  _buildFilterAndOver() {
+  _buildFilterAndOver(): [string, unknown[]] {
     let sql = this._sql;
     let args = this._args;
 
@@ -98,13 +116,14 @@ class FunctionBuilder extends RawBuilder {
         sql = sql.replace('*', 'CASE WHEN ? THEN 1 END');
         args = [condition];
       } else {
-        const filtered = [];
+        const filtered: unknown[] = [];
         let i = 0;
 
         sql = sql.replace(/\?/g, () => {
           const arg = args[i++];
 
-          if (i <= this._aggregated) {
+          // A number: `filter()` needs an aggregate, and '*' is handled above.
+          if (i <= (this._aggregated as number)) {
             filtered.push(condition, arg);
             return 'CASE WHEN ? THEN ? END';
           } else {
@@ -130,7 +149,13 @@ class FunctionBuilder extends RawBuilder {
 // `fn.case()` is `CASE WHEN condition THEN result ... END` and `fn.case(value)` is
 // `CASE value WHEN other THEN result ... END`.
 class CaseBuilder extends FunctionBuilder {
-  constructor(hasValue, value) {
+  declare _hasValue: boolean;
+  declare _value: unknown;
+  declare _whens: [unknown, unknown][];
+  declare _hasElse: boolean;
+  declare _else: unknown;
+
+  constructor(hasValue: boolean, value: unknown) {
     super('', []);
     this._hasValue = hasValue;
     this._value = value;
@@ -139,23 +164,23 @@ class CaseBuilder extends FunctionBuilder {
     this._else = null;
   }
 
-  when(condition, result) {
+  when(condition: unknown, result: unknown): this {
     this._whens.push([condition, result]);
     return this;
   }
 
-  else(result) {
+  else(result: unknown): this {
     this._hasElse = true;
     this._else = result;
     return this;
   }
 
-  toKnexRaw(builder) {
+  toKnexRaw(builder: ExpressionQueryBuilder): Knex.Raw {
     if (this._whens.length === 0) {
       throw new Error('fn.case() needs at least one when().');
     }
 
-    const args = this._hasValue ? [this._value] : [];
+    const args: unknown[] = this._hasValue ? [this._value] : [];
     let sql = this._hasValue ? '(CASE ?' : '(CASE';
 
     for (const [condition, result] of this._whens) {
@@ -178,11 +203,13 @@ class CaseBuilder extends FunctionBuilder {
 // The value an upsert tried to insert: `VALUES(col)` on MySQL, `excluded.col` on
 // postgres and SQLite.
 class ExcludedBuilder extends FunctionBuilder {
-  constructor(column) {
+  declare _column: string;
+
+  constructor(column: unknown) {
     super('', []);
 
-    if (isObject(column) && column.isObjectionReferenceBuilder) {
-      column = column.column;
+    if (isObject(column) && (column as ReferenceBuilder).isObjectionReferenceBuilder) {
+      column = (column as ReferenceBuilder).column;
     }
 
     if (typeof column !== 'string') {
@@ -192,7 +219,7 @@ class ExcludedBuilder extends FunctionBuilder {
     this._column = column;
   }
 
-  toKnexRaw(builder) {
+  toKnexRaw(builder: ExpressionQueryBuilder): Knex.Raw {
     if (isMySql(builder.unsafeKnex())) {
       this._sql = 'VALUES(??)';
       this._args = [this._column];
@@ -205,12 +232,14 @@ class ExcludedBuilder extends FunctionBuilder {
   }
 }
 
-function buildOver({ partitionBy, orderBy }) {
-  const parts = [];
-  const args = [];
+function buildOver({ partitionBy, orderBy }: OverOptions): [string, unknown[]] {
+  const parts: string[] = [];
+  const args: unknown[] = [];
 
   if (partitionBy !== undefined) {
-    const columns = asArray(partitionBy).map((it) => (typeof it === 'string' ? ref(it) : it));
+    const columns = asArray(partitionBy).map((it: unknown) =>
+      typeof it === 'string' ? ref(it) : it,
+    );
     parts.push(`PARTITION BY ${columns.map(() => '?').join(', ')}`);
     args.push(...columns);
   }
@@ -224,21 +253,25 @@ function buildOver({ partitionBy, orderBy }) {
   return [parts.join(' '), args];
 }
 
-function fn(...argsIn) {
+// `fn` with the helpers that the loops below add by name.
+type FnWithHelpers = typeof fn & Record<string, (...args: never[]) => FunctionBuilder>;
+
+function fn(...argsIn: unknown[]): FunctionBuilder {
   const { sql, args } = normalizeRawArgs(argsIn);
   return new FunctionBuilder(`${sql}(${args.map(() => '?').join(', ')})`, args);
 }
 
 for (const func of ['coalesce', 'concat', 'upper', 'lower']) {
-  fn[func] = (...args) => fn(func.toUpperCase(), args);
+  (fn as FnWithHelpers)[func] = (...args: unknown[]) => fn(func.toUpperCase(), args);
 }
 
 for (const func of ['sum', 'avg', 'min', 'max']) {
-  fn[func] = (...args) => aggregate(fn(func.toUpperCase(), args), args.length);
+  (fn as FnWithHelpers)[func] = (...args: unknown[]) =>
+    aggregate(fn(func.toUpperCase(), args), args.length);
 }
 
 // `fn.count()` and `fn.count('*')` are `COUNT(*)`.
-fn.count = (...args) => {
+fn.count = (...args: unknown[]): FunctionBuilder => {
   if (args.length === 0 || (args.length === 1 && args[0] === '*')) {
     return aggregate(new FunctionBuilder('COUNT(*)', []), '*');
   }
@@ -246,10 +279,12 @@ fn.count = (...args) => {
   return aggregate(fn('COUNT', args), args.length);
 };
 
-fn.now = (precision) => {
-  precision = parseInt(asSingle(precision), 10);
+fn.now = (precision: unknown): FunctionBuilder => {
+  // `parseInt()` converts a number to a string first.
+  precision = parseInt(asSingle(precision) as string, 10);
 
-  if (isNaN(precision) || !isNumber(precision)) {
+  // A number, from `parseInt()`.
+  if (isNaN(precision as number) || !isNumber(precision)) {
     precision = 6;
   }
 
@@ -260,17 +295,20 @@ fn.now = (precision) => {
   return new FunctionBuilder(`CURRENT_TIMESTAMP(${precision})`, []);
 };
 
-fn.case = (...args) => new CaseBuilder(args.length !== 0, args[0]);
+fn.case = (...args: unknown[]): CaseBuilder => new CaseBuilder(args.length !== 0, args[0]);
 
-fn.exists = (subquery) => {
-  if (!isObject(subquery) || !subquery.isObjectionQueryBuilderBase) {
+fn.exists = (subquery: unknown): FunctionBuilder => {
+  if (
+    !isObject(subquery) ||
+    !(subquery as { isObjectionQueryBuilderBase?: boolean }).isObjectionQueryBuilderBase
+  ) {
     throw new Error('fn.exists() takes a query.');
   }
 
   return new FunctionBuilder('(EXISTS ?)', [subquery]);
 };
 
-fn.excluded = (column) => new ExcludedBuilder(column);
+fn.excluded = (column: unknown): ExcludedBuilder => new ExcludedBuilder(column);
 
 for (const [name, sql, , , options = {}] of FUNCTIONS) {
   // `defineProperty` since `fn.length` is a read-only property of functions.
@@ -282,7 +320,11 @@ for (const [name, sql, , , options = {}] of FUNCTIONS) {
   });
 }
 
-function createMySqlFunction(name, sql, options) {
+function createMySqlFunction(
+  name: string,
+  sql: string,
+  options: FunctionOptions,
+): (...args: unknown[]) => FunctionBuilder {
   return (...args) => {
     const [text, values] = options.build
       ? options.build(name, sql, args)
@@ -312,14 +354,18 @@ function createMySqlFunction(name, sql, options) {
   };
 }
 
-function aggregate(builder, aggregated) {
+function aggregate(builder: FunctionBuilder, aggregated: number | '*'): FunctionBuilder {
   builder._aggregated = aggregated;
   return builder;
 }
 
 // Objects and arrays passed as JSON documents are cast to JSON. Without the cast
 // MySQL would get a string (or knex would expand an array into a list).
-function createWithJsonArgs(text, values, json) {
+function createWithJsonArgs(
+  text: string,
+  values: unknown[],
+  json: FunctionOptions['json'],
+): FunctionBuilder {
   const casts = values.map((value, i) => isJsonArg(json, i) && isJsonValue(value));
   let i = 0;
 
@@ -329,7 +375,7 @@ function createWithJsonArgs(text, values, json) {
   return new FunctionBuilder(text, values);
 }
 
-function isJsonArg(json, i) {
+function isJsonArg(json: FunctionOptions['json'], i: number): boolean {
   if (json === 'all') {
     return true;
   } else if (json === 'even') {
@@ -341,7 +387,7 @@ function isJsonArg(json, i) {
   }
 }
 
-function isJsonValue(value) {
+function isJsonValue(value: unknown): boolean {
   return Array.isArray(value) || isPlainObject(value);
 }
 
@@ -353,7 +399,4 @@ Object.defineProperties(FunctionBuilder.prototype, {
   },
 });
 
-module.exports = {
-  FunctionBuilder,
-  fn,
-};
+export { FunctionBuilder, fn };
