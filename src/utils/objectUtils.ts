@@ -1,4 +1,10 @@
-import { cloneDeep } from './cloneDeep';
+import { cloneDeep as cloneDeepImpl } from './cloneDeep';
+
+// Re-exporting an imported binding makes tsc define the export as a getter,
+// which puts this module's whole exports object in V8's slow dictionary mode
+// and makes every `objectUtils.x()` call several times slower. A local
+// constant is exported as a plain property instead.
+const cloneDeep = cloneDeepImpl;
 
 const SMALL_ARRAY_SIZE = 10;
 

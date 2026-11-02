@@ -1,4 +1,6 @@
-import * as jsonFieldExpressionParser from '../queryBuilder/parsers/jsonFieldExpressionParser';
+// A named import: `import * as` of a JavaScript module wraps it in an object
+// of getters (tsc's __importStar), which is slow to call through.
+import { parse as parseJsonFieldExpression } from '../queryBuilder/parsers/jsonFieldExpressionParser';
 
 // One step of the JSON path of a field expression: `[1]` is an array access
 // and `.a` or `["a"]` an object access.
@@ -32,7 +34,7 @@ function parseFieldExpression(expr: string): ParsedFieldExpression {
   if (parsedExpr !== undefined) {
     return parsedExpr;
   } else {
-    const parserOutput = jsonFieldExpressionParser.parse(expr) as ParserOutput;
+    const parserOutput = parseJsonFieldExpression(expr) as ParserOutput;
     parsedExpr = preprocessParsedExpression(parserOutput);
 
     // We don't take a copy of the parsedExpr each time we

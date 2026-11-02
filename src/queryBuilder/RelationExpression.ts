@@ -1,4 +1,6 @@
-import * as parser from './parsers/relationExpressionParser';
+// A named import: `import * as` of a JavaScript module wraps it in an object
+// of getters (tsc's __importStar), which is slow to call through.
+import { parse as parseRelationExpression } from './parsers/relationExpressionParser';
 import { isObject, isNumber, isString, union } from '../utils/objectUtils';
 import { RelationDoesNotExistError } from '../model/RelationDoesNotExistError';
 
@@ -261,7 +263,7 @@ function parse(str: string): RelationNode {
   if (cachedNode) {
     return cloneNode(cachedNode);
   } else {
-    const node: RelationNode = parser.parse(str);
+    const node: RelationNode = parseRelationExpression(str);
     parseCache.set(str, cloneNode(node));
     return node;
   }
