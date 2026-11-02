@@ -37,7 +37,11 @@ export default defineConfig({
         ],
       },
       { text: 'Recipe Book', link: '/recipes/' },
-      { text: 'Fork Additions', link: '/fork/' },
+      // The fork's own section stands out in the nav (styled in theme/custom.css).
+      {
+        text: '<span class="fork-nav">Fork Additions</span><span class="fork-nav-badge">new</span>',
+        link: '/fork/',
+      },
       {
         text: 'Release Notes',
         items: [

@@ -12,3 +12,66 @@
   --vp-c-brand-3: #b8862a;
   --vp-c-brand-soft: rgba(224, 178, 77, 0.16);
 }
+
+/* The "Fork Additions" nav item: an animated gradient label with a badge,
+   so the fork's own section stands out from the objection.js docs. */
+.fork-nav {
+  background: linear-gradient(
+    90deg,
+    var(--vp-c-brand-1) 0%,
+    #ff7a59 25%,
+    #c86dd7 50%,
+    var(--vp-c-brand-1) 75%,
+    #ff7a59 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 700;
+  animation: fork-nav-shimmer 4s linear infinite;
+}
+
+.fork-nav-badge {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ff7a59, #c86dd7);
+  color: #fff;
+  font-size: 0.625rem;
+  font-weight: 700;
+  line-height: 1.5;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: 2px;
+  box-shadow: 0 0 10px rgba(200, 109, 215, 0.55);
+  animation: fork-nav-glow 2.4s ease-in-out infinite;
+}
+
+.VPNavMenuLink:hover .fork-nav,
+.VPNavMenuLink.active .fork-nav {
+  animation-duration: 1.5s;
+}
+
+@keyframes fork-nav-shimmer {
+  to {
+    background-position: -200% center;
+  }
+}
+
+@keyframes fork-nav-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 6px rgba(200, 109, 215, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 14px rgba(255, 122, 89, 0.75);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fork-nav,
+  .fork-nav-badge {
+    animation: none;
+  }
+}
