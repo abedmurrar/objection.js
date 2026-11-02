@@ -92,7 +92,7 @@ people.map((it) => it.id); // the ids of both rows
 
 ## Graph operations run one query at a time
 
-On MySQL the default [`concurrency`](../api/model/static-properties.md#static-concurrency) is 1. See [Breaking changes](./breaking-changes.md#graph-operations-run-one-query-at-a-time-on-mysql).
+On MySQL the default [`concurrency`](../api/model/static-properties.md#static-concurrency) of graph writes is 1, and eager loading still runs 4 queries at a time. See [Breaking changes](./breaking-changes.md#graph-operations-run-one-query-at-a-time-on-mysql).
 
 ## `fn` helpers for MySQL functions
 

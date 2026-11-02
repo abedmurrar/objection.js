@@ -132,6 +132,15 @@ module.exports = {
     return () => models.Person.query().withGraphFetched('[pets.toys, movies]');
   },
 
+  // Eager loading runs the queries of sibling relations and batches
+  // concurrently, which only shows when the queries take time.
+  'graph: withGraphFetched [pets.toys, movies] on MySQL, 1 ms per query': async (objection) => {
+    const models = defineModels(objection);
+    bind(objection, models, { personCount: 100, client: 'mysql2', latencyMs: 1 });
+
+    return () => models.Person.query().withGraphFetched('[pets.toys, movies]');
+  },
+
   'graph: withGraphJoined [pets.toys] x100': async (objection) => {
     const models = defineModels(objection);
     const rows = joinedRows(100);

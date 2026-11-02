@@ -167,9 +167,15 @@ function personRows(count, snakeCase = false) {
 // Answers queries the way a database would for the fixture models:
 // `persons` returns `personCount` rows, `pets` returns PETS_PER_OWNER pets for
 // each owner id in the bindings and so on. Inserts return the ids.
-function createMockKnex(objection, { personCount = 1, rows = null } = {}) {
+function createMockKnex(
+  objection,
+  { personCount = 1, rows = null, client = null, latencyMs = 0 } = {},
+) {
   // sql-check.js runs the scenarios with each dialect and records the queries.
-  const knex = Knex({ client: process.env.BENCH_CLIENT || 'pg', useNullAsDefault: true });
+  const knex = Knex({
+    client: client || process.env.BENCH_CLIENT || 'pg',
+    useNullAsDefault: true,
+  });
   let nextId = 1;
 
   const mock = mockKnex(knex, function (_mock, _oldImpl, args) {
@@ -179,6 +185,12 @@ function createMockKnex(objection, { personCount = 1, rows = null } = {}) {
     }
 
     const result = respond(this);
+
+    if (latencyMs) {
+      // The time a query takes on the database and over the network.
+      return new Promise((resolve) => setTimeout(() => resolve(result), latencyMs)).then(...args);
+    }
+
     return Promise.resolve(result).then(...args);
   });
 

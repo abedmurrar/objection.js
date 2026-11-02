@@ -40,12 +40,20 @@ function compare() {
       const a = JSON.stringify(before[name]);
       const b = JSON.stringify(after[name]);
 
-      if (a !== b) {
-        failed = true;
-        console.log(`DIFFERENT  ${client}  ${name}`);
-        console.log('  before: ' + a.slice(0, 2000));
-        console.log('  after:  ' + b.slice(0, 2000));
+      if (a === b) {
+        continue;
       }
+
+      // Queries that run concurrently can finish in a different order.
+      if (JSON.stringify(sorted(before[name])) === JSON.stringify(sorted(after[name]))) {
+        console.log(`same queries, different order  ${client}  ${name}`);
+        continue;
+      }
+
+      failed = true;
+      console.log(`DIFFERENT  ${client}  ${name}`);
+      console.log('  before: ' + a.slice(0, 2000));
+      console.log('  after:  ' + b.slice(0, 2000));
     }
 
     const count = Object.values(before).reduce((n, queries) => n + queries.length, 0);
@@ -105,4 +113,8 @@ async function record() {
 
   global.benchRecordQuery = null;
   process.stdout.write(JSON.stringify(recordings));
+}
+
+function sorted(queries) {
+  return queries.map((query) => JSON.stringify(query)).sort();
 }

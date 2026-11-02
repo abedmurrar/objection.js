@@ -10,6 +10,7 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ### What's new
 
+- On MySQL, `withGraphFetched()` and `fetchGraph()` run their queries 4 at a time again, like on the other databases. 4.0.0-alpha.0 ran every query of graph operations one at a time to stop the deadlocks of concurrent `upsertGraph()` updates, which only writes need. A concurrency set on the model still applies to all queries
 - The documentation has a [Fork additions](/fork/) section that covers only what the fork adds to objection.js 3.1.5.
 
 ## 4.0.0-alpha.0 (2026-10-20)

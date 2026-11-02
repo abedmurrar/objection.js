@@ -77,7 +77,7 @@ The fork is only tested with knex 3.
 
 ## Graph operations run one query at a time on MySQL
 
-The default [`concurrency`](../api/model/static-properties.md#static-concurrency) on MySQL is now 1, as it already was on mssql. Without a transaction, concurrent `upsertGraph()` updates deadlocked: MySQL wraps those updates in subqueries that lock the rows of the join tables they read. To run queries in parallel again, set `concurrency` on the model:
+The default [`concurrency`](../api/model/static-properties.md#static-concurrency) of graph writes (`insertGraph()`, `upsertGraph()`, ...) on MySQL is now 1, as it already was on mssql. Without a transaction, concurrent `upsertGraph()` updates deadlocked: MySQL wraps those updates in subqueries that lock the rows of the join tables they read. Queries that only read, like those of `withGraphFetched()` and `fetchGraph()`, still run 4 at a time. To run graph writes in parallel again, set `concurrency` on the model, which then applies to all queries:
 
 ```js
 class BaseModel extends Model {
