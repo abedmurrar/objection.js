@@ -857,6 +857,67 @@ describe('Model', () => {
     });
   });
 
+  describe('bindKnex', () => {
+    it('should share one validator between the classes bound to different knex instances', () => {
+      let created = 0;
+
+      class Person extends Model {
+        static get tableName() {
+          return 'persons';
+        }
+
+        static get jsonSchema() {
+          return { type: 'object', properties: { name: { type: 'string' } } };
+        }
+
+        static createValidator() {
+          created++;
+          return super.createValidator();
+        }
+      }
+
+      // Like a transaction: a new knex instance every time.
+      const knexes = [1, 2, 3].map(() => require('knex')({ client: 'pg' }));
+      const bound = knexes.map((knex) => Person.bindKnex(knex));
+
+      for (const BoundPerson of bound) {
+        expect(BoundPerson.fromJson({ name: 'Jennifer' }).name).to.equal('Jennifer');
+        expect(() => BoundPerson.fromJson({ name: 1 })).to.throwException(
+          (err) => err instanceof ValidationError,
+        );
+        expect(BoundPerson.getValidator()).to.equal(Person.getValidator());
+      }
+
+      expect(created).to.equal(1);
+    });
+
+    it('should validate bound classes against their own schemas', () => {
+      const strictKnex = require('knex')({ client: 'pg' });
+      const looseKnex = require('knex')({ client: 'pg' });
+
+      class Person extends Model {
+        static get tableName() {
+          return 'persons';
+        }
+
+        // A schema that depends on the database, like in multitenancy.
+        static get jsonSchema() {
+          const maxLength = this.knex() === strictKnex ? 3 : 100;
+          return { type: 'object', properties: { name: { type: 'string', maxLength } } };
+        }
+      }
+
+      const LoosePerson = Person.bindKnex(looseKnex);
+      const StrictPerson = Person.bindKnex(strictKnex);
+
+      expect(LoosePerson.fromJson({ name: 'Jennifer' }).name).to.equal('Jennifer');
+      expect(() => StrictPerson.fromJson({ name: 'Jennifer' })).to.throwException(
+        (err) => err instanceof ValidationError,
+      );
+      expect(LoosePerson.fromJson({ name: 'Jennifer' }).name).to.equal('Jennifer');
+    });
+  });
+
   describe('ensureModel', () => {
     let Model1;
     let Model2;
