@@ -4,6 +4,8 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+## 4.0.0-beta.9 (2026-11-02)
+
 ### Bug fixes
 
 - 4.0.0-beta.6 to beta.8 were up to 20% slower than the JavaScript build: building queries up to 18%, batch inserts 20%, `toJSON()` 10% and validation 8%. Two utility modules exported getters, which made every call to them about three times slower. They export plain values again, and every benchmark is back within noise of the JavaScript build. A test keeps compiled modules from exporting getters.
