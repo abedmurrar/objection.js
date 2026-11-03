@@ -24,6 +24,32 @@ ln -s "$PWD/node_modules" ../objection-baseline/node_modules
 npm run bench:compare -- --baseline ../objection-baseline
 ```
 
+## On a busy machine
+
+Times depend on what else runs on the machine. Two more tools compare checkouts in ways that depend on it much less:
+
+```sh
+node bench/compare.js --baseline ../other --metric cpu   # CPU time of the worker instead of wall time
+node bench/count.js --baseline ../other                  # CPU instructions per operation
+```
+
+`count.js` runs each scenario under `perf stat` in single-threaded Node processes, so that V8's background compiler and GC threads don't add to the counts. The counts repeat within about ±1%. It needs `perf` and `sudo sysctl kernel.perf_event_paranoid=1` (until the next reboot).
+
+`node bench/profile.js "<scenario>"` runs one scenario under the CPU profiler and prints the functions with the most self time. With `--orm`, it runs an ORM scenario on MySQL instead (see below).
+
+## Against other ORMs on MySQL
+
+`bench/orms` runs the same 11 scenarios on this checkout, objection 4.4.2 and 3.1.5, raw knex, kysely, drizzle-orm, sequelize, typeorm and mikro-orm, on a real MySQL through the mysql2 driver: finds by id, of 100 and of 1000 rows, inserts of 1 and 100 rows, updates, deletes, eager loading with separate queries and with one query, a transaction and a nested insert. Each contender uses its own idiomatic API on the same tables.
+
+```sh
+npm --prefix bench/orms install          # its dependencies, kept out of the root package
+docker compose up -d mysql
+npm run bench:orms                       # all contenders and scenarios
+npm run bench:orms -- --contenders fork,knex,kysely --filter "find" --rounds 5
+```
+
+Every contender runs every scenario in a new process on tables copied from templates, so that each run starts from the same state. The rounds run the contenders in alternating order, and a contender's time is the median of its rounds. The database is `bench_orms` on 127.0.0.1:3306 as root; `BENCH_HOST`, `BENCH_PORT`, `BENCH_USER`, `BENCH_PASSWORD` and `BENCH_DB` change it. The writes include MySQL's commit to disk, so they are best run on an otherwise quiet machine.
+
 ## Results of the perf branch
 
 `npm run bench:compare -- --rounds 5` of the perf branch against `7f34d7a6`, the commit before it, on Node 24.17 (a 4-core laptop). "noise" means the change was smaller than 3 times the spread between rounds.
