@@ -1,5 +1,5 @@
 import { QueryTransformation } from './QueryTransformation';
-import { isMySql } from '../../utils/knexUtils';
+import { isMySql, isMariaDb, getMariaDbVersion } from '../../utils/knexUtils';
 import type { QueryBuilder } from '../QueryBuilder';
 import type { ObjectionToKnexConvertingOperation } from '../operations/ObjectionToKnexConvertingOperation';
 
@@ -32,6 +32,13 @@ class WrapMysqlModifySubqueryTransformation extends QueryTransformation {
       return query;
     }
 
+    // MariaDB 10.3.2+ allows these subqueries. Wrapping them would break
+    // correlated subqueries, since MariaDB doesn't support outer references in
+    // derived tables (MySQL 8.0.14+ does).
+    if (allowsSameTableSubqueries(knex)) {
+      return query;
+    }
+
     // Subqueries in where groups and join clauses are converted with a
     // partial builder (or a `JoinBuilder`) as their parent. Walk up to the
     // query that they belong to.
@@ -59,6 +66,17 @@ class WrapMysqlModifySubqueryTransformation extends QueryTransformation {
 
     return query.modelClass().query().from(query.as('mysql_subquery_fix'));
   }
+}
+
+function allowsSameTableSubqueries(knex: unknown): boolean {
+  if (!isMariaDb(knex)) {
+    return false;
+  }
+
+  const version = getMariaDbVersion(knex);
+
+  // A MariaDB without a known version is assumed to be a current one.
+  return !version || version[0] > 10 || (version[0] === 10 && version[1] >= 3);
 }
 
 function hasJoinsToTable(query: QueryBuilder, tableName: string): boolean {
