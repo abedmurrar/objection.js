@@ -197,7 +197,9 @@ function getDefaultReturning(builder: QueryBuilder): string | string[] {
   const conflictColumns = getConflictColumns(builder);
 
   if (conflictColumns.length === 0) {
-    return builder.modelClass().getIdColumn();
+    // As before `onConflict()` support: a model without an id column (`null`)
+    // was passed to `returning()` as is.
+    return builder.modelClass().getIdColumn() as string | string[];
   }
 
   const idColumns = builder.modelClass().getIdColumnArray();
