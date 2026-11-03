@@ -86,7 +86,12 @@ class InsertOperation extends QueryBuilderOperation {
 
   onBuildKnex(knexBuilder: KnexBuilder, builder: QueryBuilder): KnexBuilder {
     const knex = builder.knex();
-    const returnsIds = !isMySql(knex) && (!isSqlite(knex) || this.models.length > 1);
+    // SQLite only returns the id of the last row of an insert without a
+    // `returning` clause. That isn't needed if every row has an id.
+    const returnsIds =
+      !isMySql(knex) &&
+      (!isSqlite(knex) ||
+        (this.models.length > 1 && !this.models.every((model) => model.$hasId())));
 
     if (!builder.has(/returning/)) {
       if (returnsIds) {
@@ -122,6 +127,8 @@ class InsertOperation extends QueryBuilderOperation {
         // `where` clause after `merge()`) are not returned, so the returned rows
         // can't be merged to the models based on their position.
         mergeMatchingRows(builder, this.models, ret as Record<string, unknown>[]);
+      } else if (isSqlite(builder.knex()) && this.models.length > 1 && !isOnConflict) {
+        mergeSqliteRows(builder, this.models, ret as Record<string, unknown>[]);
       } else {
         // If the user specified a `returning` clause the result may be an array of objects.
         // Merge all values of the objects to our models.
@@ -190,6 +197,67 @@ function addToId(id: InsertedId, amount: number): InsertedId {
     return id + BigInt(amount);
   } else {
     return String(BigInt(id) + BigInt(amount));
+  }
+}
+
+// SQLite doesn't guarantee the order of the rows that `returning` returns.
+// The rows of an insert are inserted in the order of the input though, and the
+// rows without an id get increasing ids. So the rows of the models with an id
+// are matched by that id, and the other rows, ordered by their ids, are merged
+// into the models without an id in their order. Without a single numeric id
+// column, the rows are merged by position.
+function mergeSqliteRows(
+  builder: QueryBuilder,
+  models: Model[],
+  rows: Record<string, unknown>[],
+): void {
+  const idColumnOrColumns = builder.modelClass().getIdColumn();
+  const idColumn = typeof idColumnOrColumns === 'string' ? idColumnOrColumns : null;
+  const isNumericId = (row: Record<string, unknown>): boolean =>
+    typeof row[idColumn!] === 'number' || typeof row[idColumn!] === 'bigint';
+
+  if (idColumn === null || rows.length !== models.length || !rows.every(isNumericId)) {
+    for (let i = 0, l = models.length; i < l; ++i) {
+      models[i].$setDatabaseJson(rows[i]);
+    }
+
+    return;
+  }
+
+  const modelsById = new Map<string, Model>();
+  const modelsWithoutId: Model[] = [];
+
+  for (const model of models) {
+    if (model.$hasId()) {
+      modelsById.set(String(model.$id()), model);
+    } else {
+      modelsWithoutId.push(model);
+    }
+  }
+
+  const rowsWithoutModel: Record<string, unknown>[] = [];
+
+  for (const row of rows) {
+    const model = modelsById.get(String(row[idColumn]));
+
+    if (model) {
+      modelsById.delete(String(row[idColumn]));
+      model.$setDatabaseJson(row);
+    } else {
+      rowsWithoutModel.push(row);
+    }
+  }
+
+  rowsWithoutModel.sort((a, b) => {
+    const idA = a[idColumn] as number | bigint;
+    const idB = b[idColumn] as number | bigint;
+    return idA < idB ? -1 : idA > idB ? 1 : 0;
+  });
+
+  for (let i = 0, l = modelsWithoutId.length; i < l; ++i) {
+    if (rowsWithoutModel[i]) {
+      modelsWithoutId[i].$setDatabaseJson(rowsWithoutModel[i]);
+    }
   }
 }
 
