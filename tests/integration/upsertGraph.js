@@ -413,6 +413,29 @@ module.exports = (session) => {
         );
       }
 
+      it('should not insert the descendants of models skipped by noInsert (#215)', async () => {
+        await Model1.query(session.knex).upsertGraph(
+          {
+            id: 1,
+
+            model1Relation1: {
+              // Not inserted because of `noInsert`, and neither are its descendants.
+              model1Prop1: 'skipped belongsToOne',
+              model1Relation2: [{ model2Prop1: 'hasMany of skipped' }],
+            },
+          },
+          { fetchStrategy, noInsert: ['model1Relation1'] },
+        );
+
+        const [model1Rows, model2Rows] = await Promise.all([
+          session.knex('Model1'),
+          session.knex('model2'),
+        ]);
+
+        chai.expect(model1Rows).to.have.length(7);
+        chai.expect(model2Rows).to.have.length(2);
+      });
+
       it('should respect noDelete, noInsert and noUpdate flags', () => {
         const upsert = {
           // Nothing is done for the root since it only has an ids.
