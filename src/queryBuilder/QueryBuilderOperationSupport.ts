@@ -2,6 +2,7 @@ import { isString, isFunction, isRegExp, mergeMaps, last } from '../utils/object
 import { QueryBuilderContextBase } from './QueryBuilderContextBase';
 import { QueryBuilderUserContext } from './QueryBuilderUserContext';
 import { deprecate } from '../utils/deprecate';
+import { isPromise } from '../utils/promiseUtils/isPromise';
 import { effectiveWhereScope, createWhereGrouping } from './whereScopes';
 import type { WhereScope } from './whereScopes';
 import type { QueryBuilderOperation, HookName } from './operations/QueryBuilderOperation';
@@ -463,6 +464,49 @@ class QueryBuilderOperationSupport {
     } finally {
       this._activeOperations.pop();
     }
+  }
+
+  // Calls a hook that may or may not be async. Returns the hook's value as is
+  // when it isn't a promise, so sync hooks cost no promise or microtask. The
+  // operation stays active until a returned promise settles, as with
+  // `callAsyncOperationMethod()`.
+  callMaybeAsyncOperationMethod(
+    operation: Operation,
+    hookName: HookName,
+    args: unknown[],
+  ): unknown {
+    operation.removeChildOperationsByHookName(hookName);
+
+    const activeOperations = this._activeOperations;
+    activeOperations.push({
+      operation,
+      hookName,
+    });
+
+    let result: unknown;
+
+    try {
+      result = (operation[hookName] as HookMethod)(...args);
+    } catch (err) {
+      activeOperations.pop();
+      throw err;
+    }
+
+    if (isPromise(result)) {
+      return Promise.resolve(result).then(
+        (value) => {
+          activeOperations.pop();
+          return value;
+        },
+        (err: unknown) => {
+          activeOperations.pop();
+          throw err;
+        },
+      );
+    }
+
+    activeOperations.pop();
+    return result;
   }
 
   // Returns whatever the hook returns.

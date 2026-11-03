@@ -19,6 +19,8 @@ const opt = parseArgs(process.argv.slice(2), {
   sampleMs: 150,
   warmupMs: 800,
   out: '',
+  // 'wall' or 'cpu': the CPU time of the worker process, steadier on a busy machine.
+  metric: 'wall',
 });
 
 if (!opt.baseline) {
@@ -39,8 +41,10 @@ for (const testCase of cases) {
 
     for (const which of order) {
       const lib = which === 'before' ? opt.baseline : opt.lib;
-      const { nsPerOp } = runCase(testCase, lib, opt);
-      (which === 'before' ? before : after).push(median(nsPerOp));
+      const { nsPerOp, cpuNsPerOp } = runCase(testCase, lib, opt);
+      (which === 'before' ? before : after).push(
+        median(opt.metric === 'cpu' ? cpuNsPerOp : nsPerOp),
+      );
     }
   }
 

@@ -33,15 +33,21 @@ async function main() {
   }
 
   const nsPerOp = [];
+  // CPU time of this process: unlike the wall time, it doesn't include the
+  // time other processes on a busy machine run instead of this one.
+  const cpuNsPerOp = [];
 
   for (let i = 0; i < Number(samples); ++i) {
     global.gc();
+    const cpuStart = process.cpuUsage();
     const start = now();
     await runBatch(run, batch);
     nsPerOp.push((now() - start) / batch);
+    const cpu = process.cpuUsage(cpuStart);
+    cpuNsPerOp.push(((cpu.user + cpu.system) * 1000) / batch);
   }
 
-  process.stdout.write(JSON.stringify({ name: caseName, batch, nsPerOp }) + '\n');
+  process.stdout.write(JSON.stringify({ name: caseName, batch, nsPerOp, cpuNsPerOp }) + '\n');
   process.exit(0);
 }
 
