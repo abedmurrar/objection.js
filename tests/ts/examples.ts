@@ -416,8 +416,8 @@ const omitPersonFromKey: Person = examplePerson.$omitFromJson('lastName');
 const omitPersonFromObj: Person = examplePerson.$omitFromJson({ firstName: true });
 const clonePerson: Person = examplePerson.$clone();
 const setRelatedPerson: Person = examplePerson.$setRelated(
-  'parent',
-  Person.fromJson({ firstName: 'parent' }),
+  'children',
+  Person.fromJson({ firstName: 'child' }),
 );
 const appendRelatedPerson: Person = examplePerson.$appendRelated('pets', [
   Animal.fromJson({ firstName: 'pet 1' }),

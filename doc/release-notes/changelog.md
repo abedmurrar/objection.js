@@ -4,6 +4,12 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+### Bug fixes
+
+- Types:
+  - `modify()` on an `AnyQueryBuilder<M>`, as in modifiers that call other modifiers, returned a union of two query builders whose methods couldn't be called. It returns the query builder.
+  - `$setRelated()` and `$appendRelated()` check the relation name and the related models, like `relatedQuery()`. A misspelled name, or models of another model class, is a compile error. Names the types can't check take the related model type explicitly: `$setRelated<Pet>(name, pets)`. Unknown names already threw at runtime.
+
 ## 4.0.5 (2026-11-03)
 
 ### Bug fixes
