@@ -184,7 +184,8 @@ class QueryBuilder extends QueryBuilderBase {
   }
 
   isExplicitlyResolvedOrRejected(): boolean {
-    return !!(this._explicitRejectValue || this._explicitResolveValue);
+    // `resolve(0)` and `resolve(false)` resolve the query too.
+    return this._explicitRejectValue !== null || this._explicitResolveValue !== null;
   }
 
   isExecutable(): boolean {
