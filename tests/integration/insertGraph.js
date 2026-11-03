@@ -806,6 +806,87 @@ module.exports = (session) => {
       });
     });
 
+    describe('batch inserts', () => {
+      beforeEach(() => session.populate([]));
+
+      it('should insert the rows of each table in one query on MySQL and PostgreSQL, with the right keys', async () => {
+        const queries = [];
+        const onQuery = (query) => queries.push(query.sql);
+        session.knex.on('query', onQuery);
+
+        let root;
+        try {
+          root = await Model1.query().insertGraph({
+            model1Prop1: 'root',
+            model1Relation2: [1, 2, 3].map((i) => ({
+              model2Prop1: `hasMany ${i}`,
+              // Each child has its own children, which depend on the child's id.
+              model2Relation1: [1, 2].map((j) => ({ model1Prop1: `manyToMany ${i}.${j}` })),
+            })),
+          });
+        } finally {
+          session.knex.removeListener('query', onQuery);
+        }
+
+        const inserts = queries.filter((sql) => /^insert/i.test(sql));
+
+        if (session.isMySql() || session.isPostgres()) {
+          // The root with the 6 many-to-many rows (the same table), the 3
+          // children and the 6 join rows.
+          expect(inserts).to.have.length(3);
+        } else {
+          expect(inserts).to.have.length(16);
+        }
+
+        const fetched = await Model1.query()
+          .findById(root.id)
+          .withGraphFetched('model1Relation2.model2Relation1');
+
+        // The ids and props of the inserted models match the rows, which have
+        // the right foreign keys and join rows. The rows are matched by their
+        // props, since the order of the ids differs between databases.
+        const describe = (model1) =>
+          model1.model1Relation2
+            .map((it) => ({
+              idCol: it.idCol,
+              model2Prop1: it.model2Prop1,
+              related: it.model2Relation1
+                .map((m) => ({ id: m.id, model1Prop1: m.model1Prop1 }))
+                .sort((a, b) => a.model1Prop1.localeCompare(b.model1Prop1)),
+            }))
+            .sort((a, b) => a.model2Prop1.localeCompare(b.model2Prop1));
+
+        expect(describe(fetched)).to.eql(describe(root));
+        expect(describe(fetched).map((it) => it.related.map((m) => m.model1Prop1))).to.eql([
+          ['manyToMany 1.1', 'manyToMany 1.2'],
+          ['manyToMany 2.1', 'manyToMany 2.2'],
+          ['manyToMany 3.1', 'manyToMany 3.2'],
+        ]);
+      });
+
+      it('should insert the rows with an id separately from the ones without on MySQL', async () => {
+        const root = await Model1.query().insertGraph({
+          model1Prop1: 'root',
+          model1Relation2: [
+            { idCol: 100, model2Prop1: 'with id' },
+            { model2Prop1: 'without id' },
+            { idCol: 101, model2Prop1: 'with id 2' },
+            { model2Prop1: 'without id 2' },
+          ],
+        });
+
+        const rows = await session.knex('model2').where('model1_id', root.id).orderBy('id_col');
+        expect(rows).to.have.length(4);
+
+        const byProp = new Map(rows.map((it) => [it.model2_prop1, it.id_col]));
+        for (const model of root.model1Relation2) {
+          expect(model.idCol).to.equal(byProp.get(model.model2Prop1));
+        }
+        expect(byProp.get('with id')).to.equal(100);
+        expect(byProp.get('with id 2')).to.equal(101);
+      });
+    });
+
     describe('.$relatedQuery().insertGraph()', () => {
       describe('belongs to one relation', () => {
         let parent;
