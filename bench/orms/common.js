@@ -49,57 +49,80 @@ async function createDatabase() {
   }
 }
 
-// Recreates the tables with the same data, so every run starts from the same state.
+const TABLES = ['person', 'pet', 'toy'];
+
+// Builds the template tables `seed_person`, `seed_pet` and `seed_toy` once.
+async function createTemplates(knex) {
+  const [[{ count }]] = await knex.raw(
+    "select count(*) as count from information_schema.tables where table_schema = ? and table_name = 'seed_toy'",
+    [DATABASE],
+  );
+
+  if (Number(count) > 0) {
+    return;
+  }
+
+  for (const table of [...TABLES].reverse()) {
+    await knex.schema.dropTableIfExists(`seed_${table}`);
+  }
+
+  await knex.schema.createTable('seed_person', (t) => {
+    t.increments('id').primary();
+    t.string('firstName', 100);
+    t.string('lastName', 100);
+    t.integer('age');
+    t.index('age');
+  });
+  await knex.schema.createTable('seed_pet', (t) => {
+    t.increments('id').primary();
+    t.integer('ownerId').unsigned().index();
+    t.string('name', 100);
+    t.string('species', 50);
+  });
+  await knex.schema.createTable('seed_toy', (t) => {
+    t.increments('id').primary();
+    t.integer('petId').unsigned().index();
+    t.string('name', 100);
+    t.integer('price');
+  });
+
+  const persons = [];
+  const pets = [];
+  const toys = [];
+
+  for (let i = 1; i <= PERSONS; ++i) {
+    persons.push({ id: i, ...personRow(i) });
+
+    for (let p = 0; p < PETS_PER_PERSON; ++p) {
+      const petId = (i - 1) * PETS_PER_PERSON + p + 1;
+      pets.push({ id: petId, ownerId: i, name: `Pet ${petId}`, species: p ? 'cat' : 'dog' });
+
+      for (let t = 0; t < TOYS_PER_PET; ++t) {
+        const toyId = (petId - 1) * TOYS_PER_PET + t + 1;
+        toys.push({ id: toyId, petId, name: `Toy ${toyId}`, price: (toyId % 20) + 1 });
+      }
+    }
+  }
+
+  await knex.batchInsert('seed_person', persons, 500);
+  await knex.batchInsert('seed_pet', pets, 500);
+  await knex.batchInsert('seed_toy', toys, 500);
+}
+
+// Recreates the tables from the templates, so every run starts from the same
+// state, including the auto increment counters.
 async function seed() {
   await createDatabase();
   const knex = knexFactory({ client: 'mysql2', connection });
 
   try {
-    await knex.schema.dropTableIfExists('toy');
-    await knex.schema.dropTableIfExists('pet');
-    await knex.schema.dropTableIfExists('person');
+    await createTemplates(knex);
 
-    await knex.schema.createTable('person', (t) => {
-      t.increments('id').primary();
-      t.string('firstName', 100);
-      t.string('lastName', 100);
-      t.integer('age');
-      t.index('age');
-    });
-    await knex.schema.createTable('pet', (t) => {
-      t.increments('id').primary();
-      t.integer('ownerId').unsigned().index();
-      t.string('name', 100);
-      t.string('species', 50);
-    });
-    await knex.schema.createTable('toy', (t) => {
-      t.increments('id').primary();
-      t.integer('petId').unsigned().index();
-      t.string('name', 100);
-      t.integer('price');
-    });
-
-    const persons = [];
-    const pets = [];
-    const toys = [];
-
-    for (let i = 1; i <= PERSONS; ++i) {
-      persons.push({ id: i, ...personRow(i) });
-
-      for (let p = 0; p < PETS_PER_PERSON; ++p) {
-        const petId = (i - 1) * PETS_PER_PERSON + p + 1;
-        pets.push({ id: petId, ownerId: i, name: `Pet ${petId}`, species: p ? 'cat' : 'dog' });
-
-        for (let t = 0; t < TOYS_PER_PET; ++t) {
-          const toyId = (petId - 1) * TOYS_PER_PET + t + 1;
-          toys.push({ id: toyId, petId, name: `Toy ${toyId}`, price: (toyId % 20) + 1 });
-        }
-      }
+    for (const table of TABLES) {
+      await knex.raw('DROP TABLE IF EXISTS ??', [table]);
+      await knex.raw('CREATE TABLE ?? LIKE ??', [table, `seed_${table}`]);
+      await knex.raw('INSERT INTO ?? SELECT * FROM ??', [table, `seed_${table}`]);
     }
-
-    await knex.batchInsert('person', persons, 500);
-    await knex.batchInsert('pet', pets, 500);
-    await knex.batchInsert('toy', toys, 500);
   } finally {
     await knex.destroy();
   }

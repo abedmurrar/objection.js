@@ -73,10 +73,14 @@ async function create() {
           jsonArrayFrom(
             eb
               .selectFrom('pet')
-              .selectAll('pet')
+              // MySQL's json_object() needs explicit columns.
+              .select(['pet.id', 'pet.ownerId', 'pet.name', 'pet.species'])
               .select((eb2) => [
                 jsonArrayFrom(
-                  eb2.selectFrom('toy').selectAll('toy').whereRef('toy.petId', '=', 'pet.id'),
+                  eb2
+                    .selectFrom('toy')
+                    .select(['toy.id', 'toy.petId', 'toy.name', 'toy.price'])
+                    .whereRef('toy.petId', '=', 'pet.id'),
                 ).as('toys'),
               ])
               .whereRef('pet.ownerId', '=', 'person.id'),

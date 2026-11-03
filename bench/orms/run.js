@@ -22,9 +22,10 @@ const opt = parseArgs(process.argv.slice(2), {
   lib: path.join(__dirname, '..', '..'),
   filter: '',
   contenders: Object.keys(CONTENDERS).join(','),
-  samples: 10,
-  sampleMs: 300,
-  warmupMs: 1500,
+  rounds: 3,
+  samples: 7,
+  sampleMs: 250,
+  warmupMs: 1000,
   json: '',
 });
 
@@ -41,15 +42,24 @@ async function main() {
   const results = [];
 
   for (const scenario of scenarios) {
-    const rows = [];
+    // The database's own speed drifts over a run (buffer pool, redo log,
+    // other processes). Each round runs every contender once, in alternating
+    // order, and a contender's time is the median of its round medians.
+    const rounds = new Map(contenders.map((name) => [name, []]));
 
-    for (const contender of contenders) {
-      await seed();
-      const result = runWorker(contender, scenario);
-      rows.push(result);
-      results.push(result);
+    for (let round = 0; round < opt.rounds; ++round) {
+      const order = round % 2 ? [...contenders].reverse() : contenders;
+
+      for (const contender of order) {
+        await seed();
+        rounds.get(contender).push(runWorker(contender, scenario));
+      }
     }
 
+    const rows = contenders.map((contender) =>
+      combineRounds(contender, scenario, rounds.get(contender)),
+    );
+    results.push(...rows);
     printScenario(scenario, rows);
   }
 
@@ -61,6 +71,26 @@ async function main() {
       JSON.stringify({ date: new Date().toISOString(), node: process.version, results }, null, 2),
     );
   }
+}
+
+function combineRounds(contender, scenario, runs) {
+  const timed = runs.filter((r) => r.median);
+
+  if (timed.length === 0) {
+    return runs[0];
+  }
+
+  const medians = timed.map((r) => r.median);
+  const value = median(medians);
+
+  return {
+    name: scenario,
+    contender,
+    median: value,
+    // The spread between rounds, which is larger than the one within a round.
+    mad: Math.max(mad(medians), median(timed.map((r) => r.mad))),
+    rounds: medians,
+  };
 }
 
 function runWorker(contender, scenario) {
