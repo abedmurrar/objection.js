@@ -33,7 +33,7 @@ module.exports = (options) => {
         // queries created by this builder and also in the model hooks. `session` is
         // not a reserved word or some objection.js concept. You can store any data
         // to the query context.
-        return this.mergeContext({
+        return this.context({
           session: session,
         });
       }

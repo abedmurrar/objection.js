@@ -10,7 +10,7 @@ const qs = require('node:querystring');
 
 const req = axios.create({
   baseURL: 'http://localhost:8641/',
-  paramsSerializer: qs.stringify,
+  paramsSerializer: (params) => qs.stringify(params),
 });
 
 (async () => {
@@ -40,7 +40,11 @@ const req = axios.create({
   await addPersonToMovieAsActor(departed, matt);
   await removePersonFromMovie(departed, matt);
 })().catch((err) => {
-  console.error('error:', err.response.status, err.response.data);
+  if (err.response) {
+    console.error('error:', err.response.status, err.response.data);
+  } else {
+    console.error('error:', err);
+  }
 });
 
 async function insertPersonWithRelations() {

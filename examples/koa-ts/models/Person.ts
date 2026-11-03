@@ -1,17 +1,13 @@
-import { Model, type Modifiers } from 'objection';
+import { Model, defineRelations, type QueryBuilder } from 'objection';
 import Movie from './Movie';
 import Animal from './Animal';
 
 export default class Person extends Model {
   id!: number;
+  parentId!: number | null;
   firstName!: string;
   lastName!: string;
   age!: number;
-
-  pets?: Animal[];
-  movies?: Movie[];
-  children?: Person[];
-  parent?: Person;
 
   // Table name is the only required property.
   static tableName = 'persons';
@@ -42,12 +38,14 @@ export default class Person extends Model {
   };
 
   // Modifiers are reusable query snippets that can be used in various places.
-  static modifiers: Modifiers = {
+  // Without a type annotation, the modifier names and their arguments are
+  // checked in `modify('searchByName', name)`.
+  static modifiers = {
     // Our example modifier is a a semi-dumb fuzzy name match. We split the
     // name into pieces using whitespace and then try to partially match
     // each of those pieces to both the `firstName` and the `lastName`
     // fields.
-    searchByName(query, name) {
+    searchByName(query: QueryBuilder<Person>, name: string) {
       // This `where` simply creates parentheses so that other `where`
       // statements don't get mixed with the these.
       query.where((query) => {
@@ -61,8 +59,10 @@ export default class Person extends Model {
   };
 
   // This object defines the relations to other models. The relationMappings
-  // property can be a thunk to prevent circular dependencies.
-  static relationMappings = () => ({
+  // property can be a thunk to prevent circular dependencies. The types of the
+  // relation properties (`pets`, `movies`, `children` and `parent`) are inferred
+  // from it, so they don't need to be declared.
+  static relationMappings = defineRelations(() => ({
     pets: {
       relation: Model.HasManyRelation,
       // The related model. This can be either a Model subclass constructor or an
@@ -105,5 +105,5 @@ export default class Person extends Model {
         to: 'persons.id',
       },
     },
-  });
+  }));
 }

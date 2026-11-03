@@ -1,11 +1,11 @@
-import { Model } from 'objection';
+import { Model, defineRelations } from 'objection';
 import Person from './Person';
 
 export default class Animal extends Model {
   id!: number;
+  ownerId!: number | null;
   name!: string;
-
-  owner?: Person;
+  species!: string;
 
   // Table name is the only required property.
   static tableName = 'animals';
@@ -26,8 +26,10 @@ export default class Animal extends Model {
   };
 
   // This object defines the relations to other models. The relationMappings
-  // property can be a thunk to prevent circular dependencies.
-  static relationMappings = () => ({
+  // property can be a thunk to prevent circular dependencies. The types of the
+  // relation properties (`owner` here) are inferred from it, so they don't need
+  // to be declared. Don't annotate its type, that would hide them.
+  static relationMappings = defineRelations(() => ({
     owner: {
       relation: Model.BelongsToOneRelation,
       // The related model.
@@ -38,5 +40,5 @@ export default class Animal extends Model {
         to: 'persons.id',
       },
     },
-  });
+  }));
 }

@@ -1,11 +1,9 @@
-import { Model } from 'objection';
+import { Model, defineRelations } from 'objection';
 import Person from './Person';
 
 export default class Movie extends Model {
   id!: number;
   name!: string;
-
-  actors!: Person[];
 
   // Table name is the only required property.
   static tableName = 'movies';
@@ -24,8 +22,9 @@ export default class Movie extends Model {
   };
 
   // This object defines the relations to other models. The relationMappings
-  // property can be a thunk to prevent circular dependencies.
-  static relationMappings = () => ({
+  // property can be a thunk to prevent circular dependencies. The type of the
+  // `actors` relation is inferred from it.
+  static relationMappings = defineRelations(() => ({
     actors: {
       relation: Model.ManyToManyRelation,
 
@@ -44,5 +43,5 @@ export default class Movie extends Model {
         to: 'persons.id',
       },
     },
-  });
+  }));
 }

@@ -1,5 +1,5 @@
 const Koa = require('koa');
-const KoaRouter = require('koa-router');
+const KoaRouter = require('@koa/router');
 const bodyParser = require('koa-bodyparser');
 
 const Knex = require('knex');
@@ -33,7 +33,7 @@ const server = app.listen(8641, () => {
 // Error handling.
 //
 // NOTE: This is not a good error handler, this is a simple one. See the error handing
-//       recipe for a better handler: http://vincit.github.io/objection.js/recipes/error-handling.html
+//       recipe for a better handler: https://abedmurrar.github.io/objection.js/recipes/error-handling
 async function errorHandler(ctx, next) {
   try {
     await next();
