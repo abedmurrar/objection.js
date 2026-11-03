@@ -191,17 +191,18 @@ describe('where scopes', () => {
     it('patch with join table extras', () =>
       expectQueries(aOrB(person.$relatedQuery('movies').patch({ name: 'x', role: 'r' })), [
         `update "movies" set "name" = 'x' where "movies"."id" in (${filter})`,
-        `update "pm" set "role" = 'r' where "pm"."movieId" in (${filter}) and "pm"."personId" in (1)`,
+        // Only the join rows whose related row matches the filters (#1853).
+        `update "pm" set "role" = 'r' where "pm"."personId" in (1) and exists (select 1 from "movies" where "movies"."id" = "pm"."movieId" and ("a" = 1 or "b" = 2))`,
       ]));
 
     it('unrelate', () =>
       expectQueries(aOrB(person.$relatedQuery('movies').unrelate()), [
-        `delete from "pm" where "pm"."movieId" in (${filter}) and "pm"."personId" in (1)`,
+        `delete from "pm" where "pm"."personId" in (1) and exists (select 1 from "movies" where "movies"."id" = "pm"."movieId" and ("a" = 1 or "b" = 2))`,
       ]));
 
     it('join table modify with orWhere', () =>
       expectQueries(person.$relatedQuery('leadMovies').unrelate(), [
-        `delete from "pm" where "pm"."movieId" in (select "movies"."id" from "movies" inner join (select "pm".* from "pm" where "role" = 'lead' or "role" = 'star') as "pm" on "movies"."id" = "pm"."movieId" where "pm"."personId" in (1)) and "pm"."personId" in (1) and ("role" = 'lead' or "role" = 'star')`,
+        `delete from "pm" where "pm"."personId" in (1) and exists (select 1 from "movies" where "movies"."id" = "pm"."movieId") and ("role" = 'lead' or "role" = 'star')`,
       ]));
   });
 

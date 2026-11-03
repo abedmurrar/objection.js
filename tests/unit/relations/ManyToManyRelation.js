@@ -1582,7 +1582,7 @@ describe('ManyToManyRelation', () => {
         expect(executedQueries[0]).to.equal(builder.toKnexQuery().toString());
         expect(executedQueries[0]).to.equal(builder.toKnexQuery().toString());
         expect(executedQueries[0]).to.eql(
-          `delete from "JoinModel" where "JoinModel"."relatedId" in (select "RelatedModel"."rid" from "RelatedModel" inner join "JoinModel" on "RelatedModel"."rid" = "JoinModel"."relatedId" where "JoinModel"."ownerId" in (666) and "someColumn" = 100 and "code" in (55, 66, 77)) and "JoinModel"."ownerId" in (666)`,
+          `delete from "JoinModel" where "JoinModel"."ownerId" in (666) and exists (select 1 from "RelatedModel" where "RelatedModel"."rid" = "JoinModel"."relatedId" and "someColumn" = 100 and "code" in (55, 66, 77))`,
         );
       });
     });
@@ -1605,7 +1605,7 @@ describe('ManyToManyRelation', () => {
         expect(executedQueries[0]).to.equal(builder.toKnexQuery().toString());
         expect(executedQueries[0]).to.equal(builder.toKnexQuery().toString());
         expect(executedQueries[0]).to.eql(
-          `delete from "JoinModel" where ("JoinModel"."relatedCId","JoinModel"."relatedDId") in (select "RelatedModel"."cid", "RelatedModel"."did" from "RelatedModel" inner join "JoinModel" on "RelatedModel"."cid" = "JoinModel"."relatedCId" and "RelatedModel"."did" = "JoinModel"."relatedDId" where ("JoinModel"."ownerAId", "JoinModel"."ownerBId") in ((11, 22)) and "code" in (55, 66, 77) and "someColumn" = 100) and ("JoinModel"."ownerAId", "JoinModel"."ownerBId") in ((11, 22))`,
+          `delete from "JoinModel" where ("JoinModel"."ownerAId", "JoinModel"."ownerBId") in ((11, 22)) and exists (select 1 from "RelatedModel" where "RelatedModel"."cid" = "JoinModel"."relatedCId" and "RelatedModel"."did" = "JoinModel"."relatedDId" and "code" in (55, 66, 77) and "someColumn" = 100)`,
         );
       });
     });

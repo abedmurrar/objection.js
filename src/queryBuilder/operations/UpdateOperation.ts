@@ -20,12 +20,16 @@ class UpdateOperation extends QueryBuilderOperation {
   // update, and `InstanceUpdateOperation` uses its instance then.
   declare model: Model;
   declare modelOptions: ModelOptions;
+  // Set when the query is resolved because the model has nothing to write to
+  // its table: the update still applies to everything else, like join rows.
+  declare hasNothingToUpdate: boolean;
 
   constructor(name: string | null, opt?: OperationOptions) {
     super(name, opt);
 
     this.model = null!;
     this.modelOptions = Object.assign({}, this.opt.modelOptions || {});
+    this.hasNothingToUpdate = false;
   }
 
   onAdd(builder: QueryBuilder, args: unknown[]): boolean {
@@ -46,6 +50,7 @@ class UpdateOperation extends QueryBuilderOperation {
 
     if (isEmpty(row)) {
       // Resolve the query if there is nothing to update.
+      this.hasNothingToUpdate = !builder.isExplicitlyResolvedOrRejected();
       builder.resolve(0);
     }
   }
@@ -55,6 +60,13 @@ class UpdateOperation extends QueryBuilderOperation {
     const convertedJson = convertFieldExpressionsToRaw(builder, json);
 
     return knexBuilder.update(convertedJson);
+  }
+
+  // Whether the query was resolved without updating anything, e.g. with
+  // `none()` or `resolve()` in a hook, but not when it was only resolved
+  // because there is nothing to update in the table (#2184).
+  isResolvedWithoutUpdate(builder: QueryBuilder): boolean {
+    return builder.isExplicitlyResolvedOrRejected() && !this.hasNothingToUpdate;
   }
 
   async onAfter2(builder: QueryBuilder, numUpdated: unknown): Promise<unknown> {
@@ -72,6 +84,7 @@ class UpdateOperation extends QueryBuilderOperation {
   clone(): this {
     const clone = super.clone();
     clone.model = this.model;
+    clone.hasNothingToUpdate = this.hasNothingToUpdate;
     return clone;
   }
 }

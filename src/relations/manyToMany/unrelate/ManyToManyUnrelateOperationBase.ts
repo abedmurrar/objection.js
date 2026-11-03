@@ -8,6 +8,15 @@ class ManyToManyUnrelateOperationBase extends UnrelateOperation {
   declare relation: ManyToManyRelation;
   declare owner: RelationOwner;
 
+  get modifiesJoinTable(): boolean {
+    return true;
+  }
+
+  // The main query is replaced by the query that `queryExecutor()` returns.
+  get modifiesJoinTableOnly(): boolean {
+    return true;
+  }
+
   queryExecutor(builder: RelationQueryBuilder): RelationQueryBuilder {
     const unrelateQuery = this.relation
       .getJoinModelClass(builder.knex())!
@@ -18,8 +27,11 @@ class ManyToManyUnrelateOperationBase extends UnrelateOperation {
     withWhereScope(unrelateQuery, () => {
       this.applyModifyFilterForJoinTable(unrelateQuery);
     });
+    withWhereScope(unrelateQuery, () => {
+      unrelateQuery.modify(this.relation.joinTableModify);
+    });
 
-    return unrelateQuery.modify(this.relation.joinTableModify);
+    return unrelateQuery;
   }
 
   /* istanbul ignore next */

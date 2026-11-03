@@ -58,7 +58,12 @@ function buildCompositeArgs(knex: KnexInstance, columns: unknown[], values: unkn
 }
 
 function buildCompositeValueArgs(columns: unknown[], values: unknown[]): unknown[] {
-  if (!Array.isArray(values[0])) {
+  if (values.length === 0) {
+    // knex turns an empty `whereIn` into `1 = 0` and an empty `whereNotIn`
+    // into `1 = 1`. A composite one would be `(a, b) in (())`, which is
+    // invalid SQL (#1914).
+    return [columns, []];
+  } else if (!Array.isArray(values[0])) {
     return [columns, [values]];
   } else {
     return [columns, values];

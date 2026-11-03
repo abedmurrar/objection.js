@@ -3,7 +3,7 @@ import { getModel } from '../../model/getModel';
 import { Relation } from '../Relation';
 import { RelationProperty } from '../RelationProperty';
 
-import { isSqlite } from '../../utils/knexUtils';
+import { isSqlite, isMySql } from '../../utils/knexUtils';
 import { inheritModel } from '../../model/inheritModel';
 import { resolveModel } from '../../utils/resolveModel';
 import { mapAfterAllReturn } from '../../utils/promiseUtils';
@@ -15,10 +15,14 @@ import { ManyToManyInsertOperation } from './insert/ManyToManyInsertOperation';
 import { ManyToManyRelateOperation } from './relate/ManyToManyRelateOperation';
 
 import { ManyToManyUnrelateOperation } from './unrelate/ManyToManyUnrelateOperation';
+import type { ManyToManyUnrelateOperationBase } from './unrelate/ManyToManyUnrelateOperationBase';
 import { ManyToManyUnrelateSqliteOperation } from './unrelate/ManyToManyUnrelateSqliteOperation';
+import { ManyToManyUnrelateMySqlOperation } from './unrelate/ManyToManyUnrelateMySqlOperation';
 
 import { ManyToManyUpdateOperation } from './update/ManyToManyUpdateOperation';
+import type { ManyToManyUpdateOperationBase } from './update/ManyToManyUpdateOperationBase';
 import { ManyToManyUpdateSqliteOperation } from './update/ManyToManyUpdateSqliteOperation';
+import { ManyToManyUpdateMySqlOperation } from './update/ManyToManyUpdateMySqlOperation';
 
 import { ManyToManyDeleteOperation } from './delete/ManyToManyDeleteOperation';
 import { ManyToManyDeleteSqliteOperation } from './delete/ManyToManyDeleteSqliteOperation';
@@ -197,40 +201,31 @@ class ManyToManyRelation extends Relation {
     });
   }
 
-  update(
-    builder: RelationQueryBuilder,
-    owner: RelationOwner,
-  ): ManyToManyUpdateSqliteOperation | ManyToManyUpdateOperation {
-    if (isSqlite(builder.knex())) {
-      return new ManyToManyUpdateSqliteOperation('update', {
-        relation: this,
-        owner,
-      });
-    } else {
-      return new ManyToManyUpdateOperation('update', {
-        relation: this,
-        owner,
-      });
-    }
+  update(builder: RelationQueryBuilder, owner: RelationOwner): ManyToManyUpdateOperationBase {
+    const Operation = getOperationClass(builder, {
+      sqlite: ManyToManyUpdateSqliteOperation,
+      mysql: ManyToManyUpdateMySqlOperation,
+      other: ManyToManyUpdateOperation,
+    });
+
+    return new Operation('update', {
+      relation: this,
+      owner,
+    });
   }
 
-  patch(
-    builder: RelationQueryBuilder,
-    owner: RelationOwner,
-  ): ManyToManyUpdateSqliteOperation | ManyToManyUpdateOperation {
-    if (isSqlite(builder.knex())) {
-      return new ManyToManyUpdateSqliteOperation('patch', {
-        modelOptions: { patch: true },
-        relation: this,
-        owner,
-      });
-    } else {
-      return new ManyToManyUpdateOperation('patch', {
-        modelOptions: { patch: true },
-        relation: this,
-        owner,
-      });
-    }
+  patch(builder: RelationQueryBuilder, owner: RelationOwner): ManyToManyUpdateOperationBase {
+    const Operation = getOperationClass(builder, {
+      sqlite: ManyToManyUpdateSqliteOperation,
+      mysql: ManyToManyUpdateMySqlOperation,
+      other: ManyToManyUpdateOperation,
+    });
+
+    return new Operation('patch', {
+      modelOptions: { patch: true },
+      relation: this,
+      owner,
+    });
   }
 
   delete(
@@ -257,21 +252,17 @@ class ManyToManyRelation extends Relation {
     });
   }
 
-  unrelate(
-    builder: RelationQueryBuilder,
-    owner: RelationOwner,
-  ): ManyToManyUnrelateSqliteOperation | ManyToManyUnrelateOperation {
-    if (isSqlite(builder.knex())) {
-      return new ManyToManyUnrelateSqliteOperation('unrelate', {
-        relation: this,
-        owner,
-      });
-    } else {
-      return new ManyToManyUnrelateOperation('unrelate', {
-        relation: this,
-        owner,
-      });
-    }
+  unrelate(builder: RelationQueryBuilder, owner: RelationOwner): ManyToManyUnrelateOperationBase {
+    const Operation = getOperationClass(builder, {
+      sqlite: ManyToManyUnrelateSqliteOperation,
+      mysql: ManyToManyUnrelateMySqlOperation,
+      other: ManyToManyUnrelateOperation,
+    });
+
+    return new Operation('unrelate', {
+      relation: this,
+      owner,
+    });
   }
 
   createJoinModels(ownerId: unknown[], related: RelationModel[]): Record<string, unknown>[] {
@@ -572,3 +563,20 @@ function finalizeJoinModelClass(ctx: MappingContext): MappingContext {
 }
 
 export { ManyToManyRelation };
+
+// Updates and unrelates need dialect specific code on sqlite and mysql, see
+// the `ManyToMany*ModifyMixin` classes.
+function getOperationClass<T>(
+  builder: RelationQueryBuilder,
+  { sqlite, mysql, other }: { sqlite: T; mysql: T; other: T },
+): T {
+  const knex = builder.knex();
+
+  if (isSqlite(knex)) {
+    return sqlite;
+  } else if (isMySql(knex)) {
+    return mysql;
+  } else {
+    return other;
+  }
+}

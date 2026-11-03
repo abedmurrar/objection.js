@@ -14,6 +14,15 @@ class ManyToManyDeleteOperationBase extends DeleteOperation {
     this.owner = opt.owner;
   }
 
+  // Deletes only delete the related rows.
+  get modifiesJoinTable(): boolean {
+    return false;
+  }
+
+  get modifiesJoinTableOnly(): boolean {
+    return false;
+  }
+
   /* istanbul ignore next */
   applyModifyFilterForRelatedTable(builder: RelationQueryBuilder): RelationQueryBuilder {
     throw new Error('not implemented');

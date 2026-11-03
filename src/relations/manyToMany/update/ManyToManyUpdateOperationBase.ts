@@ -11,6 +11,7 @@ class ManyToManyUpdateOperationBase extends UpdateOperation {
   declare hasExtraProps: boolean;
   declare joinTablePatch: Record<string, unknown>;
   declare joinTablePatchFilterQuery: RelationQueryBuilder | null;
+  declare skipRelationFilter: boolean;
 
   constructor(name: string, opt: RelationOperationOptions<ManyToManyRelation>) {
     super(name, opt);
@@ -21,10 +22,26 @@ class ManyToManyUpdateOperationBase extends UpdateOperation {
     this.hasExtraProps = false;
     this.joinTablePatch = {};
     this.joinTablePatchFilterQuery = null;
+    this.skipRelationFilter = false;
+  }
+
+  // Only patches with join table extras write join rows.
+  get modifiesJoinTable(): boolean {
+    return this.hasExtraProps;
+  }
+
+  get modifiesJoinTableOnly(): boolean {
+    return false;
   }
 
   onAdd(builder: RelationQueryBuilder, args: unknown[]): boolean {
     const obj = args[0] as Record<string, unknown>;
+
+    // The updated rows are known to be related to the owner, so they keep
+    // their own filters, and the join rows are filtered by the ids of the
+    // owner and the updated model. A subquery that joins the join table
+    // deadlocks concurrent updates on MySQL (#135).
+    this.skipRelationFilter = builder.internalOptions().skipRelationFilter;
 
     // Copy all extra properties to the `joinTablePatch` object.
     for (const extra of this.relation.joinTableExtras) {
@@ -46,7 +63,9 @@ class ManyToManyUpdateOperationBase extends UpdateOperation {
   }
 
   async onAfter1(builder: RelationQueryBuilder, result: unknown) {
-    if (this.hasExtraProps) {
+    // A query resolved without updating anything, e.g. with `none()`, leaves
+    // the join rows untouched too.
+    if (this.hasExtraProps && !this.isResolvedWithoutUpdate(builder)) {
       const joinTableUpdateQuery = this.relation
         .getJoinModelClass(builder.knex())!
         .query()
@@ -54,14 +73,34 @@ class ManyToManyUpdateOperationBase extends UpdateOperation {
         .patch(this.joinTablePatch);
 
       withWhereScope(joinTableUpdateQuery, () => {
-        this.applyModifyFilterForJoinTable(joinTableUpdateQuery);
+        if (this.skipRelationFilter) {
+          this.applyIdFilterForJoinTable(joinTableUpdateQuery);
+        } else {
+          this.applyModifyFilterForJoinTable(joinTableUpdateQuery);
+        }
+      });
+      withWhereScope(joinTableUpdateQuery, () => {
+        joinTableUpdateQuery.modify(this.relation.joinTableModify);
       });
 
-      await joinTableUpdateQuery.modify(this.relation.joinTableModify);
+      await joinTableUpdateQuery;
       return result;
     } else {
       return result;
     }
+  }
+
+  // Filters the join rows by the ids of the owner and the updated model.
+  applyIdFilterForJoinTable(builder: RelationQueryBuilder): RelationQueryBuilder {
+    return builder
+      .whereInComposite(
+        this.relation.joinTableOwnerProp.refs(builder),
+        this.owner.getProps(this.relation),
+      )
+      .whereComposite(
+        this.relation.joinTableRelatedProp!.refs(builder),
+        this.relation.relatedProp.getProps(this.model),
+      );
   }
 
   /* istanbul ignore next */
@@ -80,6 +119,7 @@ class ManyToManyUpdateOperationBase extends UpdateOperation {
     clone.hasExtraProps = this.hasExtraProps;
     clone.joinTablePatch = this.joinTablePatch;
     clone.joinTablePatchFilterQuery = this.joinTablePatchFilterQuery;
+    clone.skipRelationFilter = this.skipRelationFilter;
 
     return clone;
   }

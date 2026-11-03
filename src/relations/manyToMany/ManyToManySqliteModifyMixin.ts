@@ -6,7 +6,8 @@ const SQLITE_BUILTIN_ROW_ID = '_rowid_';
 
 // We need to override this mixin for sqlite because sqlite doesn't support
 // multi-column where in statements with subqueries. We need to use the
-// internal _rowid_ column instead.
+// internal _rowid_ column instead. The join rows are filtered by the shared
+// correlated subquery of `ManyToManyModifyMixin`.
 const ManyToManySqliteModifyMixin = <T extends ManyToManyModifyOperationClass>(Operation: T) => {
   return class extends ManyToManyModifyMixin(Operation) {
     applyModifyFilterForRelatedTable(builder: RelationQueryBuilder): RelationQueryBuilder {
@@ -15,19 +16,6 @@ const ManyToManySqliteModifyMixin = <T extends ManyToManyModifyOperationClass>(O
       const subquery = this.modifyFilterSubquery.clone().select(rowIdRef);
 
       return builder.whereInComposite(rowIdRef, subquery);
-    }
-
-    applyModifyFilterForJoinTable(builder: RelationQueryBuilder): RelationQueryBuilder {
-      const joinTableOwnerRefs = this.relation.joinTableOwnerProp.refs(builder);
-      const tableRef = builder.tableRefFor(this.relation.getJoinModelClass(builder));
-      const rowIdRef = `${tableRef}.${SQLITE_BUILTIN_ROW_ID}`;
-
-      const ownerValues = this.owner.getProps(this.relation);
-      const subquery = this.modifyFilterSubquery.clone().select(rowIdRef);
-
-      return builder
-        .whereInComposite(rowIdRef, subquery)
-        .whereInComposite(joinTableOwnerRefs, ownerValues);
     }
   };
 };
