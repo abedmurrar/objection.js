@@ -4,6 +4,18 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+### Bug fixes
+
+- Many-to-many `unrelate()` and patches with join table extras modified every join row between the owner and the matching related rows. Filters on join table columns, like `unrelate().where('persons_movies.role', 'extra')`, were ignored, so join rows they didn't match were deleted or patched too (#1853, #2127). The join rows are now filtered by a correlated subquery, so only the join rows that match are modified, also on MySQL and MariaDB.
+  - On MySQL, filters that read the join table themselves (joins, `joinRelated()`, subqueries, raw SQL) can't be used in that subquery. The ids of the matching join rows are then fetched in a separate query first.
+  - The same happens when a trigger on the join table changes a table that the subquery reads, which MySQL rejects (#2406). The statement is run again with the ids, and the join table is remembered for the next statements.
+- `upsertGraph()` patches many-to-many rows by their ids, without a subquery that joins the join table (#135).
+- `asFindQuery()` of a many-to-many patch or delete keeps its filters (#2266).
+- A query resolved with `resolve()` in a hook doesn't patch join rows, update the instance of `$query().patch()`, or clear the owner keys of a BelongsToOne `delete()` (#2184). `resolve(0)` and `resolve(false)` count as resolved.
+- `whereInComposite()` with an empty list of composite values built invalid SQL, `(a, b) in (())` (#1914).
+
+The bugs were found by Jürg Lehni in [ditojs/objection](https://github.com/ditojs/objection), whose tests are ported. The correlated subquery follows his design; the MySQL code is this fork's own: dito fetches the ids first on every MySQL statement, which takes an extra query and modifies join rows that differ only in their other columns. The MySQL trigger case was first handled in ditojs/objection by Marcin L. See [Ported from ditojs/objection](/fork/dito.md).
+
 ## 4.1.3 (2026-11-03)
 
 ### Performance

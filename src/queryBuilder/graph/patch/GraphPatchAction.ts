@@ -112,6 +112,9 @@ class GraphPatchAction extends GraphAction {
 
     const updateBuilder: QueryBuilder = this._createBuilder(node)
       .childQueryOf(builder, childQueryOptions())
+      // The current graph was fetched through the relations, so the patched
+      // models are known to be related to their parents.
+      .internalOptions({ skipRelationFilter: true })
       .copyFrom(builder, GraphAction.ReturningAllSelector);
 
     if (hasBeforeUpdate) {
