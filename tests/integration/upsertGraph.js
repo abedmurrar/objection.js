@@ -3928,6 +3928,26 @@ module.exports = (session) => {
             .catch(done);
         });
 
+        it('should not delete anything when the graph contains cyclic references', async () => {
+          const upsert = [
+            { id: 2, model1Relation2: [] },
+            { '#id': 'a', model1Prop1: '#ref{b.model1Prop1}' },
+            { '#id': 'b', model1Prop1: '#ref{a.model1Prop1}' },
+          ];
+
+          const before = await session.knex('model2').where('model1_id', 2);
+          expect(before.length).to.be.above(0);
+
+          const err = await Model1.query(session.knex)
+            .upsertGraph(upsert, { fetchStrategy, allowRefs: true })
+            .catch((err) => err);
+
+          expect(err.message).to.equal('the object graph contains cyclic references');
+          // Give queries that would run after the rejection the time to do so.
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          expect(await session.knex('model2').where('model1_id', 2)).to.have.length(before.length);
+        });
+
         it('cycle detection should consider already inserted nodes', () => {
           // There are no cycles in this graph because `id=2` has already
           // been inserted.

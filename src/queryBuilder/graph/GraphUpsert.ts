@@ -303,12 +303,16 @@ function executeOperations(builder: QueryBuilder): (graphData: GraphData) => Pro
       ? [GraphInsert]
       : [GraphDelete, GraphInsert, GraphPatch, GraphRecursiveUpsert];
 
-    return operations.reduce<Promise<unknown>>((promise, Operation) => {
-      const operation = new Operation(graphData);
-      const actions = operation.createActions();
+    // Create all actions before chaining the first ones, which would run even
+    // if creating the actions of a later operation throws, e.g. for a cycle.
+    const operationActions = operations.map((Operation) =>
+      new Operation(graphData).createActions(),
+    );
 
-      return promise.then(() => executeActions(builder, actions));
-    }, Promise.resolve());
+    return operationActions.reduce<Promise<unknown>>(
+      (promise, actions) => promise.then(() => executeActions(builder, actions)),
+      Promise.resolve(),
+    );
   };
 }
 
