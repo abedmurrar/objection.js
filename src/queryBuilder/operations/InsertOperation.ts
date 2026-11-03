@@ -4,7 +4,7 @@ import { QueryBuilderOperation } from './QueryBuilderOperation';
 import { StaticHookArguments, hasStaticHook } from '../StaticHookArguments';
 import { after, mapAfterAllReturn } from '../../utils/promiseUtils';
 import { isSqlite, isMySql } from '../../utils/knexUtils';
-import { isObject } from '../../utils/objectUtils';
+import { isObject, isString } from '../../utils/objectUtils';
 import type { KnexBuilder, Model, ModelOptions, OperationOptions, QueryBuilder } from './types';
 
 // The id of an inserted row as the database driver returns it.
@@ -88,11 +88,20 @@ class InsertOperation extends QueryBuilderOperation {
     const knex = builder.knex();
     const returnsIds = !isMySql(knex) && (!isSqlite(knex) || this.models.length > 1);
 
-    if (returnsIds && !builder.has(/returning/)) {
-      // If the user hasn't specified a `returning` clause, we make sure
-      // that at least the identifier is returned. SQLite only returns the
-      // id of the last row without one.
-      knexBuilder = knexBuilder.returning(builder.modelClass().getIdColumn());
+    if (!builder.has(/returning/)) {
+      if (returnsIds) {
+        // If the user hasn't specified a `returning` clause, we make sure
+        // that at least the identifier is returned. SQLite only returns the
+        // id of the last row without one. With `onConflict()` the conflict
+        // columns are returned too, so that the returned rows can be matched
+        // to the models when some of the rows are ignored.
+        knexBuilder = knexBuilder.returning(getDefaultReturning(builder));
+      } else if (isSqlite(knex) && builder.has('onConflict')) {
+        // Without a `returning` clause, SQLite returns the id of the last
+        // inserted row, which belongs to a previous insert if the row was
+        // ignored. Use `returning` to find out what was actually inserted.
+        knexBuilder = knexBuilder.returning(getDefaultReturning(builder));
+      }
     }
 
     return knexBuilder.insert(this.models.map((model) => model.$toDatabaseJson(builder)));
@@ -105,22 +114,32 @@ class InsertOperation extends QueryBuilderOperation {
       return this.models;
     }
 
-    if (ret.length === 1 && this.models.length > 1) {
-      this.setMySqlBatchInsertIds(builder, ret[0]);
-    } else if (isObject(ret[0])) {
-      // If the user specified a `returning` clause the result may be an array of objects.
-      // Merge all values of the objects to our models.
-      for (let i = 0, l = this.models.length; i < l; ++i) {
-        this.models[i].$setDatabaseJson(ret[i]);
+    const isOnConflict = builder.has('onConflict');
+
+    if (isObject(ret[0])) {
+      if (isOnConflict && ret.length !== this.models.length) {
+        // With `onConflict()`, ignored rows (and rows not updated because of a
+        // `where` clause after `merge()`) are not returned, so the returned rows
+        // can't be merged to the models based on their position.
+        mergeMatchingRows(builder, this.models, ret as Record<string, unknown>[]);
+      } else {
+        // If the user specified a `returning` clause the result may be an array of objects.
+        // Merge all values of the objects to our models.
+        for (let i = 0, l = this.models.length; i < l; ++i) {
+          this.models[i].$setDatabaseJson(ret[i]);
+        }
       }
+    } else if (ret.length === 1 && this.models.length > 1) {
+      this.setMySqlBatchInsertIds(builder, ret[0]);
     } else {
       // If the return value is not an array of objects, we assume it is an array of identifiers.
       for (let i = 0, l = this.models.length; i < l; ++i) {
         const model = this.models[i];
 
         // Don't set the id if the model already has one. MySQL and Sqlite don't return the correct
-        // primary key value if the id is not generated in db, but given explicitly.
-        if (!model.$id()) {
+        // primary key value if the id is not generated in db, but given explicitly. With
+        // `onConflict()`, MySQL returns `0` for ignored rows, which is not a valid id.
+        if (!model.$id() && !(isOnConflict && !ret[i])) {
           model.$id(ret[i]);
         }
       }
@@ -172,6 +191,101 @@ function addToId(id: InsertedId, amount: number): InsertedId {
   } else {
     return String(BigInt(id) + BigInt(amount));
   }
+}
+
+function getDefaultReturning(builder: QueryBuilder): string | string[] {
+  const idColumns = builder.modelClass().getIdColumnArray();
+  const columns = Array.from(new Set(idColumns.concat(getConflictColumns(builder))));
+
+  return columns.length === 1 ? columns[0] : columns;
+}
+
+function getConflictColumns(builder: QueryBuilder): string[] {
+  // `onConflict` is a `KnexOperation`, which has `args`.
+  const op = builder.findOperation('onConflict') as { args?: unknown[] } | null;
+
+  if (!op) {
+    return [];
+  }
+
+  const arg = op.args ? op.args[0] : undefined;
+  const columns = Array.isArray(arg) ? arg : [arg];
+
+  // Raw conflict targets (or no target at all) can't be used for matching.
+  return columns.every(isString) ? (columns as string[]) : [];
+}
+
+// Merges the rows returned by an insert with `onConflict()` into the models with
+// matching key values. Models whose rows were not returned are left untouched.
+function mergeMatchingRows(
+  builder: QueryBuilder,
+  models: Model[],
+  rows: Record<string, unknown>[],
+): void {
+  const jsons = models.map((model) => model.$toDatabaseJson(builder) as Record<string, unknown>);
+  const idColumns = builder.modelClass().getIdColumnArray();
+
+  // Use the conflict columns, or else the identifiers, to match the rows to
+  // the models. The columns must be present in the input and the result.
+  const keyColumns = [getConflictColumns(builder), idColumns].find((columns) => {
+    return (
+      columns.length > 0 &&
+      columns.every((col) => {
+        return (
+          rows.every((row) => row[col] !== undefined) &&
+          jsons.every((json) => json[col] !== undefined)
+        );
+      })
+    );
+  });
+
+  if (!keyColumns) {
+    throw createMatchError();
+  }
+
+  const createKey = (obj: Record<string, unknown>): string =>
+    JSON.stringify(keyColumns.map((col) => normalizeKey(obj[col])));
+  const indicesByKey = new Map<string, number[]>();
+
+  jsons.forEach((json, index) => {
+    const key = createKey(json);
+    const indices = indicesByKey.get(key);
+
+    if (indices) {
+      indices.push(index);
+    } else {
+      indicesByKey.set(key, [index]);
+    }
+  });
+
+  for (const row of rows) {
+    const indices = indicesByKey.get(createKey(row));
+    const index = indices ? indices.shift() : undefined;
+
+    if (index === undefined) {
+      throw createMatchError();
+    }
+
+    models[index].$setDatabaseJson(row);
+  }
+}
+
+function normalizeKey(value: unknown): string | null {
+  if (value === null || value === undefined) {
+    return null;
+  } else if (isObject(value)) {
+    return JSON.stringify(value);
+  } else {
+    return String(value);
+  }
+}
+
+function createMatchError(): Error {
+  return new Error(
+    'Could not match the rows returned by an insert with `onConflict()` to the inserted models. ' +
+      'Pass the conflict columns to `onConflict()` and make sure they are returned, or provide ' +
+      'the identifiers of the inserted models.',
+  );
 }
 
 function callBeforeInsert(builder: QueryBuilder, models: Model[]): unknown {
