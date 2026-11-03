@@ -163,4 +163,4 @@ function isKnexRawConvertable(queryProp: object): boolean {
   return isFunction((queryProp as Partial<KnexRawConvertable>).toKnexRaw);
 }
 
-export { splitQueryProps, mergeQueryProps };
+export { splitQueryProps, mergeQueryProps, isQueryProp };
