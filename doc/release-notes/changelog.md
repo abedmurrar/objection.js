@@ -4,6 +4,8 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+## 4.2.1 (2026-11-03)
+
 ### Bug fixes
 
 - SQLite: the ids that a multi-row `insert()` returns were merged into the models by position, but SQLite doesn't guarantee the order of the rows that `returning` returns, and ids that the models already had were overwritten. The rows of models with an id are now matched by that id, and the rows the database gave an id, ordered by it, are merged into the other models in their order: SQLite inserts the rows in the order of the input and gives them increasing ids. An insert of models that all have an id doesn't ask for ids.
