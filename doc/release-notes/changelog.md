@@ -4,6 +4,8 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+## 4.1.1 (2026-11-03)
+
 ### Bug fixes
 
 Ported from [ditojs/objection](https://github.com/ditojs/objection) by Jürg Lehni. [Ported from ditojs/objection](/fork/dito.md) links the original commits.
