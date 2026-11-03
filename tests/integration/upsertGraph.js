@@ -436,6 +436,33 @@ module.exports = (session) => {
         chai.expect(model2Rows).to.have.length(2);
       });
 
+      it('should only insert the missing models with the options of insertGraph', async () => {
+        await Model1.query(session.knex).upsertGraph(
+          {
+            id: 2,
+            model1Prop1: 'updated root 2',
+            model1Relation2: [
+              { idCol: 1, model2Prop1: 'updated hasMany 1' },
+              { idCol: 10, model2Prop1: 'inserted hasMany 10' },
+              { model2Prop1: 'inserted hasMany' },
+            ],
+          },
+          { fetchStrategy, noUpdate: true, noDelete: true, noUnrelate: true, insertMissing: true },
+        );
+
+        const root = await Model1.query(session.knex)
+          .findById(2)
+          .withGraphFetched('model1Relation2');
+
+        expect(root.model1Prop1).to.equal('root 2');
+        expect(root.model1Relation2.map((it) => it.model2Prop1).sort()).to.eql([
+          'hasMany 1',
+          'hasMany 2',
+          'inserted hasMany',
+          'inserted hasMany 10',
+        ]);
+      });
+
       it('should respect noDelete, noInsert and noUpdate flags', () => {
         const upsert = {
           // Nothing is done for the root since it only has an ids.

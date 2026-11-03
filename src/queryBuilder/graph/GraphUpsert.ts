@@ -22,21 +22,25 @@ class GraphUpsert {
   declare objects: GraphModel[];
   declare isArray: boolean;
   declare upsertOpt: GraphOptionsInput;
+  declare insertOnly: boolean;
 
   constructor({
     rootModelClass,
     objects,
     upsertOptions,
+    insertOnly = false,
   }: {
     rootModelClass: ModelClass;
     objects: unknown;
     upsertOptions: GraphOptionsInput;
+    insertOnly?: boolean;
   }) {
     checkCanBeConvertedToModels(rootModelClass, objects);
 
     this.objects = rootModelClass.ensureModelArray(objects, GraphUpsert.modelOptions);
     this.isArray = Array.isArray(objects);
     this.upsertOpt = upsertOptions;
+    this.insertOnly = insertOnly;
   }
 
   static get modelOptions(): { skipValidation: boolean } {
@@ -45,7 +49,7 @@ class GraphUpsert {
 
   run(builder: QueryBuilder): Promise<GraphModel | GraphModel[]> {
     const modelClass = builder.modelClass();
-    const graphOptions = new GraphOptions(this.upsertOpt);
+    const graphOptions = new GraphOptions(this.upsertOpt, this.insertOnly);
 
     const graph = ModelGraph.create(modelClass, this.objects) as Graph;
     assignDbRefsAsRelateProps(graph);
