@@ -4,6 +4,8 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+## 4.1.4 (2026-11-03)
+
 ### Bug fixes
 
 - Many-to-many `unrelate()` and patches with join table extras modified every join row between the owner and the matching related rows. Filters on join table columns, like `unrelate().where('persons_movies.role', 'extra')`, were ignored, so join rows they didn't match were deleted or patched too (#1853, #2127). The join rows are now filtered by a correlated subquery, so only the join rows that match are modified, also on MySQL and MariaDB.
