@@ -956,7 +956,7 @@ console.log(result.total); // --> 3341
 
 Two queries are performed by this method: the actual query and a query to get the `total` count.
 
-On a delete query, knex rejects `page()` on postgres and SQLite, and leaves the offset out on MySQL. See [Deletes with a limit](/fork/knex.md#deletes-with-a-limit).
+On a delete query, `page()` throws for any page but the first, since deletes have no offset. knex also rejects the limit on postgres and SQLite. See [Deletes with a limit](/fork/knex.md#deletes-with-a-limit).
 
 Mysql has the `SQL_CALC_FOUND_ROWS` option and `FOUND_ROWS()` function that can be used to calculate the result size, but according to my tests and [the interwebs](https://www.google.com/search?q=SQL_CALC_FOUND_ROWS+performance) the performance is significantly worse than just executing a separate count query.
 
@@ -985,7 +985,7 @@ Only returns the given range of results.
 
 Two queries are performed by this method: the actual query and a query to get the `total` count.
 
-On a delete query, knex rejects `range()` on postgres and SQLite, and leaves the offset out on MySQL. See [Deletes with a limit](/fork/knex.md#deletes-with-a-limit).
+On a delete query, `range()` throws unless it starts at 0, since deletes have no offset. knex also rejects the limit on postgres and SQLite. See [Deletes with a limit](/fork/knex.md#deletes-with-a-limit).
 
 Mysql has the `SQL_CALC_FOUND_ROWS` option and `FOUND_ROWS()` function that can be used to calculate the result size, but according to my tests and [the interwebs](https://www.google.com/search?q=SQL_CALC_FOUND_ROWS+performance) the performance is significantly worse than just executing a separate count query.
 

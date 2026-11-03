@@ -66,6 +66,28 @@ module.exports = (session) => {
           });
       });
 
+      it('should throw and delete nothing when the query has an offset', async () => {
+        const queries = [
+          Model1.query().delete().orderBy('id').page(1, 1),
+          Model1.query().delete().orderBy('id').range(1, 1),
+          Model1.query().delete().offset(1),
+        ];
+
+        for (const query of queries) {
+          let error = null;
+          try {
+            await query;
+          } catch (err) {
+            error = err;
+          }
+
+          expect(error.message).to.contain("offset() can't be used with a delete query");
+        }
+
+        const rows = await session.knex('Model1').orderBy('id');
+        expect(rows).to.have.length(3);
+      });
+
       it('should delete a model using deleteById', () => {
         return Model1.query()
           .deleteById(2)

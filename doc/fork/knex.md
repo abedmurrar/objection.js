@@ -185,3 +185,10 @@ do {
 ```
 
 knex leaves `orderBy()` out of deletes, also on MySQL, so the database picks which matching rows are deleted.
+
+Deletes have no offset either. knex used to leave it out, so `delete().page(2, 10)` deleted the first 10 rows on MySQL, and `delete().offset(10)` deleted every matching row. An offset on a delete query now throws `offset() can't be used with a delete query`. `page(0, n)` and `offset(0)` add no offset and still work. To delete a page of rows, select their ids first:
+
+```js
+const ids = await Person.query().select('id').orderBy('id').page(2, 10);
+await Person.query().delete().whereIn('id', ids.results.map((it) => it.id));
+```
