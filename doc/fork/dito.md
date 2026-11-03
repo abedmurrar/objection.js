@@ -30,3 +30,4 @@ Each row links the original commits, which are by Jürg Lehni unless another aut
 | 4.1.4   | `upsertGraph()` patches many-to-many rows by their ids. | [0d4d4c71](https://github.com/ditojs/objection/commit/0d4d4c71) |
 | 4.1.4   | `resolve()` in a hook doesn't patch join rows, update instances or clear BelongsToOne owner keys. | [ebeba06a](https://github.com/ditojs/objection/commit/ebeba06a) |
 | 4.1.4   | `whereInComposite()` with an empty list of composite values. | [495ebb00](https://github.com/ditojs/objection/commit/495ebb00) |
+| 4.2.0   | `static useAfterFindInGraphs`: eager loading respects the static `afterFind()` hook of related model classes, opt-in in 4.x. | [70b2417d](https://github.com/ditojs/objection/commit/70b2417d), [c1433500](https://github.com/ditojs/objection/commit/c1433500) |

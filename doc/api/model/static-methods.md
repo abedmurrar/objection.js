@@ -421,6 +421,26 @@ See these sections for more information:
 | ---- | ----------------------------------------------------------------------------------------- |
 | any  | If the return value is not `undefined`, it will be used as the return value of the query. |
 
+##### With eager loading
+
+The relations that `withGraphFetched()` loads run a query of their own, so the hook of the related model class is called for them. But the related models are assigned to their owners before the hook runs, so what the hook returns, for example filtered models, doesn't end up in the graph. `withGraphJoined()` doesn't call the hooks of the related model classes at all.
+
+With [useAfterFindInGraphs](/api/model/static-properties.html#static-useafterfindingraphs) set on the related model class, both do: `withGraphJoined()` calls the hook for the joined relations of the class, and the models that the hook returns are what both put in the graph. Use it when `afterFind()` filters out models that the user may not see.
+
+```js
+class Pet extends Model {
+  static useAfterFindInGraphs = true;
+
+  // Pets of other tenants are filtered out, also in `withGraphFetched('pets')`
+  // and `withGraphJoined('pets')`.
+  static afterFind({ result, context }) {
+    return result.filter((pet) => pet.tenantId === context.tenantId);
+  }
+}
+```
+
+Under `withGraphJoined()`, the hook gets the relation and its owner models as `relation` and `items`, and `asFindQuery()` and `cancelQuery()` throw, as there is no query of the relation. The hook can only return the models it got, filtered or reordered.
+
 ## `static` beforeUpdate()
 
 ```js

@@ -38,6 +38,7 @@ import { expectType } from './_utils/expect';
   class Concurrent extends Model {
     static concurrency = 4;
     static cloneObjectAttributes = false;
+    static useAfterFindInGraphs = true;
   }
 
   class LazyConcurrency extends Model {
@@ -46,6 +47,7 @@ import { expectType } from './_utils/expect';
 
   const concurrency: number | (() => number) | null = Person.concurrency;
   const clone: boolean = Concurrent.cloneObjectAttributes;
+  const afterFindInGraphs: boolean = Concurrent.useAfterFindInGraphs;
   const lazy: () => number = LazyConcurrency.concurrency;
 
   const person = Person.fromJson({ firstName: 'Jennifer' });

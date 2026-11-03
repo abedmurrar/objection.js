@@ -42,41 +42,9 @@ class ManyToManyFindOperation extends RelationFindOperation {
     }
   }
 
-  onAfter2(_: RelationQueryBuilder, related: RelationModel[]): RelationModel[] {
-    const isOneToOne = this.relation.isOneToOne();
-
-    if (this.assignResultToOwner && this.owner.isModels) {
-      const owners = this.owner.modelArray;
-      const ownerProp = this.relation.ownerProp;
-      const relatedByOwnerId = new Map<string, RelationModel[]>();
-
-      for (let i = 0, l = related.length; i < l; ++i) {
-        const rel = related[i];
-        const key = rel.$propKey(this.ownerJoinColumnAlias);
-        let arr = relatedByOwnerId.get(key);
-
-        if (!arr) {
-          arr = [];
-          relatedByOwnerId.set(key, arr);
-        }
-
-        arr.push(rel);
-      }
-
-      for (let i = 0, l = owners.length; i < l; ++i) {
-        const own = owners[i];
-        const key = ownerProp.propKey(own);
-        const related = relatedByOwnerId.get(key);
-
-        if (isOneToOne) {
-          own[this.relationProperty] = (related && related[0]) || null;
-        } else {
-          own[this.relationProperty] = related || [];
-        }
-      }
-    }
-
-    return related;
+  // The owner keys of the related rows are in the selected join columns.
+  getOwnerKey(related: RelationModel): string {
+    return related.$propKey(this.ownerJoinColumnAlias);
   }
 
   clone(): this {
