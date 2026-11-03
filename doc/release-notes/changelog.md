@@ -14,7 +14,7 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ### Bug fixes
 
-Ported from [ditojs/objection](https://github.com/ditojs/objection) by Jürg Lehni. [Ported from ditojs/objection](/fork/dito.md) links the original commits.
+Ported from [ditojs/objection](https://github.com/ditojs/objection): fixes by Jürg Lehni, and the `$defs` support by Jérémy Lal. [Ported from ditojs/objection](/fork/dito.md) links the original commits.
 
 - MySQL:
   - `patch()` and `delete()` with a subquery of the same table inside a where group (`where(qb => qb.whereIn('id', subquery))`) or a join clause failed with `ER_UPDATE_TABLE_USED`.
