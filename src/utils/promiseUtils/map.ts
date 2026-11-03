@@ -9,7 +9,8 @@ interface PromiseMapOptions {
 interface MapContext<T, R> {
   reject: (err: unknown) => void;
   resolve: (results: R[]) => void;
-  rejected: boolean;
+  failed: boolean;
+  error: unknown;
   index: number;
   numFinished: number;
   results: R[];
@@ -66,7 +67,8 @@ function mapMany<T, R>(
     const ctx: MapContext<T, R> = {
       reject,
       resolve,
-      rejected: false,
+      failed: false,
+      error: null,
       index: 0,
       numFinished: 0,
       results: new Array(items.length),
@@ -74,7 +76,7 @@ function mapMany<T, R>(
       mapper,
     };
 
-    while (ctx.index < concurrency && ctx.index < items.length && !ctx.rejected) {
+    while (ctx.index < concurrency && ctx.index < items.length && !ctx.failed) {
       executeNext(ctx);
     }
   });
@@ -82,7 +84,7 @@ function mapMany<T, R>(
 
 function executeNext<T, R>(ctx: MapContext<T, R>): null | undefined {
   try {
-    if (ctx.rejected) {
+    if (ctx.failed) {
       return;
     }
 
@@ -108,12 +110,14 @@ function executeNext<T, R>(ctx: MapContext<T, R>): null | undefined {
 }
 
 function afterExecute<T, R>(ctx: MapContext<T, R>, result: R, index: number): null {
-  if (ctx.rejected) {
+  ctx.numFinished++;
+
+  if (ctx.failed) {
+    rejectWhenFinished(ctx);
     return null;
   }
 
   ctx.results[index] = result;
-  ctx.numFinished++;
 
   if (ctx.numFinished === ctx.items.length) {
     ctx.resolve(ctx.results);
@@ -127,8 +131,22 @@ function afterExecute<T, R>(ctx: MapContext<T, R>, result: R, index: number): nu
 }
 
 function onError<T, R>(ctx: MapContext<T, R>, err: unknown): void {
-  ctx.rejected = true;
-  ctx.reject(err);
+  ctx.numFinished++;
+
+  if (!ctx.failed) {
+    ctx.failed = true;
+    ctx.error = err;
+  }
+
+  rejectWhenFinished(ctx);
+}
+
+// Wait for all started mappers before rejecting: they may run queries in a
+// transaction that the caller rolls back on rejection.
+function rejectWhenFinished<T, R>(ctx: MapContext<T, R>): void {
+  if (ctx.numFinished === ctx.index) {
+    ctx.reject(ctx.error);
+  }
 }
 
 export { promiseMap };

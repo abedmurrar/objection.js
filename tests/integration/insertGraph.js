@@ -333,6 +333,44 @@ module.exports = (session) => {
         }, 'model1Relation1.model1Relation3[1].model2Prop1'),
       );
 
+      it('should roll back after the inserts that already started when a model fails validation', async () => {
+        let numStarted = 0;
+        let numInserted = 0;
+
+        class ValidatedModel1 extends Model1 {
+          static jsonSchema = {
+            type: 'object',
+            properties: {
+              model1Prop1: { type: 'string' },
+            },
+          };
+
+          // Keep the valid inserts running when the invalid model fails:
+          async $beforeInsert() {
+            numStarted++;
+            await new Promise((resolve) => setTimeout(resolve, 10));
+          }
+
+          $afterInsert() {
+            numInserted++;
+          }
+        }
+
+        const graph = [
+          ...Array.from({ length: 7 }, (_, i) => ({ model1Prop1: `${i}` })),
+          { model1Prop1: 666 },
+        ];
+
+        const err = await transaction(ValidatedModel1, (ValidatedModel1) =>
+          ValidatedModel1.query().insertGraph(graph),
+        ).catch((err) => err);
+
+        expect(err).to.be.a(ValidationError);
+        // Inserts that run after the rollback can commit their rows on SQLite:
+        expect(numInserted).to.equal(numStarted);
+        expect(await session.knex('Model1')).to.have.length(1);
+      });
+
       it('should validate models upon insertion: references in integer columns should be accepted', () => {
         return transaction(Model1, Model2, (Model1, Model2) => {
           // We can modify Model1 and Model2 here since it is a subclass of the actual
