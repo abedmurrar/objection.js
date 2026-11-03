@@ -30,7 +30,7 @@ If installing the example project seems like too much work, here is a simple sta
 
 ```js
 // run the following command to install:
-// npm install objection knex sqlite3
+// npm install objection@npm:@abedmurrar/objection knex sqlite3
 
 const { Model } = require('objection');
 const Knex = require('knex');

@@ -3,8 +3,8 @@
  * They create a simple IMDB-style database. Try to add minimal modifications to this file to reproduce
  * your bug.
  *
- * install:
- *    npm install objection knex sqlite3 chai
+ * install (Node.js 24 or newer):
+ *    npm install objection@npm:@abedmurrar/objection knex sqlite3 chai
  *
  * run:
  *    node reproduction-template

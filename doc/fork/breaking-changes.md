@@ -83,7 +83,9 @@ JSON field expressions and the `whereJson*` methods only work on postgres and [M
 await Person.query().where(ref('data:a'), 1);
 // Error: JSON field expressions are only supported on postgres and mysql.
 // Tried to use "data:a" with dialect "sqlite3".
-``` On MySQL, the generated `#>` started a comment, which silently dropped the rest of the `where` clause.
+```
+
+On MySQL, the generated `#>` started a comment, which silently dropped the rest of the `where` clause.
 
 ## Patching a field of a `NULL` JSON column creates the object
 
@@ -93,7 +95,7 @@ await Notification.query()
   .findById(id);
 ```
 
-If `payload` is `NULL`, it becomes `{ "courseName": "Physics" }`, or an array if the path starts with an index. Before, the column stayed `NULL` on postgres. The `COALESCE()` provides the empty object:
+If `payload` is `NULL`, it becomes `{ "courseName": "Physics" }`, or an array if the path starts with an index. This only creates the last key of the path: for `'payload:a.b'`, `a` has to exist already, as `jsonb_set()` and `JSON_SET()` don't create missing parents. Before, the column stayed `NULL` on postgres. The `COALESCE()` provides the empty object:
 
 ```sql
 -- postgres

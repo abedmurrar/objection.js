@@ -1,5 +1,5 @@
 import Koa, { type Context } from 'koa';
-import KoaRouter from 'koa-router';
+import KoaRouter from '@koa/router';
 import bodyParser from 'koa-bodyparser';
 import Knex from 'knex';
 import knexConfig from './knexfile';
@@ -33,7 +33,7 @@ app.listen(port, () => {
 // Error handling.
 //
 // NOTE: This is not a good error handler, this is a simple one. See the error handing
-//       recipe for a better handler: http://vincit.github.io/objection.js/recipes/error-handling.html
+//       recipe for a better handler: https://abedmurrar.github.io/objection.js/recipes/error-handling
 async function errorHandler(ctx: Context, next: () => Promise<any>) {
   try {
     await next();

@@ -17,6 +17,17 @@ await Person.query().patch({
 });
 ```
 
+Comparisons, conditions and arithmetic like this don't need raw SQL. `ref()`, `val()`, `fn()` and `raw()` have [expression methods](/fork/expressions.md) such as `eq()`, `gt()`, `and()` and `plus()`:
+
+```js
+const { ref } = require('objection');
+
+// update "persons" set "age" = ("age" + 10)
+await Person.query().patch({
+  age: ref('age').plus(ageToAdd),
+});
+```
+
 ```js
 const { raw } = require('objection');
 
@@ -31,7 +42,7 @@ const childAgeSums = await Person.query()
 console.log(childAgeSums[0].childAgeSum);
 ```
 
-Also see the [fn](/api/objection/#fn) helper for calling SQL functions. The following example is equivalent the previous one.
+Also see the [fn](/api/objection/#fn) helper for calling SQL functions. The following example is equivalent to the previous one.
 
 ```js
 const { fn, ref } = require('objection');
@@ -55,11 +66,11 @@ const { raw, ref } = require('objection');
 const people = await Person
   .query()
   .alias('p')
-  .select(raw('array(?) as childIds', [
+  .select(raw('array(?)', [
     Person.query()
       .select('id')
-      .where('id', ref('p.parentId'))
-  ]);
+      .where('parentId', ref('p.id'))
+  ]).as('childIds'));
 
 console.log('child identifiers:', people[0].childIds)
 ```

@@ -21,7 +21,7 @@ try {
 }
 ```
 
-The first argument is a callback that gets called with the transaction object as an argument once the transaction has been successfully started. The transaction object is actually just a [knex transaction object](https://knexjs.org/guide/transactions.html) and you can start the transaction just as well using [knex.transaction](https://knexjs.org/#Transactions) function.
+The first argument is a callback that gets called with the transaction object as an argument once the transaction has been successfully started. The transaction object is actually just a [knex transaction object](https://knexjs.org/guide/transactions.html) and you can start the transaction just as well using [knex.transaction](https://knexjs.org/guide/transactions.html) function.
 
 The transaction is committed if the promise returned from the callback is resolved successfully. If the returned Promise is rejected or an error is thrown inside the callback the transaction is rolled back.
 
@@ -101,9 +101,9 @@ Note that you can pass either a normal knex instance or a transaction to [query]
 // `null` or `undefined` if you have globally set the knex
 // instance using `Model.knex(knex)`.
 async function insertPersonAndPet(person, pet, db) {
-  const person = await Person.query(db).insert(person);
+  const insertedPerson = await Person.query(db).insert(person);
 
-  return person.$relatedQuery('pets', db).insert(pet);
+  return insertedPerson.$relatedQuery('pets', db).insert(pet);
 }
 
 // All following four ways to call insertPersonAndPet work:

@@ -1,6 +1,6 @@
 # Custom query builder (extending the query builder)
 
-You can extend the [QueryBuilder](/api/query-builder/) returned by [query()](/api/model/static-methods.html#static-query), [relatedQuery()](/api/model/static-methods.html#static-relatedquery), [\$relatedQuery()](/api/model/instance-methods.html#relatedquery) and [\$query()](/api/model/instance-methods.html#query) methods (and all other methods that create a [QueryBuilder](/api/query-builder/)) by setting the model class's static [QueryBuilder](/api/model/static-methods.html#static-querybuilder) property.
+You can extend the [QueryBuilder](/api/query-builder/) returned by [query()](/api/model/static-methods.html#static-query), [relatedQuery()](/api/model/static-methods.html#static-relatedquery), [\$relatedQuery()](/api/model/instance-methods.html#relatedquery) and [\$query()](/api/model/instance-methods.html#query) methods (and all other methods that create a [QueryBuilder](/api/query-builder/)) by setting the model class's static [QueryBuilder](/api/model/static-properties.html#static-querybuilder) property.
 
 ```js
 // MyQueryBuilder.js
@@ -26,35 +26,10 @@ class Person extends Model {
 Now you can do this:
 
 ```js
-const person = await Person.query().active().findById(1).active(); // Person | undefined
-const numDeleted = await Person.query().where('id', 1).softDelete(); // number
+await Person.query().where('id', 1).myCustomMethod(1).where('foo', 'bar');
 ```
 
-## Typing functions that take query builders
-
-Use `AnyQueryBuilder<M>` for parameters that should accept a query builder of any result kind, for example in modifiers. Modifiers passed to `modify()` can also be typed with `QueryBuilder<M>`: only the model type of the parameter is checked, and the rest of the arguments of `modify()` are checked against the modifier's parameters.
-
-```ts
-import { AnyQueryBuilder } from 'objection';
-
-export function byName(query: AnyQueryBuilder<Person>, name: string) {
-  query.where('firstName', name);
-}
-
-await Person.query().findById(1).modify(byName, 'Jennifer');
-// Error: the second argument must be a string.
-await Person.query().modify(byName, 1);
-```
-
-Generic functions that return the query builder they get don't need casts:
-
-```ts
-function paginate<QB extends AnyQueryBuilder>(query: QB, page: number): QB {
-  return query.limit(10).offset(page * 10);
-}
-```
-
-If you want to set the custom query builder for all model classes you can just set the [QueryBuilder](/api/model/static-methods.html#static-querybuilder) property of the [Model](/api/model/) base class. A cleaner option would be to create your own Model subclass, set its [QueryBuilder](/api/query-builder/) property and inherit all your models from the custom Model class.
+If you want to set the custom query builder for all model classes you can just set the [QueryBuilder](/api/model/static-properties.html#static-querybuilder) property of the [Model](/api/model/) base class. A cleaner option would be to create your own Model subclass, set its [QueryBuilder](/api/query-builder/) property and inherit all your models from the custom Model class.
 
 ```js
 // BaseModel.js
@@ -137,14 +112,19 @@ class BaseModel extends Model {
 
 Now all models you inherit from `BaseModel` use `MyQueryBuilder` as a query builder.
 
-```js
+```ts
 class Person extends BaseModel {
   static tableName = 'persons';
+
+  id!: number;
+  deletedAt!: Date | null;
 }
 
-const person = await Person.query().active().findById(1).active(); // Person | undefined
+const person = await Person.query().active().findById(1).active(); // ModelRow<Person> | undefined
 const numDeleted = await Person.query().where('id', 1).softDelete(); // number
 ```
+
+Set the custom query builder in a base class like this, not in a mixin. See the [plugins recipe](/recipes/plugins.md).
 
 ## Typing functions that take query builders
 

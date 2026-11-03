@@ -1,6 +1,12 @@
+import type { ModelInstance, PartialModelGraph, PartialModelObject } from 'objection';
 import Person from './models/Person';
 import Movie from './models/Movie';
-import type KoaRouter from 'koa-router';
+import type Animal from './models/Animal';
+import type KoaRouter from '@koa/router';
+
+// TypeScript doesn't know the type of the request body (`ctx.request.body` is
+// `unknown`), so the routes cast it. objection validates it against the
+// `jsonSchema` of the models before anything is written.
 
 export default (router: KoaRouter) => {
   /**
@@ -18,7 +24,7 @@ export default (router: KoaRouter) => {
       const insertedGraph = await Person.query(trx)
         // For security reasons, limit the relations that can be inserted.
         .allowGraph('[pets, children.[pets, movies], movies, parent]')
-        .insertGraph(ctx.request.body);
+        .insertGraph(ctx.request.body as PartialModelGraph<ModelInstance<typeof Person>>);
 
       return insertedGraph;
     });
@@ -54,7 +60,7 @@ export default (router: KoaRouter) => {
     if (ctx.query.name) {
       // The fuzzy name search has been defined as a reusable
       // modifier. See the Person model.
-      query.modify('searchByName', ctx.query.name);
+      query.modify('searchByName', takeFirst(ctx.query.name));
     }
 
     if (ctx.query.hasPets) {
@@ -94,7 +100,9 @@ export default (router: KoaRouter) => {
    * Update a single Person.
    */
   router.patch('/persons/:id', async (ctx) => {
-    const numUpdated = await Person.query().findById(ctx.params.id).patch(ctx.request.body);
+    const numUpdated = await Person.query()
+      .findById(ctx.params.id)
+      .patch(ctx.request.body as PartialModelObject<Person>);
 
     ctx.body = {
       success: numUpdated == 1,
@@ -118,7 +126,9 @@ export default (router: KoaRouter) => {
   router.post('/persons/:id/children', async (ctx) => {
     const personId = parseInt(ctx.params.id, 10);
 
-    const child = await Person.relatedQuery('children').for(personId).insert(ctx.request.body);
+    const child = await Person.relatedQuery('children')
+      .for(personId)
+      .insert(ctx.request.body as PartialModelObject<Person>);
 
     ctx.body = child;
   });
@@ -144,7 +154,7 @@ export default (router: KoaRouter) => {
     if (ctx.query.name) {
       // The fuzzy name search has been defined as a reusable
       // modifier. See the Person model.
-      query.modify('searchByName', ctx.query.name);
+      query.modify('searchByName', takeFirst(ctx.query.name));
     }
 
     if (ctx.query.actorInMovie) {
@@ -167,7 +177,9 @@ export default (router: KoaRouter) => {
   router.post('/persons/:id/pets', async (ctx) => {
     const personId = parseInt(ctx.params.id, 10);
 
-    const pet = await Person.relatedQuery('pets').for(personId).insert(ctx.request.body);
+    const pet = await Person.relatedQuery('pets')
+      .for(personId)
+      .insert(ctx.request.body as PartialModelObject<Animal>);
 
     ctx.body = pet;
   });
@@ -199,7 +211,7 @@ export default (router: KoaRouter) => {
    * Insert a new movie.
    */
   router.post('/movies', async (ctx) => {
-    const movie = await Movie.query().insert(ctx.request.body);
+    const movie = await Movie.query().insert(ctx.request.body as PartialModelObject<Movie>);
     ctx.body = movie;
   });
 
@@ -240,6 +252,6 @@ export default (router: KoaRouter) => {
   });
 };
 
-function takeFirst<T>(item: T | ReadonlyArray<T>): T {
+function takeFirst(item: string | string[]): string {
   return Array.isArray(item) ? item[0] : item;
 }

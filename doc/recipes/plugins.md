@@ -15,13 +15,15 @@ export function Mixin(options = {}) {
 
 class Person extends Model {}
 
-const MixinPerson = Mixin(Person);
+const MixinPerson = Mixin()(Person);
 
 // Or as a decorator:
 
-@Mixin
+@Mixin()
 class Person extends Model {}
 ```
+
+A decorator doesn't change the type of the class, so TypeScript doesn't know about `mixinMethod()` on the decorated `Person`. Use `class Person extends Mixin()(Model)` to keep the types.
 
 ## TypeScript Example with Custom QueryBuilder
 

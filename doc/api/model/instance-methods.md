@@ -73,7 +73,7 @@ Use this to build a query that only affects items related through a relation.
 See the examples below and [here](/guide/query-examples.html#relation-queries).
 
 ::: tip
-This methods is just a shortcut for this call to the static [relatedQuery](/api/model/static-methods.html#static-relatedquery) method:
+This method is a shortcut for this call to the static [relatedQuery](/api/model/static-methods.html#static-relatedquery) method:
 
 ```js
 const builder = Person.relatedQuery(relationName, transactionOrKnex).for(
@@ -81,6 +81,7 @@ const builder = Person.relatedQuery(relationName, transactionOrKnex).for(
 );
 ```
 
+The one difference is the result of a find query for a to-one relation (`BelongsToOneRelation`, `HasOneRelation`, `HasOneThroughRelation`). `$relatedQuery()` resolves to the related model, or `undefined` if there is none. The static `relatedQuery()` always resolves to an array.
 :::
 
 ##### Arguments
@@ -165,12 +166,12 @@ console.log('jennifer no longer has any cats');
 `update` and `patch` can be used to update related models. Only difference between the mentioned methods is that `update` validates the input objects using the related model class's full schema and `patch` ignores the `required` property of the schema. Use `update` when you want to update _all_ properties of a model and `patch` when only a subset should be updated.
 
 ```js
-const updatedFluffy = await jennifer
+const numUpdated = await jennifer
   .$relatedQuery('pets')
   .update({ species: 'dog', name: 'Fluffy the great', vaccinated: false })
   .where('id', fluffy.id);
 
-console.log("fluffy's new name is", updatedFluffy.name);
+console.log(numUpdated, 'pet was updated');
 
 // This query will be rejected assuming that `name` or `species`
 // is a required property for an Animal.
@@ -213,9 +214,9 @@ If you start a query from this hook, make sure you specify `queryContext.transac
 
 ##### Return value
 
-| Type                                                               | Description                                                  |
-| ------------------------------------------------------------------ | ------------------------------------------------------------ |
-| [Promise](http://bluebirdjs.com/docs/getting-started.html)<br>void | Promise or void depending whether your hook is async or not. |
+| Type                                                                                                        | Description                                                  |
+| ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| [Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise)<br>void | Promise or void depending whether your hook is async or not. |
 
 ##### Examples
 
@@ -258,9 +259,9 @@ You can return a promise from this function if you need to do asynchronous stuff
 
 ##### Return value
 
-| Type                                                               | Description                                                  |
-| ------------------------------------------------------------------ | ------------------------------------------------------------ |
-| [Promise](http://bluebirdjs.com/docs/getting-started.html)<br>void | Promise or void depending whether your hook is async or not. |
+| Type                                                                                                        | Description                                                  |
+| ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| [Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise)<br>void | Promise or void depending whether your hook is async or not. |
 
 ##### Examples
 
@@ -308,9 +309,9 @@ Inside the hook, `this` contains the values to be updated. If (and only if) the 
 
 ##### Return value
 
-| Type                                                               | Description                                                  |
-| ------------------------------------------------------------------ | ------------------------------------------------------------ |
-| [Promise](http://bluebirdjs.com/docs/getting-started.html)<br>void | Promise or void depending whether your hook is async or not. |
+| Type                                                                                                        | Description                                                  |
+| ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| [Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise)<br>void | Promise or void depending whether your hook is async or not. |
 
 ##### Examples
 
@@ -372,9 +373,9 @@ Inside the hook, `this` contains the values to be updated. If (and only if) the 
 
 ##### Return value
 
-| Type                                                               | Description                                                  |
-| ------------------------------------------------------------------ | ------------------------------------------------------------ |
-| [Promise](http://bluebirdjs.com/docs/getting-started.html)<br>void | Promise or void depending whether your hook is async or not. |
+| Type                                                                                                        | Description                                                  |
+| ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| [Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise)<br>void | Promise or void depending whether your hook is async or not. |
 
 ##### Examples
 
@@ -430,13 +431,13 @@ This method is only called for instance deletes started with [\$query()](/api/mo
 
 | Argument     | Type   | Description                                                                                           |
 | ------------ | ------ | ----------------------------------------------------------------------------------------------------- |
-| queryContext | Object | The context object of the update query. See [context](/api/query-builder/other-methods.html#context). |
+| queryContext | Object | The context object of the delete query. See [context](/api/query-builder/other-methods.html#context). |
 
 ##### Return value
 
-| Type                                                               | Description                                                  |
-| ------------------------------------------------------------------ | ------------------------------------------------------------ |
-| [Promise](http://bluebirdjs.com/docs/getting-started.html)<br>void | Promise or void depending whether your hook is async or not. |
+| Type                                                                                                        | Description                                                  |
+| ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| [Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise)<br>void | Promise or void depending whether your hook is async or not. |
 
 ##### Examples
 
@@ -478,13 +479,13 @@ This method is only called for instance deletes started with [\$query()](/api/mo
 
 | Argument     | Type   | Description                                                                                           |
 | ------------ | ------ | ----------------------------------------------------------------------------------------------------- |
-| queryContext | Object | The context object of the update query. See [context](/api/query-builder/other-methods.html#context). |
+| queryContext | Object | The context object of the delete query. See [context](/api/query-builder/other-methods.html#context). |
 
 ##### Return value
 
-| Type                                                               | Description                                                  |
-| ------------------------------------------------------------------ | ------------------------------------------------------------ |
-| [Promise](http://bluebirdjs.com/docs/getting-started.html)<br>void | Promise or void depending whether your hook is async or not. |
+| Type                                                                                                        | Description                                                  |
+| ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| [Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise)<br>void | Promise or void depending whether your hook is async or not. |
 
 ##### Examples
 
@@ -521,15 +522,15 @@ You can return a promise from this function if you need to do asynchronous stuff
 
 ##### Arguments
 
-| Argument     | Type   | Description                                                                                           |
-| ------------ | ------ | ----------------------------------------------------------------------------------------------------- |
-| queryContext | Object | The context object of the update query. See [context](/api/query-builder/other-methods.html#context). |
+| Argument     | Type   | Description                                                                                         |
+| ------------ | ------ | --------------------------------------------------------------------------------------------------- |
+| queryContext | Object | The context object of the find query. See [context](/api/query-builder/other-methods.html#context). |
 
 ##### Return value
 
-| Type                                                               | Description                                                  |
-| ------------------------------------------------------------------ | ------------------------------------------------------------ |
-| [Promise](http://bluebirdjs.com/docs/getting-started.html)<br>void | Promise or void depending whether your hook is async or not. |
+| Type                                                                                                        | Description                                                  |
+| ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| [Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise)<br>void | Promise or void depending whether your hook is async or not. |
 
 ##### Examples
 
@@ -910,7 +911,7 @@ child2 = person.children[person.children.length - 2];
 const builder = person.$fetchGraph(expression, options);
 ```
 
-Shortcut for [Person.fetchGraph(person, options)](/api/model/static-methods.html#static-fetchgraph)
+Shortcut for [Person.fetchGraph(person, expression, options)](/api/model/static-methods.html#static-fetchgraph).
 
 ## $traverse()
 
@@ -939,10 +940,11 @@ Shortcut for [Person.knex()](/api/model/static-methods.html#static-knex).
 ## $transaction()
 
 ```js
-const knex = person.$transaction();
+const result = await person.$transaction(callback);
+const result = await person.$transaction(trxOrKnex, callback);
 ```
 
-Shortcut for [Person.knex()](/api/model/static-methods.html#static-knex).
+Shortcut for [Person.transaction()](/api/model/static-methods.html#static-transaction).
 
 ## $id()
 
@@ -1030,6 +1032,19 @@ Validates the model instance.
 Calls [\$beforeValidate](/api/model/instance-methods.html#beforevalidate) and [\$afterValidate](/api/model/instance-methods.html#aftervalidate) methods. This method is called automatically from [fromJson](/api/model/static-methods.html#static-fromjson) and [\$setJson](/api/model/instance-methods.html#setjson) methods. This method can also be
 called explicitly when needed.
 
+##### Arguments
+
+| Argument | Type                                          | Description                                                          |
+| -------- | --------------------------------------------- | -------------------------------------------------------------------- |
+| json     | Object                                        | Optional. The JSON object to validate. Defaults to the model itself. |
+| opt      | [ModelOptions](/api/types/#type-modeloptions) | Optional options                                                     |
+
+##### Return value
+
+| Type   | Description                                                    |
+| ------ | -------------------------------------------------------------- |
+| Object | The validated JSON, with the default values of the schema set. |
+
 ##### Throws
 
 | Type                                                 | Description          |
@@ -1059,7 +1074,7 @@ Omits a set of properties when converting the model to JSON.
 ##### Examples
 
 ```js
-const json = person
+const json = Person
   .fromJson({ firstName: 'Jennifer', lastName: 'Lawrence', age: 24 })
   .$omitFromJson('lastName')
   .$toJson();
@@ -1068,7 +1083,7 @@ console.log(_.has(json, 'lastName')); // --> false
 ```
 
 ```js
-const json = person
+const json = Person
   .fromJson({ firstName: 'Jennifer', lastName: 'Lawrence', age: 24 })
   .$omitFromJson(['lastName'])
   .$toJson();
@@ -1077,7 +1092,7 @@ console.log(_.has(json, 'lastName')); // --> false
 ```
 
 ```js
-const json = person
+const json = Person
   .fromJson({ firstName: 'Jennifer', lastName: 'Lawrence', age: 24 })
   .$omitFromJson({ lastName: true })
   .$toJson();
@@ -1108,7 +1123,7 @@ Omits a set of properties when converting the model to database JSON.
 ##### Examples
 
 ```js
-const json = person
+const json = Person
   .fromJson({ firstName: 'Jennifer', lastName: 'Lawrence', age: 24 })
   .$omitFromDatabaseJson('lastName')
   .$toDatabaseJson();
@@ -1117,18 +1132,18 @@ console.log(_.has(json, 'lastName')); // --> false
 ```
 
 ```js
-const json = person
+const json = Person
   .fromJson({ firstName: 'Jennifer', lastName: 'Lawrence', age: 24 })
-  .$omitFromJson(['lastName'])
+  .$omitFromDatabaseJson(['lastName'])
   .$toDatabaseJson();
 
 console.log(_.has(json, 'lastName')); // --> false
 ```
 
 ```js
-const json = person
+const json = Person
   .fromJson({ firstName: 'Jennifer', lastName: 'Lawrence', age: 24 })
-  .$omitFromJson({ lastName: true })
+  .$omitFromDatabaseJson({ lastName: true })
   .$toDatabaseJson();
 
 console.log(_.has(json, 'lastName')); // --> false

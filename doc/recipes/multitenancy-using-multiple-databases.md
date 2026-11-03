@@ -6,7 +6,7 @@ _NOTE:_ The following patterns don't work if you have a large amount of tenants 
 
 ## Model binding pattern
 
-If you have a different database for each tenant, a useful pattern is to add a middleware that adds the models to `req.models` hash and then _always_ use the models through `req.models` instead of requiring them directly. What [bindKnex](/api/model/static-properties.html#static-bindknex) method actually does is that it creates an anonymous subclass of the model class and sets its knex connection. That way the database connection doesn't change for the other requests that are currently being executed.
+If you have a different database for each tenant, a useful pattern is to add a middleware that adds the models to `req.models` hash and then _always_ use the models through `req.models` instead of requiring them directly. What [bindKnex](/api/model/static-methods.html#static-bindknex) method actually does is that it creates an anonymous subclass of the model class and sets its knex connection. That way the database connection doesn't change for the other requests that are currently being executed.
 
 ```js
 const Knex = require('knex');
@@ -30,7 +30,7 @@ app.use((req, res, next) => {
 });
 
 function getKnexForRequest(req, knexCache) {
-  // If you pass the tenantIs a query parameter, you would do something
+  // If you pass the tenant id as a query parameter, you would do something
   // like this.
   let tenantId = req.query.tenantId;
   let knex = knexCache.get(tenantId);
@@ -49,12 +49,12 @@ function knexConfigForTenant(tenantId) {
   };
 }
 
-app.get('/people', async (req, res) => {
+app.get('/people/:id', async (req, res) => {
   const { Person } = req.models;
 
-  const people = await Person.query().findById(req.params.id);
+  const person = await Person.query().findById(req.params.id);
 
-  res.send(people);
+  res.send(person);
 });
 ```
 
@@ -65,13 +65,13 @@ Another option is to add the knex instance to the request using a middleware and
 ```js
 app.use((req, res, next) => {
   // This function is defined in the previous example.
-  req.knex = getKnexForRequest(req);
+  req.knex = getKnexForRequest(req, knexCache);
   next();
 });
 
-app.get('/people', async (req, res) => {
-  const people = await Person.query(req.knex).findById(req.params.id);
+app.get('/people/:id', async (req, res) => {
+  const person = await Person.query(req.knex).findById(req.params.id);
 
-  res.send(people);
+  res.send(person);
 });
 ```

@@ -66,6 +66,6 @@ class PullRequest extends Model {
 }
 ```
 
-The `where('commentableType', 'Type')` filter adds a `WHERE "commentableType" = 'Type'` clause to the relation fetch query. The `beforeInsert` hook takes care of setting the type on insert.
+The `where('commentableType', 'Type')` filter adds a `WHERE "commentableType" = 'Type'` clause to the relation fetch query. The `beforeInsert` hook takes care of setting the type on insert. The conditions of your own query are wrapped in parentheses, apart from the filter, so an `orWhere()` in your query can't match the comments of the other type. See [Breaking changes](/fork/breaking-changes.md#orwhere-no-longer-escapes-the-conditions-objection-adds).
 
 This kind of associations don't have referential integrity and should be avoided if possible. Instead, consider using the _exclusive arc table_ pattern discussed [here](https://github.com/Vincit/objection.js/issues/19#issuecomment-291621442).

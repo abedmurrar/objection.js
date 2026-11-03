@@ -15,15 +15,17 @@ As mentioned, this method uses multiple queries to fetch the related objects. Ob
 **Limitations:**
 
 - Relations cannot be referenced in the root query because they are not joined.
-- `limit` and `page` methods will work incorrectly when applied to a relation using `modifyGraph` or `modifiers` because they will be applied on a query that fetches relations for multiple parents. You can use `limit` and `page` for the root query.
+- `limit` and `page` methods will work incorrectly when applied to a relation using `modifyGraph` or `modifiers` because they will be applied on a query that fetches relations for multiple parents. You can use `limit` and `page` for the root query. Setting the [maxBatchSize](/api/types/#type-graphoptions) option to `1` fetches the relation with a separate query for each parent, so that `limit` works in the modifiers.
 
 See the [eager loading](/guide/query-examples.html#eager-loading) section for more examples and [RelationExpression](/api/types/#type-relationexpression) for more info about the relation expression language.
 
 See the [fetchGraph](/api/model/static-methods.html#static-fetchgraph) and [\$fetchGraph](/api/model/instance-methods.html#fetchgraph) methods if you want to load relations for items already loaded from the database.
 
+In TypeScript, the relation expression is checked against the model's relations, and the loaded relations are added to the result type. See [Relation expressions are checked](/fork/typescript.md#relation-expressions-are-checked) and [Graph methods add what they load](/fork/typescript.md#graph-methods-add-what-they-load).
+
 **About performance:**
 
-Note that while [withGraphJoined](/api/query-builder/eager-methods.html#withgraphjoined) sounds more performant than [withGraphFetched](/api/query-builder/eager-methods.html#withgraphfetched), both methods have very similar performance in most cases and [withGraphFetched](/api/query-builder/eager-methods.html#withgraphfetched) is actually much much faster in some cases where the [relationExpression](/api/types/#type-relationexpression) contains multiple many-to-many or has-many relations. The flat record list the db returns for joins can have an incredible amount of duplicate information in some cases. Transferring + parsing that data from the db to node can be very costly, even though the actual joins in the db are very fast. You shouldn't select [withGraphJoined](/api/query-builder/eager-methods.html#withgraphjoined) blindly just because it sounds more peformant. The three rules of optimization apply here too: 1. Don't optimize 2. Don't optimize yet 3. Profile before optimizing. When you don't actually need joins, use [withGraphFetched](/api/query-builder/eager-methods.html#withgraphfetched).
+Note that while [withGraphJoined](/api/query-builder/eager-methods.html#withgraphjoined) sounds more performant than [withGraphFetched](/api/query-builder/eager-methods.html#withgraphfetched), both methods have very similar performance in most cases and [withGraphFetched](/api/query-builder/eager-methods.html#withgraphfetched) is actually much much faster in some cases where the [relationExpression](/api/types/#type-relationexpression) contains multiple many-to-many or has-many relations. The flat record list the db returns for joins can have an incredible amount of duplicate information in some cases. Transferring + parsing that data from the db to node can be very costly, even though the actual joins in the db are very fast. You shouldn't select [withGraphJoined](/api/query-builder/eager-methods.html#withgraphjoined) blindly just because it sounds more performant. The three rules of optimization apply here too: 1. Don't optimize 2. Don't optimize yet 3. Profile before optimizing. When you don't actually need joins, use [withGraphFetched](/api/query-builder/eager-methods.html#withgraphfetched).
 
 ##### Arguments
 
@@ -155,7 +157,7 @@ console.log(people[0].children[0].pets[0].name);
 console.log(people[0].children[0].movies[0].id);
 ```
 
-Filters can also be registered using the [modifyGraph](/api/query-builder/other-methods.html#modifygraph) method:
+Filters can also be registered using the [modifyGraph](/api/query-builder/eager-methods.html#modifygraph) method:
 
 ```js
 const people = await Person.query()
@@ -179,7 +181,7 @@ Relations can be given aliases using the `as` keyword:
 const people = await Person.query().withGraphFetched(`[
     children(orderByAge) as kids .[
       pets(filterDogs) as dogs,
-      pets(filterCats) as cats
+      pets(filterCats) as cats,
 
       movies.[
         actors
@@ -216,7 +218,9 @@ There are two methods that can be used to load relations eagerly: [withGraphFetc
 
 As mentioned, this method uses [SQL joins](https://www.postgresql.org/docs/12/tutorial-join.html) to join all the relations defined in the `relationExpression` and then parses the result into a graph of model instances equal to the one you get from `withGraphFetched`. The main benefit of this is that you can filter the query based on the relations. See the examples.
 
-By default left join is used but you can define the join type using the [joinOperation](/api/types/#type-eageroptions) option.
+By default left join is used but you can define the join type using the [joinOperation](/api/types/#type-graphoptions) option.
+
+In TypeScript, the relation expression is checked and the loaded relations are added to the result type, like with [withGraphFetched](/api/query-builder/eager-methods.html#withgraphfetched).
 
 **Limitations:**
 
@@ -224,7 +228,7 @@ By default left join is used but you can define the join type using the [joinOpe
 
 **About performance:**
 
-Note that while [withGraphJoined](/api/query-builder/eager-methods.html#withgraphjoined) sounds more performant than [withGraphFetched](/api/query-builder/eager-methods.html#withgraphfetched), both methods have very similar performance in most cases and [withGraphFetched](/api/query-builder/eager-methods.html#withgraphfetched) is actually much much faster in some cases where the [relationExpression](/api/types/#type-relationexpression) contains multiple many-to-many or has-many relations. The flat record list the db returns for joins can have an incredible amount of duplicate information in some cases. Transferring + parsing that data from the db to node can be very costly, even though the actual joins in the db are very fast. You shouldn't select [withGraphJoined](/api/query-builder/eager-methods.html#withgraphjoined) blindly just because it sounds more peformant. The three rules of optimization apply here too: 1. Don't optimize 2. Don't optimize yet 3. Profile before optimizing. When you don't actually need joins, use [withGraphFetched](/api/query-builder/eager-methods.html#withgraphfetched).
+Note that while [withGraphJoined](/api/query-builder/eager-methods.html#withgraphjoined) sounds more performant than [withGraphFetched](/api/query-builder/eager-methods.html#withgraphfetched), both methods have very similar performance in most cases and [withGraphFetched](/api/query-builder/eager-methods.html#withgraphfetched) is actually much much faster in some cases where the [relationExpression](/api/types/#type-relationexpression) contains multiple many-to-many or has-many relations. The flat record list the db returns for joins can have an incredible amount of duplicate information in some cases. Transferring + parsing that data from the db to node can be very costly, even though the actual joins in the db are very fast. You shouldn't select [withGraphJoined](/api/query-builder/eager-methods.html#withgraphjoined) blindly just because it sounds more performant. The three rules of optimization apply here too: 1. Don't optimize 2. Don't optimize yet 3. Profile before optimizing. When you don't actually need joins, use [withGraphFetched](/api/query-builder/eager-methods.html#withgraphfetched).
 
 ##### Arguments
 
@@ -241,7 +245,7 @@ Note that while [withGraphJoined](/api/query-builder/eager-methods.html#withgrap
 
 ##### Examples
 
-All examples in [withGraphFetched](/api/query-builder/eager-methods.html#withgraphfetched) also work with `withGraphJoined`. Remember to also study those. The following examples are only about the cases that don't work with [withGraphFetched](/api/query-builder/eager-methods.html#withgraphfetched)
+All examples in [withGraphFetched](/api/query-builder/eager-methods.html#withgraphfetched) also work with `withGraphJoined`. Remember to also study those. The following examples are only about the cases that don't work with [withGraphFetched](/api/query-builder/eager-methods.html#withgraphfetched).
 
 Using `withGraphJoined` all the relations are joined to the main query and you can reference them in any query building method. Note that nested relations are named by concatenating relation names using `:` as a separator. See the next example:
 
@@ -278,7 +282,7 @@ expr.children.movies = true;
 builder.withGraphFetched(expr);
 ```
 
-Returns the object representation of the relation expression passed to either `withGraphFetched` or `withGraphJoined`.
+Returns the object representation of the relation expression passed to either `withGraphFetched` or `withGraphJoined`, or `null` if neither has been called.
 
 See [this section](/api/types/#relationexpression-object-notation) for more examples and information about the structure of the returned object.
 
@@ -298,7 +302,7 @@ Sets the allowed tree of relations to fetch, insert or upsert using [withGraphFe
 
 When using [withGraphFetched](/api/query-builder/eager-methods.html#withgraphfetched) or [withGraphJoined](/api/query-builder/eager-methods.html#withgraphjoined) the query is rejected and an error is thrown if the [expression](/api/types/#type-relationexpression) passed to the methods is not a subset of the [expression](/api/types/#type-relationexpression) passed to `allowGraph`. This method is useful when the relation expression comes from an untrusted source like query parameters of a http request.
 
-If the model tree given to the [insertGraph](/api/query-builder/mutate-methods.html#insertgraph) or the [upsertGraph](/api/query-builder/mutate-methods.html#upsertgraph) method isn't a subtree of the given [expression](/api/types/#type-relationexpression), the query is rejected and and error is thrown.
+If the model tree given to the [insertGraph](/api/query-builder/mutate-methods.html#insertgraph) or the [upsertGraph](/api/query-builder/mutate-methods.html#upsertgraph) method isn't a subtree of the given [expression](/api/types/#type-relationexpression), the query is rejected and an error is thrown.
 
 See the examples.
 
@@ -398,11 +402,31 @@ You can use [clearAllowGraph](/api/query-builder/eager-methods.html#clearallowgr
 
 ## clearAllowGraph()
 
+```js
+queryBuilder = queryBuilder.clearAllowGraph();
+```
+
 Clears all calls to `allowGraph`.
+
+##### Return value
+
+| Type                                | Description                        |
+| ----------------------------------- | ---------------------------------- |
+| [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. |
 
 ## clearWithGraph()
 
+```js
+queryBuilder = queryBuilder.clearWithGraph();
+```
+
 Clears all calls to `withGraphFetched` and `withGraphJoined`.
+
+##### Return value
+
+| Type                                | Description                        |
+| ----------------------------------- | ---------------------------------- |
+| [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. |
 
 ## modifyGraph()
 
@@ -414,14 +438,14 @@ Can be used to modify `withGraphFetched` and `withGraphJoined` queries.
 
 The `pathExpression` is a relation expression that specifies the queries for which the modifier is given.
 
-The following query would filter out the children's pets that are <= 10 years old:
+In TypeScript, the `pathExpression` is checked. When it is a single relation path like `'children.pets'`, the modifier function gets the query builder of the related model. See [Relation expressions are checked](/fork/typescript.md#relation-expressions-are-checked).
 
 ##### Arguments
 
-| Argument       | Type                                                                                           | Description                                                                                                                         |
-| -------------- | ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| pathExpression | [RelationExpression](/api/types/#type-relationexpression)                                      | Expression that specifies the queries for which to give the filter.                                                                 |
-| modifier       | function([QueryBuilder](/api/query-builder/)&nbsp;&#124;&nbsp;string&nbsp;&#124;&nbsp;string[] | A modifier function, [model modifier](/api/model/static-properties.html#static-modifiers) name or an array of model modifier names. |
+| Argument       | Type                                                                                            | Description                                                                                                                         |
+| -------------- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| pathExpression | [RelationExpression](/api/types/#type-relationexpression)                                       | Expression that specifies the queries for which to give the filter.                                                                 |
+| modifier       | function([QueryBuilder](/api/query-builder/))&nbsp;&#124;&nbsp;string&nbsp;&#124;&nbsp;string[] | A modifier function, [model modifier](/api/model/static-properties.html#static-modifiers) name or an array of model modifier names. |
 
 ##### Return value
 
@@ -430,6 +454,8 @@ The following query would filter out the children's pets that are <= 10 years ol
 | [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. |
 
 ##### Examples
+
+The following query would filter out the children's pets that are <= 10 years old:
 
 ```js
 Person.query()

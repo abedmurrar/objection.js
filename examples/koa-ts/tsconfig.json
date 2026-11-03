@@ -1,9 +1,8 @@
 {
   "compilerOptions": {
     "allowUnreachableCode": false,
-    "alwaysStrict": true,
-    "module": "commonjs",
-    "moduleResolution": "node",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
     "noFallthroughCasesInSwitch": true,
     "noImplicitAny": true,
     "noImplicitReturns": true,
@@ -12,7 +11,8 @@
     "strictNullChecks": true,
     "esModuleInterop": true,
     "allowJs": true,
-    "target": "esnext",
+    "target": "es2023",
+    "types": ["node"],
     "rootDir": "./",
     "outDir": "dist"
   }

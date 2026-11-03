@@ -9,7 +9,7 @@ const objection = require('objection');
 const { Model, ref } = require('objection');
 ```
 
-The objection module is what you get when you import objection. It has a bunch of properties that are listed below.
+The objection module is what you get when you import objection. It has a bunch of properties that are listed below. `require('objection')` and `import { Model } from 'objection'` give the same classes. Files inside the package can't be imported. See [Only the package entry can be imported](/fork/breaking-changes.html#only-the-package-entry-can-be-imported).
 
 ## Model
 
@@ -18,6 +18,87 @@ const { Model } = require('objection');
 ```
 
 [The model class](/api/model/)
+
+## QueryBuilder
+
+```js
+const { QueryBuilder } = require('objection');
+```
+
+[The query builder class](/api/query-builder/). Extend it to create a [custom query builder](/recipes/custom-query-builder.html). In TypeScript, a custom query builder also needs a `'~rebind'` declaration. See [Custom query builders need one declaration](/fork/typescript.html#custom-query-builders-need-one-declaration).
+
+## QueryBuilderBase
+
+```js
+const { QueryBuilderBase } = require('objection');
+```
+
+The base class of [QueryBuilder](/api/query-builder/).
+
+## QueryBuilderOperation
+
+```js
+const { QueryBuilderOperation } = require('objection');
+```
+
+The base class of the operations a query is made of. Every operation matches it, so `query.clear(QueryBuilderOperation)` removes all operations of the query.
+
+## Relation
+
+```js
+const {
+  Relation,
+  BelongsToOneRelation,
+  HasOneRelation,
+  HasManyRelation,
+  ManyToManyRelation,
+  HasOneThroughRelation,
+} = require('objection');
+```
+
+The [relation](/api/types/#class-relation) classes. They are the same classes as `Model.BelongsToOneRelation`, `Model.HasOneRelation` and so on, which are used as the `relation` of a [RelationMapping](/api/types/#type-relationmapping). `Relation` is the base class of the others.
+
+## RelationExpression
+
+```js
+const { RelationExpression } = require('objection');
+```
+
+The class of parsed [relation expressions](/api/types/#type-relationexpression). `RelationExpression.create(expr)` parses a string or an object expression. The query builder methods take strings and objects, so you don't need it to pass expressions to them.
+
+## defineRelations
+
+```js
+const { defineRelations } = require('objection');
+```
+
+Returns the relation mappings it's given, unchanged. It only exists for TypeScript: it keeps the literal names of `extra` columns, so that the relation types inferred from `relationMappings` include them. It takes an object or a function that returns one. See [Relations inferred from `relationMappings`](/fork/typescript.html#relations-inferred-from-relationmappings).
+
+##### Examples
+
+```ts
+import { Model, defineRelations } from 'objection';
+
+class Person extends Model {
+  static tableName = 'persons';
+
+  static relationMappings = defineRelations(() => ({
+    movies: {
+      relation: Model.ManyToManyRelation,
+      modelClass: Movie,
+      join: {
+        from: 'persons.id',
+        through: {
+          from: 'persons_movies.personId',
+          to: 'persons_movies.movieId',
+          extra: ['role'],
+        },
+        to: 'movies.id',
+      },
+    },
+  }));
+}
+```
 
 ## initialize
 
@@ -63,7 +144,7 @@ const { ref } = require('objection');
 
 Factory function that returns a [ReferenceBuilder](/api/types/#class-referencebuilder) instance, that makes it easier to refer to tables, columns, json attributes etc. [ReferenceBuilder](/api/types/#class-referencebuilder) can also be used to type cast and alias the references.
 
-See [FieldExpression](/api/types/#type-fieldexpression) for more information about how to refer to json fields.
+See [FieldExpression](/api/types/#type-fieldexpression) for more information about how to refer to json fields. JSON field expressions work on postgres and [MySQL](/fork/mysql.html#json-field-expressions), and throw an error on other databases. The keys of the path are escaped.
 
 `Model.ref()` refers to a column of the model and qualifies it with the model's table, or the alias of the table in the query. In TypeScript the column must be a property of the model: `Person.ref('firstName')`, `Person.ref('p.firstName')`, `Person.ref('address:street')` or `Person.ref('*')`. Pass the expression as a type argument for columns the model doesn't declare: `Person.ref<'legacy_column'>('legacy_column')`.
 
@@ -176,7 +257,7 @@ await Person
     alias: 'ageSum'
   }))
   .where('age', '<', raw(':value1 + :value2', {
-    value1: val(50)
+    value1: val(50),
     value2: knex.raw('25')
   }));
 ```
@@ -201,7 +282,7 @@ await Model.query().where(
   val({ name: 'Jennifer', age: 29 })
 );
 
-// Insert an array.
+// Insert an array (postgres).
 await Model.query().insert({
   numbers: val([1, 2, 3])
     .asArray()
@@ -243,11 +324,11 @@ fn.upper(...args);
 fn.lower(...args);
 ```
 
-All arguments are interpreted as values by default. Use `ref` to refer to columns. you can also pass `raw` instances, other `fn` instances, `QueryBuilders` knex builders, knex raw and anything else just like to any other objection method.
+All arguments are interpreted as values by default. Use `ref` to refer to columns. You can also pass `raw` instances, other `fn` instances, `QueryBuilders` knex builders, knex raw and anything else just like to any other objection method.
 
 ##### MySQL functions
 
-`fn` has a helper for every MySQL 8.4 built-in function, named in camel case: `fn.dateFormat()` calls `DATE_FORMAT()`, `fn.jsonArrayAgg()` calls `JSON_ARRAYAGG()` and so on. In TypeScript the helpers check the number of arguments and type the result, which `select(fn.x().as('alias'))` will use.
+`fn` has a [helper for every MySQL 8.4 built-in function](/fork/mysql.html#fn-helpers-for-mysql-functions), named in camel case: `fn.dateFormat()` calls `DATE_FORMAT()`, `fn.jsonArrayAgg()` calls `JSON_ARRAYAGG()` and so on. In TypeScript the helpers check the number of arguments and type the result, which `select(fn.x().as('alias'))` will use.
 
 ```js
 const { fn, ref } = require('objection');
@@ -322,7 +403,7 @@ await Comment.query().patch({ replyCount: fn.greatest(Comment.ref('replyCount').
 
 The SQL of every method is wrapped in parentheses, so expressions can be nested without thinking about operator precedence. Like the arguments of `fn()`, strings are values: use `ref()` or `Model.ref()` for columns. In TypeScript the values are checked against the type of the column: `Lesson.ref('order').eq('2')` is an error when `order` is a number. Dates can also be compared with strings.
 
-Conditions are booleans on postgres and `0` or `1` on MySQL and SQLite.
+Conditions are booleans on postgres and `0` or `1` on MySQL and SQLite. See [Expressions](/fork/expressions.html) for more examples and the SQL they generate.
 
 ##### fn.case()
 
@@ -515,7 +596,7 @@ const knex = Knex({
     host: '127.0.0.1',
     user: 'objection',
     database: 'objection_test'
-  }
+  },
 
   ...knexSnakeCaseMappers()
 });
@@ -534,28 +615,9 @@ const knex = Knex({
     host: '127.0.0.1',
     user: 'objection',
     database: 'objection_test'
-  }
-
-  ...knexSnakeCaseMappers({ upperCase: true })
-});
-```
-
-For older nodes:
-
-```js
-const Knex = require('knex');
-const knexSnakeCaseMappers = require('objection').knexSnakeCaseMappers;
-
-const knex = Knex({
-  client: 'postgres',
-
-  connection: {
-    host: '127.0.0.1',
-    user: 'objection',
-    database: 'objection_test'
   },
 
-  ...knexSnakeCaseMappers()
+  ...knexSnakeCaseMappers({ upperCase: true })
 });
 ```
 
@@ -580,7 +642,7 @@ const knex = Knex({
     host: '127.0.0.1',
     user: 'objection',
     database: 'objection_test'
-  }
+  },
 
   ...knexIdentifierMapping({
     MyId: 'id',
@@ -608,7 +670,7 @@ const knex = Knex({
     host: '127.0.0.1',
     user: 'objection',
     database: 'objection_test'
-  }
+  },
 
   // Go through all models and add conversions using the custom property
   // `column` in json schema.
@@ -621,33 +683,26 @@ const knex = Knex({
         mapping[properties[propName].column] = propName;
         return mapping;
       }, mapping);
-    }, {});
+    }, {})
   )
 });
 ```
 
-For older nodes:
+## Validator
 
 ```js
-const Knex = require('knex');
-const knexIdentifierMapping = require('objection').knexIdentifierMapping;
-
-const knex = Knex({
-  client: 'postgres',
-
-  connection: {
-    host: '127.0.0.1',
-    user: 'objection',
-    database: 'objection_test'
-  },
-
-  ...knexIdentifierMapping({
-    MyId: 'id',
-    MyProp: 'prop',
-    MyAnotherProp: 'anotherProp'
-  })
-});
+const { Validator } = require('objection');
 ```
+
+The [Validator](/api/types/#class-validator) base class of custom validators.
+
+## AjvValidator
+
+```js
+const { AjvValidator } = require('objection');
+```
+
+The [AjvValidator](/api/types/#class-ajvvalidator) class, the default validator.
 
 ## ValidationError
 

@@ -4,7 +4,7 @@ If you want to use the json schema validation but add some custom validation on 
 
 If you need to do validation on insert or update you can throw exceptions from the [\$beforeInsert](/api/model/instance-methods.html#beforeinsert) and [\$beforeUpdate](/api/model/instance-methods.html#beforeupdate) methods.
 
-If you don't want to use the built-in json schema validation, you can just ignore the [jsonSchema](/api/model/instance-methods.html#jsonschema) property. It is completely optional. If you want to use some other validation library you need to implement a custom [Validator](/api/types/#class-validator) (see the example).
+If you don't want to use the built-in json schema validation, you can just ignore the [jsonSchema](/api/model/static-properties.html#static-jsonschema) property. It is completely optional. If you want to use some other validation library you need to implement a custom [Validator](/api/types/#class-validator) (see the example).
 
 ## Examples
 
@@ -24,12 +24,12 @@ class Person extends Model {
 }
 ```
 
-Modifying the [Ajv](https://github.com/epoberezkin/ajv) based JSON schema validation:
+Modifying the [Ajv](https://ajv.js.org/) based JSON schema validation:
 
 ```js
-const AjvValidator = require('objection').AjvValidator;
+const { Model, AjvValidator } = require('objection');
 
-class Model {
+class BaseModel extends Model {
   static createValidator() {
     return new AjvValidator({
       onCreateAjv: ajv => {

@@ -53,7 +53,7 @@ console.log('there are', people.length, 'People in total');
 select "persons".* from "persons"
 ```
 
-The return value of the [query](/api/model/static-methods.html#static-query) method is an instance of [QueryBuilder](/api/query-builder/) that has all the methods a [knex QueryBuilder](https://knexjs.org/#Builder) has and a lot more. Here is a simple example that uses some of them:
+The return value of the [query](/api/model/static-methods.html#static-query) method is an instance of [QueryBuilder](/api/query-builder/) that has all the methods a [knex QueryBuilder](https://knexjs.org/guide/query-builder.html) has and a lot more. Here is a simple example that uses some of them:
 
 ```js
 const middleAgedJennifers = await Person.query()
@@ -130,7 +130,7 @@ left join "movies" on "movies"."directorId" = "persons"."id" and "movies"."year"
 inner join "persons" as "parent" on "parent"."id" = "persons"."parentId"
 ```
 
-`Model.ref()` refers to the table of the model, or to the alias set with [alias](/api/query-builder/other-methods.html#alias) or `from({ alias: Model })` for the root model. Refer to the columns of an aliased join with `ref('parent.id')`.
+`Model.ref()` refers to the table of the model, or to the alias set with [alias](/api/query-builder/find-methods.html#alias) or `from({ alias: Model })` for the root model. Refer to the columns of an aliased join with `ref('parent.id')`.
 
 In addition to knex methods, the [QueryBuilder](/api/query-builder/) has a lot of helpers for dealing with relations like the [joinRelated](/api/query-builder/join-methods.html#joinrelated) method:
 
@@ -295,7 +295,7 @@ console.log(numDeleted, 'people were deleted');
 delete from "persons" where lower("firstName") like '%ennif%'
 ```
 
-You can always use [subqueries](/recipes/subqueries.html), [raw](/api/objection/#raw), [ref](/api/objection/#ref), [lit](/api/objection/#lit) and all query building methods with [delete](/api/query-builder/mutate-methods.html#delete) queries, just like with every query in objection. With some databases, you cannot use joins with deletes (db restriction, not objection). You can replace joins with subqueries like this:
+You can always use [subqueries](/recipes/subqueries.html), [raw](/api/objection/#raw), [ref](/api/objection/#ref), [val](/api/objection/#val) and all query building methods with [delete](/api/query-builder/mutate-methods.html#delete) queries, just like with every query in objection. With some databases, you cannot use joins with deletes (db restriction, not objection). You can replace joins with subqueries like this:
 
 ```js
 // This query deletes all people that have a pet named "Fluffy".
@@ -313,10 +313,10 @@ await Person.query()
 ```sql
 delete from "persons"
 where "id" in (
-  select "persons.id"
+  select "persons"."id"
   from "persons"
-  join "pets" on "pets.ownerId" = "persons.id"
-  where "pets.name" = 'Fluffy'
+  inner join "animals" as "pets" on "pets"."ownerId" = "persons"."id"
+  where "pets"."name" = 'Fluffy'
 )
 ```
 
@@ -331,15 +331,17 @@ await Person.query()
 delete from "persons"
 where exists (
   select "pets".*
-  from "pets"
-  where "pets.ownerId" = "persons.id"
-  and "pets.name" = 'Fluffy'
+  from "animals" as "pets"
+  where "pets"."ownerId" = "persons"."id"
+  and "pets"."name" = 'Fluffy'
 )
 ```
 
 ## Relation queries
 
 While the static [query](/api/model/static-methods.html#static-query) method can be used to create a query to a whole table [relatedQuery](/api/model/static-methods.html#static-relatedquery) and its instance method counterpart [\$relatedQuery](/api/model/instance-methods.html#relatedquery) can be used to query items related to another item. Both of these methods return an instance of [QueryBuilder](/api/query-builder/) just like the [query](/api/model/static-methods.html#static-query) method.
+
+The conditions you add to a relation query are put in parentheses when needed, so an `orWhere()` can't match the rows of other owners. See [Breaking changes](/fork/breaking-changes#orwhere-no-longer-escapes-the-conditions-objection-adds). `for()` only works on queries made with the static `relatedQuery()`, and it has to be called before write methods like `delete()`. Otherwise the query is rejected. See [`for()` is checked](/fork/breaking-changes#for-is-checked).
 
 ### Relation find queries
 
@@ -373,8 +375,8 @@ const dogs = await person
 
 ```sql
 select "animals".* from "animals"
-where "species" = 'dog'
-and "animals"."ownerId" = 1
+where "animals"."ownerId" in (1)
+and "species" = 'dog'
 order by "name" asc
 ```
 
@@ -389,8 +391,8 @@ const dogs = await Person.relatedQuery('pets')
 
 ```sql
 select "animals".* from "animals"
-where "species" = 'dog'
-and "animals"."ownerId" = 1
+where "animals"."ownerId" in (1)
+and "species" = 'dog'
 order by "name" asc
 ```
 
@@ -423,8 +425,8 @@ const dogs = await Person.relatedQuery('pets')
 
 ```sql
 select "animals".* from "animals"
-where "species" = 'dog'
-and "animals"."ownerId" in (1, 2)
+where "animals"."ownerId" in (1, 2)
+and "species" = 'dog'
 order by "name" asc
 ```
 
@@ -444,12 +446,12 @@ const dogs = await Person.relatedQuery('pets')
 
 ```sql
 select "animals".* from "animals"
-where "species" = 'dog'
-and "animals"."ownerId" in (
+where "animals"."ownerId" in (
   select "persons"."id"
   from "persons"
   where "name" = 'Jennifer'
 )
+and "species" = 'dog'
 order by "name" asc
 ```
 
@@ -597,10 +599,14 @@ await actor
 
 ```sql
 delete from "persons_movies"
-where "persons_movies"."personId" = 100
 where "persons_movies"."movieId" in (
-  select "movies"."id" from "movies" where "name" like 'Terminator%'
+  select "movies"."id"
+  from "movies"
+  inner join "persons_movies" on "movies"."id" = "persons_movies"."movieId"
+  where "persons_movies"."personId" in (100)
+  and "name" like 'Terminator%'
 )
+and "persons_movies"."personId" in (100)
 ```
 
 The same using the static [relatedQuery](/api/model/static-methods.html#static-relatedquery) method:
@@ -614,12 +620,14 @@ await Person.relatedQuery('movies')
 
 ```sql
 delete from "persons_movies"
-where "persons_movies"."personId" = 100
-and "persons_movies"."movieId" in (
+where "persons_movies"."movieId" in (
   select "movies"."id"
   from "movies"
-  where "name" like 'Terminator%'
+  inner join "persons_movies" on "movies"."id" = "persons_movies"."movieId"
+  where "persons_movies"."personId" in (100)
+  and "name" like 'Terminator%'
 )
+and "persons_movies"."personId" in (100)
 ```
 
 The next query removes all Terminator movies from Arnold Schwarzenegger:
@@ -641,16 +649,23 @@ await Person.relatedQuery('movies')
 
 ```sql
 delete from "persons_movies"
-where "persons_movies"."personId" in (
+where "persons_movies"."movieId" in (
+  select "movies"."id"
+  from "movies"
+  inner join "persons_movies" on "movies"."id" = "persons_movies"."movieId"
+  where "persons_movies"."personId" in (
+    select "persons"."id"
+    from "persons"
+    where "firstName" = 'Arnold'
+    and "lastName" = 'Schwarzenegger'
+  )
+  and "name" like 'Terminator%'
+)
+and "persons_movies"."personId" in (
   select "persons"."id"
   from "persons"
   where "firstName" = 'Arnold'
   and "lastName" = 'Schwarzenegger'
-)
-and "persons_movies"."movieId" in (
-  select "movies"."id"
-  from "movies"
-  where "name" like 'Terminator%'
 )
 ```
 
@@ -703,6 +718,8 @@ You can fetch an arbitrary graph of relations for the results of any query by ch
 
 Because the relation expressions are strings (there's also an optional [object notation](/api/types/#relationexpression-object-notation)) they can be easily passed, for example, as a query parameter of an HTTP request. However, allowing the client to execute expressions like this without any limitations is not very secure. Therefore the [QueryBuilder](/api/query-builder/) has the [allowGraph](/api/query-builder/eager-methods.html#allowgraph) method. [allowGraph](/api/query-builder/eager-methods.html#allowgraph) can be used to limit the allowed relation expression to a certain subset.
 
+In TypeScript, the result types only contain the relations the query loaded, and relation expressions are checked at compile time. See [Loaded relations](/guide/relations.html#loaded-relations).
+
 By giving the expression `[pets, children.pets]` for [allowGraph](/api/query-builder/eager-methods.html#allowgraph) the value passed to [withGraphFetched](/api/query-builder/eager-methods.html#withgraphfetched) is allowed to be one of:
 
 - `'pets'`
@@ -718,10 +735,10 @@ Examples of expressions that would cause an error:
 - `'[pets, children.children]'`
 - `'notEvenAnExistingRelation'`
 
-In addition to the [withGraphFetched](/api/query-builder/eager-methods.html#withgraphfetched) and [withGraphJoined](/api/query-builder/eager-methods.html#withgraphjoined) methods, relations can be fetched using the [fetchGraph](/api/model/static-properties.html#static-fetchgraph) and
+In addition to the [withGraphFetched](/api/query-builder/eager-methods.html#withgraphfetched) and [withGraphJoined](/api/query-builder/eager-methods.html#withgraphjoined) methods, relations can be fetched using the [fetchGraph](/api/model/static-methods.html#static-fetchgraph) and
 [\$fetchGraph](/api/model/instance-methods.html#fetchgraph) methods.
 
-[withGraphFetched](/api/query-builder/eager-methods.html#withgraphfetched) uses multiple queries to load the related items. Note that [withGraphFetched](/api/query-builder/eager-methods.html#withgraphfetched) used to be called `eager`.). [withGraphJoined](/api/query-builder/eager-methods.html#withgraphjoined) uses joins and only performs one single query to fetch the whole relation graph. This doesn't mean that `withGraphJoined` is faster though. See the performance discussion [here](/api/query-builder/eager-methods.html#withgraphfetched). You should only use `withGraphJoined` if you actually need the joins to be able to reference the nested tables. When in doubt use [withGraphFetched](/api/query-builder/eager-methods.html#withgraphfetched).
+[withGraphFetched](/api/query-builder/eager-methods.html#withgraphfetched) uses multiple queries to load the related items. Note that [withGraphFetched](/api/query-builder/eager-methods.html#withgraphfetched) used to be called `eager`. [withGraphJoined](/api/query-builder/eager-methods.html#withgraphjoined) uses joins and only performs one single query to fetch the whole relation graph. This doesn't mean that `withGraphJoined` is faster though. See the performance discussion [here](/api/query-builder/eager-methods.html#withgraphfetched). You should only use `withGraphJoined` if you actually need the joins to be able to reference the nested tables. When in doubt use [withGraphFetched](/api/query-builder/eager-methods.html#withgraphfetched).
 
 ##### Examples
 
@@ -785,7 +802,7 @@ const people = await Person.query().withGraphFetched('[pets, children.^3]');
 console.log(people[0].children[0].children[0].children[0].firstName);
 ```
 
-Relations can be modified using the [modifyGraph](/api/query-builder/other-methods.html#modifygraph) method:
+Relations can be modified using the [modifyGraph](/api/query-builder/eager-methods.html#modifygraph) method:
 
 ```js
 const people = await Person.query()
@@ -919,7 +936,7 @@ Arbitrary relation graphs can be inserted using the [insertGraph](/api/query-bui
 
 See the [allowGraph](/api/query-builder/eager-methods.html#allowgraph) method if you need to limit which relations can be inserted using [insertGraph](/api/query-builder/mutate-methods.html#insertgraph) method to avoid security issues.
 
-If you are using Postgres the inserts are done in batches for maximum performance. On other databases the rows need to be inserted one at a time. This is because postgresql is the only database engine that returns the identifiers of all inserted rows and not just the first or the last one.
+If you are using Postgres the inserts are done in batches for maximum performance. On other databases the rows are inserted one at a time. On MySQL, graph writes run one query at a time by default. See [Breaking changes](/fork/breaking-changes#graph-operations-run-one-query-at-a-time-on-mysql).
 
 [insertGraph](/api/query-builder/mutate-methods.html#insertgraph) operation is **not** atomic by default! You need to start a transaction and pass it to the query using any of the supported ways. See the section about [transactions](/guide/transactions.html) for more information.
 
@@ -1004,17 +1021,16 @@ await Person
       pets: [{
         name: "I am the dog of #ref{jenni.firstName} whose id is #ref{jenni.id}",
         species: 'dog'
-      }
-    ],
-    { allowRefs: true }
-  }]);
+      }]
+    }
+  ], { allowRefs: true });
 ```
 
 Again, make sure you set the `allowRefs` option to `true`.
 
 The query above will insert a pet named `I am the dog of Jennifer whose id is 523` for Jennifer. If `#ref{}` is used within a string, the references are replaced with the referred values inside the string. If the reference string contains nothing but the reference, the referred value is copied to its place preserving its type.
 
-Existing rows can be related to newly inserted rows by using the `relate` option. `relate` can be `true` in which case all models in the graph that have an identifier get related. `relate` can also be an array of relation paths like `['children', 'children.movies.actors']` in which case only objects in those paths get related even if they have an idetifier.
+Existing rows can be related to newly inserted rows by using the `relate` option. `relate` can be `true` in which case all models in the graph that have an identifier get related. `relate` can also be an array of relation paths like `['children', 'children.movies.actors']` in which case only objects in those paths get related even if they have an identifier.
 
 ```js
 await Person.query().insertGraph(
@@ -1175,7 +1191,7 @@ For the following examples, assume this is the content of the database:
       text: 'Meh'
     }]
   }, {
-    id: 2
+    id: 2,
     name: 'Wanderlust',
 
     reviews: [{

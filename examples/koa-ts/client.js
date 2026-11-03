@@ -10,7 +10,7 @@ const qs = require('node:querystring');
 
 const req = axios.create({
   baseURL: 'http://localhost:8641/',
-  paramsSerializer: qs.stringify,
+  paramsSerializer: (params) => qs.stringify(params),
 });
 
 (async () => {

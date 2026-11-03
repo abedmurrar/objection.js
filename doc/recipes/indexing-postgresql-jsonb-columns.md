@@ -1,5 +1,7 @@
 # Indexing PostgreSQL JSONB columns
 
+This recipe is about postgres. On MySQL, [`whereJsonOverlaps()`](/fork/mysql.md#wherejsonoverlaps-and-wherejsonnotoverlaps) can use multi-valued indexes.
+
 Good reading on the subject:
 
 - [JSONB type performance in PostgreSQL 9.4](https://www.enterprisedb.com/blog/jsonb-type-performance-postgresql-94) and
@@ -7,20 +9,22 @@ Good reading on the subject:
 
 ## General Inverted Indexes a.k.a. GIN
 
-This is the index type which makes all JSONB set operations fast. All `isSuperset` / `isSubset` / `hasKeys` / `hasValues` etc. queries can use this index to speed ’em up. Usually this is the index you want and it may take around 30% extra space on the DB server.
+This is the index type which makes all JSONB set operations fast. All `whereJsonSupersetOf()`, `whereJsonHasAny()` and `whereJsonHasAll()` queries can use this index to speed ’em up. Usually this is the index you want and it may take around 30% extra space on the DB server.
 
-If one likes to use only the subset/superset operators with faster and smaller index one can give an extra `path_ops` parameter when creating the index: [“The path_ops index supports only the search path operator `@>` (see below), but produces a smaller and faster index for these kinds of searches.”](https://wiki.postgresql.org/wiki/What's_new_in_PostgreSQL_9.4). According to Marco Nenciarini’s post the speed up can be over 600% compared to full GIN index and the size of the index is reduced from ~30% -> ~20%.
+Objection doesn't compare the column itself in these queries, but the field expression of the column. `whereJsonSupersetOf('details', value)` compiles to `("details"#>'{}')::jsonb @> ...`, and `whereJsonSupersetOf('details:tags', value)` to `("details"#>'{tags}')::jsonb @> ...`. Postgres only uses an index for this when the index is on the same expression, so index `(details #> '{}')`, not `details`. A GIN index on the plain column isn't used by these methods.
+
+If one likes to use only the superset operator with faster and smaller index one can give an extra `path_ops` parameter when creating the index: [“The path_ops index supports only the search path operator `@>` (see below), but produces a smaller and faster index for these kinds of searches.”](https://wiki.postgresql.org/wiki/What's_new_in_PostgreSQL_9.4). According to Marco Nenciarini’s post the speed up can be over 600% compared to full GIN index and the size of the index is reduced from ~30% -> ~20%.
 
 Full GIN index to speed up all type of json queries:
 
 ```js
-.raw('CREATE INDEX on ?? USING GIN (??)', ['Hero', 'details'])
+.raw("CREATE INDEX on ?? USING GIN ((?? #> '{}'))", ['Hero', 'details'])
 ```
 
-Partial GIN index to speed up all subset / superset type of json queries:
+Partial GIN index to speed up all superset type of json queries:
 
 ```js
-.raw('CREATE INDEX on ?? USING GIN (?? jsonb_path_ops)', ['Place', 'details'])
+.raw("CREATE INDEX on ?? USING GIN ((?? #> '{}') jsonb_path_ops)", ['Place', 'details'])
 ```
 
 ## Index on Expression
@@ -46,6 +50,15 @@ Migration:
 ```js
 exports.up = knex => {
   return knex.schema
+    .createTable('Place', table => {
+      table.increments('id').primary();
+      table.string('name');
+      table.jsonb('details');
+    })
+    .raw("CREATE INDEX on ?? USING GIN ((?? #> '{}') jsonb_path_ops)", [
+      'Place',
+      'details'
+    ])
     .createTable('Hero', table => {
       table.increments('id').primary();
       table.string('name');
@@ -56,17 +69,8 @@ exports.up = knex => {
         .references('id')
         .inTable('Place');
     })
-    .raw('CREATE INDEX on ?? USING GIN (??)', ['Hero', 'details'])
-    .raw("CREATE INDEX on ?? ((??#>>'{type}'))", ['Hero', 'details'])
-    .createTable('Place', table => {
-      table.increments('id').primary();
-      table.string('name');
-      table.jsonb('details');
-    })
-    .raw('CREATE INDEX on ?? USING GIN (?? jsonb_path_ops)', [
-      'Place',
-      'details'
-    ]);
+    .raw("CREATE INDEX on ?? USING GIN ((?? #> '{}'))", ['Hero', 'details'])
+    .raw("CREATE INDEX on ?? ((??#>>'{type}'))", ['Hero', 'details']);
 };
 ```
 
@@ -83,8 +87,8 @@ objection-jsonb-example=# \d "Hero"
  homeId  | integer
 Indexes:
     "Hero_pkey" PRIMARY KEY, btree (id)
-    "Hero_details_idx" gin (details)
-    "Hero_expr_idx" btree ((details #>> '{type}'::text[]))
+    "Hero_expr_idx" gin ((details #> '{}'::text[]))
+    "Hero_expr_idx1" btree ((details #>> '{type}'::text[]))
 
 objection-jsonb-example=# \d "Place"
            Table "public.Place"
@@ -95,7 +99,7 @@ objection-jsonb-example=# \d "Place"
  details | jsonb
 Indexes:
     "Place_pkey" PRIMARY KEY, btree (id)
-    "Place_details_idx" gin (details jsonb_path_ops)
+    "Place_expr_idx" gin ((details #> '{}'::text[]) jsonb_path_ops)
 ```
 
 Expression index is used for example for following query:
@@ -105,6 +109,6 @@ explain select * from "Hero" where details#>>'{type}' = 'Hero';
 
                            QUERY PLAN
 ----------------------------------------------------------------
- Index Scan using "Hero_expr_idx" on "Hero"
+ Index Scan using "Hero_expr_idx1" on "Hero"
    Index Cond: ((details #>> '{type}'::text[]) = 'Hero'::text)
 ```

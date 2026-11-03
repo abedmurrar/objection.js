@@ -1,6 +1,20 @@
 # Migration from objection 3.x to 4.0
 
-The runtime changes are listed in the [changelog](/release-notes/changelog.html#_4-0-0). This section covers the typescript changes.
+This section covers the upgrade from objection.js 3.1.5 to `@abedmurrar/objection` 4.0. The [TypeScript](/fork/typescript.md) page has more examples of the new types.
+
+## Runtime changes
+
+These change what existing code does at runtime. Each one is explained, with examples, in [Breaking changes](/fork/breaking-changes.md):
+
+- Node.js 24, [knex 3.3](/fork/breaking-changes.md#knex-3-3-or-newer-is-required) and, on MySQL, [MySQL 8.0.17](/fork/breaking-changes.md#mysql-8-0-17-or-newer-is-required) or newer are required. With knex 3.3, `page()` and `range()` on a delete query throw on postgres and SQLite.
+- [Only the package entry can be imported](/fork/breaking-changes.md#only-the-package-entry-can-be-imported). Imports of files inside the package throw `ERR_PACKAGE_PATH_NOT_EXPORTED`.
+- [The exported classes are real classes](/fork/breaking-changes.md#the-exported-classes-are-real-classes). ES5-style subclasses (`Model.call(this)`) and code compiled with TypeScript's `target: "es5"` or Babel 6 throw.
+- [The keys of JSON field expressions are escaped](/fork/breaking-changes.md#security-json-field-expression-keys-are-escaped). Keys with `,`, `{`, `}`, `"`, whitespace or `NULL` refer to the actual key instead of being split.
+- [`orWhere` no longer escapes the conditions objection adds](/fork/breaking-changes.md#orwhere-no-longer-escapes-the-conditions-objection-adds), like the owner condition of `$relatedQuery()` and relation filters.
+- [`for()` is checked](/fork/breaking-changes.md#for-is-checked). A query that uses it without the static `relatedQuery()`, or calls a write method before it, is rejected.
+- [JSON features throw on unsupported databases](/fork/breaking-changes.md#json-features-throw-on-unsupported-databases). JSON field expressions and the `whereJson*` methods only work on postgres and MySQL.
+- [Patching a field of a `NULL` JSON column creates the object](/fork/breaking-changes.md#patching-a-field-of-a-null-json-column-creates-the-object). `patch({ 'col:key': value })` on a row where `col` is `NULL` sets `col` to `{ "key": value }`. Before, `col` stayed `NULL` on postgres.
+- [Graph operations run one query at a time on MySQL](/fork/breaking-changes.md#graph-operations-run-one-query-at-a-time-on-mysql). Graph writes like `insertGraph()` and `upsertGraph()` run one query at a time by default. Set `concurrency` on the model to run them in parallel again.
 
 ## typescript: Custom query builders declare `'~rebind'` instead of five `*QueryBuilderType` properties
 
@@ -35,6 +49,8 @@ class BaseModel extends Model {
   declare QueryBuilderType: MyQueryBuilder<this>;
 }
 ```
+
+In custom methods, the model type isn't known, so pass the type of the object to `patch()`, `update()` and `insert()`: `this.patch<{ deletedAt: Date }>({ deletedAt: new Date() })`.
 
 The type of the static query methods like `query()` now comes from the static `QueryBuilder` property, because that decides the query builder class at runtime. Before, a model that declared `QueryBuilderType` but didn't set `static QueryBuilder` type checked custom methods that didn't exist at runtime.
 
@@ -108,7 +124,7 @@ Models with `private` or `protected` members, and models that declare a relation
 
 ## typescript: Relation expressions are checked
 
-The relation names in `withGraphFetched()`, `withGraphJoined()`, `fetchGraph()`, `modifyGraph()`, `allowGraph()` and `joinRelated()` must be relations of the model, both in strings (`'[pets.toys, mom]'`) and in object notation. A misspelled name is an error like `Unknown relation "toyz" at "pets"`.
+The relation names in `withGraphFetched()`, `withGraphJoined()`, `fetchGraph()`, `$fetchGraph()`, `modifyGraph()`, `allowGraph()` and `joinRelated()` (and its variants) must be relations of the model, both in strings (`'[pets.toys, mom]'`) and in object notation. A misspelled name is an error like `Unknown relation "toyz" at "pets"`.
 
 - Relations that work at runtime but aren't in the types need a property declaration: `memberships?: Membership[];`, or inferred `relationMappings`.
 - To skip the check for one call, pass the expression type explicitly: `withGraphFetched<string>(expression)`. Expressions typed `string` aren't checked.
@@ -120,9 +136,29 @@ The callback of `modifyGraph()` now gets the query builder of the related model.
 
 When the static `modifiers` of a model is an object without a type annotation, or a getter, `modify('name')` and modifier names in relation expressions (`'pets(onlyDogs)'`) must be modifiers of the model, and the arguments of `modify()` are checked against the modifier. Annotate the property as `static modifiers: Modifiers = {...}` to opt out. Names added with `modifiers()` aren't known, so they aren't checked after it.
 
-## Field expressions and `NULL` JSON columns
+## typescript: Join callbacks get `JoinBuilder`
 
-`patch({ 'col:key': value })` on a row where `col` is `NULL` sets `col` to `{ "key": value }` (or an array, if the path starts with an index). Before, `col` stayed `NULL` on postgres.
+Join callbacks get objection's `JoinBuilder` instead of knex's `JoinClause`. A callback whose parameter is annotated as `Knex.JoinClause` no longer compiles. Remove the annotation, or use `JoinBuilder`:
+
+```ts
+import { JoinBuilder } from 'objection';
+
+// 3.x
+Person.query().join('pets', (join: Knex.JoinClause) => {
+  join.on('pets.ownerId', 'persons.id');
+});
+
+// 4.0
+Person.query().join('pets', (join: JoinBuilder) => {
+  join.on('pets.ownerId', 'persons.id');
+});
+```
+
+See [Joins and model classes](/fork/joins.md) for what `JoinBuilder` adds.
+
+## typescript: `ModelProps` and `ModelRelations` count more properties as relations
+
+Properties typed `Model | null` (like `mom: Person | null`) and unions of a model and an array of models are relations now. `ModelProps<M>` no longer includes them, and `ModelRelations<M>` does. `ModelProps<M>` also leaves out `QueryBuilderType` and the `~` keys.
 
 # Migration from objection 2.x to 3.0
 

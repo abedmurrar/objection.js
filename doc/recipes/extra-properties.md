@@ -32,16 +32,18 @@ You can define your [relationMapping](/api/model/static-properties.html#static-r
 class Actor extends Model {
   static get relationMappings() {
     return {
-      relation: Model.ManyToManyRelation,
-      modelClass: Movie,
-      join: {
-        from: 'actors.id',
-        through: {
-          from: 'actors_movies.actorId',
-          to: 'actors_movies.movieId',
-          extra: ['characterName']
-        },
-        to: 'movies.id'
+      movies: {
+        relation: Model.ManyToManyRelation,
+        modelClass: Movie,
+        join: {
+          from: 'actors.id',
+          through: {
+            from: 'actors_movies.actorId',
+            to: 'actors_movies.movieId',
+            extra: ['characterName']
+          },
+          to: 'movies.id'
+        }
       }
     };
   }
@@ -54,20 +56,22 @@ You can give a different name for the property in the result by providing an obj
 class Actor extends Model {
   static get relationMappings() {
     return {
-      relation: Model.ManyToManyRelation,
-      modelClass: Movie,
-      join: {
-        from: 'actors.id',
-        through: {
-          from: 'actors_movies.actorId',
-          to: 'actors_movies.movieId',
-          extra: {
-            // Here `character` is the name that will appear in the model object
-            // and 'characterName' is the name of the column in the db.
-            character: 'characterName'
-          }
-        },
-        to: 'movies.id'
+      movies: {
+        relation: Model.ManyToManyRelation,
+        modelClass: Movie,
+        join: {
+          from: 'actors.id',
+          through: {
+            from: 'actors_movies.actorId',
+            to: 'actors_movies.movieId',
+            extra: {
+              // Here `character` is the name that will appear in the model object
+              // and 'characterName' is the name of the column in the db.
+              character: 'characterName'
+            }
+          },
+          to: 'movies.id'
+        }
       }
     };
   }
@@ -109,3 +113,5 @@ await linda
 ```
 
 `extra` properties also work with [withGraphFetched](/api/query-builder/eager-methods.html#withgraphfetched) [insertGraph](/api/query-builder/mutate-methods.html#insertgraph) and [upsertGraph](/api/query-builder/mutate-methods.html#upsertgraph).
+
+In TypeScript, the `extra` columns are added to the type of the related models when the relation mappings are wrapped in `defineRelations()`. See [TypeScript](/fork/typescript.md#relations-inferred-from-relationmappings).

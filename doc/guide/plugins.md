@@ -2,6 +2,8 @@
 
 A curated list of plugins and modules for objection. Only plugins that follow [the best practices](/guide/plugins.html#plugin-development-best-practices) are accepted on this list. Other modules like plugins for other frameworks and things that cannot be implemented following the best practices are an exception to this rule. If you are a developer of or otherwise know of a good plugin/module for objection, please create a pull request or an issue to get it added to this list.
 
+These plugins are written for objection.js. A plugin that imports from `'objection'` only uses this package when it is installed under that name, as described in [Installation](/guide/installation.html).
+
 ## 3rd party plugins
 
 - [objection-authorize](https://github.com/JaneJeon/objection-authorize) - integrate access control into Objection queries
