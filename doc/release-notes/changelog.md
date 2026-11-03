@@ -4,6 +4,10 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+### Performance
+
+- MySQL: `insertGraph()` and `upsertGraph()` insert the new rows of each table in one query, as on PostgreSQL, instead of one query per row. A person with 2 pets with 2 toys each takes 3 inserts instead of 7, and the graph insert benchmark on MySQL 8.4 went from 29% slower than objection 3.1.5 to 16% faster. Rows with an id and rows without one are inserted separately, because the ids of a multi-row insert can only be computed when none of the rows has one.
+
 ## 4.1.1 (2026-11-03)
 
 ### Bug fixes
