@@ -35,6 +35,14 @@ Also fixed:
 
 - MariaDB: same-table subqueries of updates and deletes were wrapped like on MySQL, which MariaDB doesn't need. The wrap broke correlated subqueries, e.g. a filtered BelongsToOne `unrelate()` of a self-referencing relation failed with `Unknown column`.
 
+## 4.1.0 (2026-11-03)
+
+### Bug fixes
+
+- Types:
+  - `modify()` on an `AnyQueryBuilder<M>`, as in modifiers that call other modifiers, returned a union of two query builders whose methods couldn't be called. It returns the query builder.
+  - `$setRelated()` and `$appendRelated()` check the relation name and the related models, like `relatedQuery()`. A misspelled name, or models of another model class, is a compile error. Names the types can't check take the related model type explicitly: `$setRelated<Pet>(name, pets)`. Unknown names already threw at runtime.
+
 ## 4.0.5 (2026-11-03)
 
 ### Bug fixes

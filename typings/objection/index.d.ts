@@ -1753,7 +1753,9 @@ declare namespace Objection {
 
   // The query builder `QB` after something ran that may have loaded relations
   // the types can't see.
-  type OpaqueQueryBuilder<QB extends AnyQueryBuilder> = QB['~state'] extends { opaque: true }
+  // The tuples keep an `any` state, as in `AnyQueryBuilder<M>`, from turning the
+  // result into a union of both branches, whose methods can't be called.
+  type OpaqueQueryBuilder<QB extends AnyQueryBuilder> = [QB['~state']] extends [{ opaque: true }]
     ? QB
     : RebindQueryBuilder<
         QB,
@@ -3391,6 +3393,28 @@ declare namespace Objection {
     '~error': 'Unknown relation. Pass the related model type explicitly for relation names that can not be checked: relatedQuery<Pet>(name)';
   };
 
+  // What `$setRelated()` and `$appendRelated()` take for relation `K` of `M`:
+  // models or rows of the related model, one or many. Rows fit too: rows of a
+  // model with required relation properties are the model type. Mapping this
+  // with `Row<>` would cost about 4000 types in every check (bench:typings).
+  type SetRelatedValue<M, K extends keyof M> =
+    | RelatedModel<M, K>
+    | RelatedModel<M, K>[]
+    | null
+    | undefined;
+
+  // Any name when the types don't know the relations of the model, otherwise
+  // only with an explicit related model type.
+  type UncheckedRelationName<M, RM> = [RM] extends [never]
+    ? [RelationKeys<M>] extends [never]
+      ? string
+      : UnknownRelationName
+    : string;
+
+  type UncheckedRelatedValue<RM> = [RM] extends [never]
+    ? object | object[] | null | undefined
+    : RM | RM[] | null | undefined;
+
   type RelationMappingsDefinition = { readonly [relationName: string]: RelationMapping<any> };
 
   export interface DefineRelationsFunction {
@@ -3915,14 +3939,24 @@ declare namespace Objection {
     $setJson(json: object, opt?: ModelOptions): this;
     $setDatabaseJson(json: object): this;
 
-    $setRelated<RM extends Model>(
-      relation: String | Relation,
-      related: RM | RM[] | null | undefined,
+    // For relation names that can't be checked, and `Relation` objects. When
+    // the model has known relations, the related model type must be given
+    // explicitly: `$setRelated<Pet>(relationName, pets)`.
+    $setRelated<RM extends Model = never>(
+      relation: UncheckedRelationName<this, RM> | Relation,
+      related: UncheckedRelatedValue<NoInfer<RM>>,
     ): this;
+    // Checked last, so that its error is the one that is reported.
+    $setRelated<K extends RelationKeys<this>>(relation: K, related: SetRelatedValue<this, K>): this;
 
-    $appendRelated<RM extends Model>(
-      relation: String | Relation,
-      related: RM | RM[] | null | undefined,
+    $appendRelated<RM extends Model = never>(
+      relation: UncheckedRelationName<this, RM> | Relation,
+      related: UncheckedRelatedValue<NoInfer<RM>>,
+    ): this;
+    // Checked last, so that its error is the one that is reported.
+    $appendRelated<K extends RelationKeys<this>>(
+      relation: K,
+      related: SetRelatedValue<this, K>,
     ): this;
 
     $set(obj: Pojo): this;
