@@ -3,7 +3,7 @@ const { expect } = require('chai');
 
 module.exports = (session) => {
   describe(`withGraphJoined() should throw for models without a primary key #2748`, () => {
-    let knex = session.knex;
+    const knex = session.knex;
     let Owner;
     let Item;
 

@@ -154,7 +154,9 @@ module.exports = (session) => {
         try {
           await Model1.query().delete().where('id', '>', 1).orderBy('id').limit(1);
           expect(warnings).to.have.length(1);
-          expect(warnings[0]).to.match(/^orderBy\(\) has no effect in delete queries with limit\(\) on MySQL/);
+          expect(warnings[0]).to.match(
+            /^orderBy\(\) has no effect in delete queries with limit\(\) on MySQL/,
+          );
 
           resetDeprecations();
           const model1 = await Model1.query().findById(1);

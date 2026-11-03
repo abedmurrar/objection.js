@@ -4,6 +4,37 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+### Bug fixes
+
+Ported from [ditojs/objection](https://github.com/ditojs/objection) by Jürg Lehni. [Ported from ditojs/objection](/fork/dito.md) links the original commits.
+
+- MySQL:
+  - `patch()` and `delete()` with a subquery of the same table inside a where group (`where(qb => qb.whereIn('id', subquery))`) or a join clause failed with `ER_UPDATE_TABLE_USED`.
+  - `delete().orderBy().limit()` warns: knex leaves the order out of MySQL deletes and keeps the limit, so the query deletes any of the matching rows. It will throw in 5.0. See [Deletes with a limit](/fork/knex.md#deletes-with-a-limit).
+  - `insert().onConflict().ignore()` gave ignored models the id `0`. They now keep no id.
+- `insert().onConflict().ignore()` on PostgreSQL and SQLite merged the returned rows into the models by position, so models got the values of other rows when some were ignored. The rows are matched by the conflict columns now. `insertAndFetch()` only fetches the models that have an id.
+- Graph inserts and upserts:
+  - With `relate`, HasMany and HasOne children whose composite id contains the foreign key were treated as relates and dropped.
+  - `upsertGraph()` with cyclic references rejected, but its deletes still ran afterwards, outside the transaction.
+  - When a graph write failed, the query rejected before its other running queries finished, so in a transaction they could commit rows after the rollback.
+  - The models that `upsertGraph()` returns kept leaving out their unchanged props, so a later `$query().patch()` on them skipped those props.
+  - `upsertGraph()` with `relate` and `noUpdate` didn't write the foreign keys of related HasMany and HasOne models.
+  - `noInsert` still inserted the models below the skipped ones, as orphans. Models that a `#ref` from outside points to are still inserted.
+  - `upsertGraph()` with `noUpdate`, `noDelete`, `noUnrelate` and `insertMissing` ran as an insert and failed with a `UniqueViolationError` on the existing rows.
+  - BelongsToOne `$relatedQuery().insertGraph()` inserted the model but didn't relate it to the owner.
+- Relations:
+  - `through.modify` of many-to-many relations was lost on `bindKnex()` classes, so `unrelate()` deleted join rows that the filter protects.
+  - BelongsToOne `unrelate()` ignored the relation's `modify` when the query had no where clause, and cleared the keys of owner models it didn't unrelate. It now unrelates only the owners whose related row matches, like the other relations.
+- Executing a `patchAndFetch()` or `updateAndFetch()` query a second time, e.g. by awaiting it twice, wrote the row that the first run fetched back over later changes. It now throws; create a new query for each run.
+- A `patch()` or `merge()` with a field expression like `'meta:color'` wrote nothing when the query was built before it ran, e.g. by `toKnexQuery()` or `clone()`.
+- A `raw()` set on a JSON attribute in `$beforeInsert()` or `$beforeUpdate()` was stored as the serialized raw builder instead of its value.
+- `withGraphJoined()` with a model that has no primary key merged rows or gave children the wrong owner. It throws now, pointing to `withGraphFetched()`.
+- Patch validation: boolean subschemas, `not` (which rejected every patch), `required` in nullable or untyped objects, anyOf/oneOf options with only `required`, and `$defs`. The `JSONSchema` type has `$defs`, and `definitions` is deprecated.
+
+Also fixed:
+
+- MariaDB: same-table subqueries of updates and deletes were wrapped like on MySQL, which MariaDB doesn't need. The wrap broke correlated subqueries, e.g. a filtered BelongsToOne `unrelate()` of a self-referencing relation failed with `Unknown column`.
+
 ## 4.0.5 (2026-11-03)
 
 ### Bug fixes

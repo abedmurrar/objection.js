@@ -358,7 +358,10 @@ function definitionsWithoutRequired(jsonSchema: JsonSchema, prop: string): JsonS
   if (definitions && Object.keys(definitions).length > 0) {
     return {
       [prop]: Object.fromEntries(
-        Object.entries(definitions).map(([key, schema]) => [key, jsonSchemaWithoutRequired(schema)]),
+        Object.entries(definitions).map(([key, schema]) => [
+          key,
+          jsonSchemaWithoutRequired(schema),
+        ]),
       ),
     };
   } else {
