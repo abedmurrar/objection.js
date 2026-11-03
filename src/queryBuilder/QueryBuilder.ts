@@ -5,6 +5,7 @@ import { raw } from './RawBuilder';
 import { createModifier } from '../utils/createModifier';
 import { ValidationErrorType } from '../model/ValidationError';
 import { isObject, isFunction, last } from '../utils/objectUtils';
+import { isPromise } from '../utils/promiseUtils/isPromise';
 import { RelationExpression, DuplicateRelationError } from './RelationExpression';
 import { assertIdNotUndefined } from '../utils/assert';
 
@@ -505,9 +506,23 @@ class QueryBuilder extends QueryBuilderBase {
     const builder = this.clone();
 
     try {
-      await beforeExecute(builder);
-      const result = await doExecute(builder);
-      return await afterExecute(builder, result);
+      // The hooks run synchronously one after another, and a phase only waits
+      // when a hook returns a promise. Most queries have no async hook, so this
+      // saves a promise and a microtask per hook and phase.
+      const runBefore = beforeExecute(builder);
+      // As before, no hook runs inside the caller's call to `execute()`.
+      await undefined;
+
+      let result = runBefore();
+      if (isPromise(result)) result = await result;
+
+      result = doExecute(builder);
+      if (isPromise(result)) result = await result;
+
+      result = afterExecute(builder, result);
+      if (isPromise(result)) result = await result;
+
+      return result;
     } catch (error) {
       return await handleExecuteError(builder, error);
     }
@@ -1169,30 +1184,31 @@ function checkForUsage(builder: QueryBuilder): void {
   }
 }
 
-function beforeExecute(builder: QueryBuilder): Promise<unknown> {
-  let promise: Promise<unknown> = Promise.resolve();
-
+// Checks the query and adds the implicit operations, synchronously. Returns a
+// function that runs the before hooks, which returns a promise only when a hook
+// does. The `runBefore` hooks are read here, as when they were chained here.
+function beforeExecute(builder: QueryBuilder): () => unknown {
   // This needs to be checked before any hooks are called.
   checkForUsage(builder);
 
   builder = addImplicitOperations(builder);
 
-  // Resolve all before hooks before building and executing the query
-  // and the rest of the hooks.
-  promise = chainOperationHooks(promise, builder, 'onBefore1');
-  promise = chainOperationHooks(promise, builder, 'onBefore2');
+  const userRunBefore = builder.context().runBefore;
+  const internalRunBefore = builder.internalContext().runBefore;
 
-  promise = chainHooks(promise, builder, builder.context().runBefore);
-  promise = chainHooks(promise, builder, builder.internalContext().runBefore);
-
-  promise = chainOperationHooks(promise, builder, 'onBefore3');
-
-  return promise;
+  return () =>
+    then(runOperationHooks(builder, 'onBefore1', undefined), (result) =>
+      then(runOperationHooks(builder, 'onBefore2', result), (result) =>
+        then(runHooks(builder, userRunBefore, result), (result) =>
+          then(runHooks(builder, internalRunBefore, result), (result) =>
+            runOperationHooks(builder, 'onBefore3', result),
+          ),
+        ),
+      ),
+    );
 }
 
-function doExecute(builder: QueryBuilder): Promise<unknown> {
-  let promise: Promise<unknown> = Promise.resolve();
-
+function doExecute(builder: QueryBuilder): unknown {
   builder = callOnBuildHooks(builder);
   const queryExecutorOperation = findQueryExecutorOperation(builder);
 
@@ -1200,33 +1216,40 @@ function doExecute(builder: QueryBuilder): Promise<unknown> {
   const explicitResolveValue = builder._explicitResolveValue;
 
   if (explicitRejectValue !== null) {
-    promise = Promise.reject(explicitRejectValue);
+    return Promise.reject(explicitRejectValue);
   } else if (explicitResolveValue !== null) {
-    promise = Promise.resolve(explicitResolveValue);
+    return explicitResolveValue;
   } else if (queryExecutorOperation !== null) {
-    promise = Promise.resolve(queryExecutorOperation.queryExecutor(builder));
+    return queryExecutorOperation.queryExecutor(builder);
   } else {
-    promise = Promise.resolve(buildKnexQuery(builder));
-
-    promise = chainOperationHooks(promise, builder, 'onRawResult');
-    promise = promise.then((result) => createModels(result, builder));
+    // The knex query builder is a thenable: resolving it runs the query.
+    return Promise.resolve(buildKnexQuery(builder)).then((result) =>
+      then(runOperationHooks(builder, 'onRawResult', result), (result) =>
+        createModels(result, builder),
+      ),
+    );
   }
-
-  return promise;
 }
 
-function afterExecute(builder: QueryBuilder, result: unknown): Promise<unknown> {
-  let promise = Promise.resolve(result);
+function afterExecute(builder: QueryBuilder, result: unknown): unknown {
+  return then(runOperationHooks(builder, 'onAfter1', result), (result) =>
+    then(runOperationHooks(builder, 'onAfter2', result), (result) => {
+      const userRunAfter = builder.context().runAfter;
+      const internalRunAfter = builder.internalContext().runAfter;
 
-  promise = chainOperationHooks(promise, builder, 'onAfter1');
-  promise = chainOperationHooks(promise, builder, 'onAfter2');
+      return then(runHooks(builder, userRunAfter, result), (result) =>
+        then(runHooks(builder, internalRunAfter, result), (result) =>
+          runOperationHooks(builder, 'onAfter3', result),
+        ),
+      );
+    }),
+  );
+}
 
-  promise = chainHooks(promise, builder, builder.context().runAfter);
-  promise = chainHooks(promise, builder, builder.internalContext().runAfter);
-
-  promise = chainOperationHooks(promise, builder, 'onAfter3');
-
-  return promise;
+// Calls `cb` with `value`, or with what it resolves to when it's a promise
+// (or another thenable, like a query builder).
+function then(value: unknown, cb: (value: unknown) => unknown): unknown {
+  return isPromise(value) ? Promise.resolve(value).then(cb) : cb(value);
 }
 
 class ReturnImmediatelyException {
@@ -1262,26 +1285,50 @@ function handleExecuteError(builder: QueryBuilder, err: unknown): Promise<unknow
   return promise;
 }
 
-function chainOperationHooks(
-  promise: Promise<unknown>,
-  builder: QueryBuilder,
-  hookName: HookName,
-): Promise<unknown> {
-  return promise.then((result) => {
-    let promise = Promise.resolve(result);
+// Calls the `hookName` hook of every operation that has one, in order, each
+// with the result of the previous one. The operations are collected when the
+// phase starts, so ones that hooks add only take part in later phases.
+function runOperationHooks(builder: QueryBuilder, hookName: HookName, result: unknown): unknown {
+  let operations: Operation[] | null = null;
 
-    builder.forEachOperation(true, (op) => {
-      if (op.hasHook(hookName)) {
-        promise = promise.then((result) => {
-          const res = builder.callAsyncOperationMethod(op, hookName, [builder, result]);
-          handleReturnImmediatelyValue(builder);
-          return res;
-        });
+  builder.forEachOperation(true, (op) => {
+    if (op.hasHook(hookName)) {
+      if (operations === null) {
+        operations = [op];
+      } else {
+        operations.push(op);
       }
-    });
-
-    return promise;
+    }
   });
+
+  if (operations === null) {
+    return result;
+  }
+
+  return runOperationHooksFrom(builder, operations, 0, hookName, result);
+}
+
+function runOperationHooksFrom(
+  builder: QueryBuilder,
+  operations: Operation[],
+  start: number,
+  hookName: HookName,
+  result: unknown,
+): unknown {
+  for (let i = start; i < operations.length; ++i) {
+    const res = builder.callMaybeAsyncOperationMethod(operations[i], hookName, [builder, result]);
+    handleReturnImmediatelyValue(builder);
+
+    if (isPromise(res)) {
+      return Promise.resolve(res).then((res) =>
+        runOperationHooksFrom(builder, operations, i + 1, hookName, res),
+      );
+    }
+
+    result = res;
+  }
+
+  return result;
 }
 
 function ensureJoinRelatedOperation(
@@ -1407,30 +1454,40 @@ function setDefaultSelect(builder: QueryBuilder, knexBuilder: KnexLike): KnexLik
 }
 
 // `func` is a function or an array of functions and arrays.
-async function chainHooks(
-  promise: Promise<unknown>,
-  builder: QueryBuilder,
-  func: unknown,
-): Promise<unknown> {
-  return promise.then((result) => {
-    let promise = Promise.resolve(result);
+// `func` is a hook function or an array of functions and arrays. The arrays are
+// read when they're reached, up to the length they have then.
+function runHooks(builder: QueryBuilder, func: unknown, result: unknown): unknown {
+  if (isFunction(func)) {
+    const res = (
+      func as (this: QueryBuilder, result: unknown, builder: QueryBuilder) => unknown
+    ).call(builder, result, builder);
+    handleReturnImmediatelyValue(builder);
+    return res;
+  } else if (Array.isArray(func) && func.length > 0) {
+    return runHooksFrom(builder, func, 0, func.length, result);
+  } else {
+    return result;
+  }
+}
 
-    if (isFunction(func)) {
-      promise = promise.then((result) => {
-        const res = (
-          func as (this: QueryBuilder, result: unknown, builder: QueryBuilder) => unknown
-        ).call(builder, result, builder);
-        handleReturnImmediatelyValue(builder);
-        return res;
-      });
-    } else if (Array.isArray(func)) {
-      func.forEach((func) => {
-        promise = chainHooks(promise, builder, func);
-      });
+function runHooksFrom(
+  builder: QueryBuilder,
+  funcs: unknown[],
+  start: number,
+  end: number,
+  result: unknown,
+): unknown {
+  for (let i = start; i < end; ++i) {
+    const res = runHooks(builder, funcs[i], result);
+
+    if (isPromise(res)) {
+      return Promise.resolve(res).then((res) => runHooksFrom(builder, funcs, i + 1, end, res));
     }
 
-    return promise;
-  });
+    result = res;
+  }
+
+  return result;
 }
 
 function createModels(result: unknown, builder: QueryBuilder): unknown {
