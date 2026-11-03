@@ -16,7 +16,8 @@ import type { ObjectionToKnexConvertingOperation } from '../operations/Objection
  *   update foo set bar = 1 where id in (select * from (select id from foo))
  */
 class WrapMysqlModifySubqueryTransformation extends QueryTransformation {
-  // In a join callback `parentQuery` is a `JoinBuilder`, which the loop below walks past.
+  // In a where group or a join callback `parentQuery` is a partial builder,
+  // which the loop below walks past.
   onConvertQueryBuilderBase(query: QueryBuilder, parentQuery: QueryBuilder | null): QueryBuilder {
     const knex = parentQuery!.unsafeKnex();
 
@@ -31,9 +32,14 @@ class WrapMysqlModifySubqueryTransformation extends QueryTransformation {
       return query;
     }
 
-    // A subquery in a join callback belongs to the query of the join.
-    while (parentQuery && typeof parentQuery.isUpdate !== 'function') {
-      // The loop stops at the first parent query that is a `QueryBuilder`.
+    // Subqueries in where groups and join clauses are converted with a
+    // partial builder (or a `JoinBuilder`) as their parent. Walk up to the
+    // query that they belong to.
+    while (
+      parentQuery &&
+      (typeof parentQuery.isUpdate !== 'function' ||
+        (parentQuery.isPartial() && parentQuery.parentQuery()))
+    ) {
       parentQuery = parentQuery.parentQuery() as QueryBuilder | null;
     }
 
