@@ -13,7 +13,7 @@ console.log(result.total); // --> 3341
 
 There are some cases where [page](/api/query-builder/other-methods.html#page) and [range](/api/query-builder/other-methods.html#range) don't work.
 
-1. In [modifyGraph](/api/query-builder/other-methods.html#modifygraph) or modifiers:
+1. In [modifyGraph](/api/query-builder/eager-methods.html#modifygraph) or modifiers:
 
 ```js
 // This doesn't work because the query `qb` fetches the
@@ -36,4 +36,14 @@ const result = await Person.query()
 const result = await Person.query()
   .withGraphJoined('children')
   .page(0, 10);
+```
+
+3. On delete queries:
+
+```js
+// postgres and SQLite: knex rejects a limit on a delete with
+// "Aborted query compilation: `limit` has no effect on a `delete` statement".
+// MySQL supports a limit on deletes, but not an offset. This deletes
+// the first 10 rows: delete from `persons` limit 10
+await Person.query().delete().page(2, 10);
 ```

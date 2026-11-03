@@ -1,6 +1,6 @@
 # Hooks
 
-Hooks are model methods that allow you too hook into different stages of objection queries. There are three different kinds of hooks
+Hooks are model methods that allow you to hook into different stages of objection queries. There are three different kinds of hooks
 
 1. [instance query hooks](#instance-query-hooks)
 2. [static query hooks](#static-query-hooks)
@@ -87,7 +87,7 @@ const arnold = await Person.query().findOne({ name: 'Arnold' });
 await arnold.$query().patch({ firstName: 'Jennifer' });
 ```
 
-Each instance hook is passed the [context](/api/query-builder/other-methods.html#context) object as the only argument. The context contains whatever data you have installed using either the [context](/api/query-builder/other-methods.html#context) or the [mergeContext](/api/query-builder/other-methods.html#mergecontext) method. In addition to that, it always contains the `transaction` property that holds the parent query's transaction.
+Each instance hook is passed the [context](/api/query-builder/other-methods.html#context) object as the only argument. The context contains whatever data you have installed using the [context](/api/query-builder/other-methods.html#context) method. In addition to that, it always contains the `transaction` property that holds the parent query's transaction.
 
 ```js
 class Person extends Model {
@@ -98,7 +98,7 @@ class Person extends Model {
 
 // This will print 'hello!'
 await Person.query()
-  .mergeContext({ hello: 'hello!' })
+  .context({ hello: 'hello!' })
   .patch({ firstName: 'Jennifer' })
   .where('id', 1);
 ```
@@ -188,7 +188,9 @@ The example above turns all delete queries into updates that set the `deleted` p
 You can also access the model instances for which the query is started, the input model instances and the relation. The next example should explain what each of them mean:
 
 ```js
-class Person extends Model {
+// Person, Movie and Animal extend BaseModel. The hooks of the
+// queried model run: Movie's for `movies`, Animal's for `pets`.
+class BaseModel extends Model {
   static beforeUpdate({ items, inputItems, relation }) {
     console.log('items:     ', items);
     console.log('inputItems:', inputItems);
@@ -219,9 +221,9 @@ await jennifer.$relatedQuery('movies').insert({ name: "We're the Millers" });
 
 await Person.relatedQuery('pets')
   .for([jennifer, brad])
-  .insert([{ name: 'Cato' }, { name: 'Doggo' }]);
+  .patch({ name: 'Doggo' });
 // items:      [{ id: 1, firstName: 'Jennifer' }, { id: 2, firstName: 'Brad' }]
-// inputItems: [{ name: 'Cato' }, { name: 'Doggo' }]
+// inputItems: [{ name: 'Doggo' }]
 // relation:   pets
 ```
 

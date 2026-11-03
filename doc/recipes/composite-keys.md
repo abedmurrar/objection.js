@@ -36,7 +36,7 @@ class Person extends Model {
   static get relationMappings() {
     return {
       pets: {
-        relation: Model.BelongsToOneRelation,
+        relation: Model.HasManyRelation,
         modelClass: Animal,
         join: {
           from: [

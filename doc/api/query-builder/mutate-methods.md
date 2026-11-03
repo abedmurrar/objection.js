@@ -13,9 +13,9 @@ the Promise is rejected with a [ValidationError](/api/types/#class-validationerr
 
 NOTE: The return value of the insert query _only_ contains the properties given to the insert
 method plus the identifier. This is because we don't make an additional fetch query after
-the insert. Using postgres you can chain [returning('\*')](/api/query-builder/find-methods.html#returning) to the query to get all
+the insert. On postgres and SQLite you can chain [returning('\*')](/api/query-builder/find-methods.html#returning) to the query to get all
 properties - see [this recipe](/recipes/returning-tricks.html) for some examples. If you use
-`returning(['only', 'some', 'props'])` note that the result object will still contain the input properies
+`returning(['only', 'some', 'props'])` note that the result object will still contain the input properties
 **plus** the properties listed in `returning`. On other databases you can use the [insertAndFetch](/api/query-builder/mutate-methods.html#insertandfetch) method.
 
 Batch inserts work on all databases. Postgres, SQL Server and SQLite return the
@@ -26,6 +26,8 @@ one multi-row insert consecutive ids, `@@auto_increment_increment` apart. On MyS
 - Set the id of either all rows or none of them. A batch where only some rows have an id
   fails before anything is inserted, because the ids of the other rows can't be known.
 - With `onConflict()`, rows can be skipped or updated, so the ids aren't set.
+
+See [Batch inserts](/fork/mysql.md#batch-inserts).
 
 ##### Arguments
 
@@ -99,7 +101,7 @@ queryBuilder = queryBuilder.insertAndFetch(modelsOrObjects);
 
 Just like [insert](/api/query-builder/mutate-methods.html#insert) but also fetches the item afterwards.
 
-Note that on postgresql you can just chain [returning('\*')](/api/query-builder/find-methods.html#returning) to the normal insert query to get the same result without an additional query. See [this recipe](/recipes/returning-tricks.html) for some examples.
+Note that on postgres and SQLite you can just chain [returning('\*')](/api/query-builder/find-methods.html#returning) to the normal insert query to get the same result without an additional query. See [this recipe](/recipes/returning-tricks.html) for some examples.
 
 ##### Arguments
 
@@ -120,6 +122,8 @@ queryBuilder = queryBuilder.insertGraph(graph, options);
 ```
 
 See the [section about graph inserts](/guide/query-examples.html#graph-inserts).
+
+On MySQL, graph writes run one query at a time by default. See [concurrency](/api/model/static-properties.html#static-concurrency).
 
 ##### Arguments
 
@@ -157,7 +161,7 @@ This generates an SQL `update` query. While there's also the [update](/api/query
 :::
 
 ::: warning
-[raw](/api/objection/#raw), [lit](/api/objection/#lit), subqueries and other "query properties" in the patch object are not validated. Also fields specified using [FieldExpressions](/api/types/#type-fieldexpression) are not validated.
+[raw](/api/objection/#raw), [val](/api/objection/#val), subqueries and other "query properties" in the patch object are not validated. Also fields specified using [FieldExpressions](/api/types/#type-fieldexpression) are not validated.
 :::
 
 ##### Arguments
@@ -216,6 +220,8 @@ await Person.query().patch({
   'detailsJsonColumn:address.street': 'Elm street'
 });
 ```
+
+Field expression keys work on postgres and MySQL, and throw on other databases. Only the given field changes, the rest of the JSON column is kept. If the column is `NULL`, the patch creates the object, or an array if the path starts with an index. See [JSON field expressions](/fork/mysql.md#json-field-expressions) and [Breaking changes](/fork/breaking-changes.md#patching-a-field-of-a-null-json-column-creates-the-object).
 
 ## patchAndFetchById()
 
@@ -324,7 +330,7 @@ await Person.query().update({
 });
 ```
 
-Updating single value inside json column and referring attributes inside json columns (only with postgres) etc.:
+Updating single value inside json column and referring attributes inside json columns (postgres and MySQL) etc.:
 
 ```js
 await Person.query().update({
@@ -397,7 +403,9 @@ console.log(updatedJennifer.firstName);
 queryBuilder = queryBuilder.upsertGraph(graph, options);
 ```
 
-See the [section about graph upserts](/guide/query-examples.html#graph-upserts)
+See the [section about graph upserts](/guide/query-examples.html#graph-upserts).
+
+On MySQL, graph writes run one query at a time by default. See [concurrency](/api/model/static-properties.html#static-concurrency).
 
 ::: warning
 WARNING!
@@ -440,6 +448,8 @@ The return value of the query will be the number of deleted rows. if you're usin
 and want to get the deleted rows, _take a look at [this recipe](/recipes/returning-tricks.html)_.
 
 Also see [deleteById](/api/query-builder/mutate-methods.html#deletebyid).
+
+`delete().limit(n)` only works on MySQL. knex rejects a limit on deletes on the other databases, and so does [page](/api/query-builder/other-methods.html#page) or [range](/api/query-builder/other-methods.html#range) on a delete query. See [Deletes with a limit](/fork/knex.md#deletes-with-a-limit).
 
 ##### Return value
 
@@ -492,6 +502,22 @@ await person
 await person.$relatedQuery('pets').delete();
 ```
 
+The where clauses you add are wrapped in parentheses, so an `orWhere()` can't delete the rows of other owners. See [Breaking changes](/fork/breaking-changes.md#orwhere-no-longer-escapes-the-conditions-objection-adds).
+
+## del()
+
+```js
+queryBuilder = queryBuilder.del();
+```
+
+The same as [delete](/api/query-builder/mutate-methods.html#delete).
+
+##### Return value
+
+| Type                                | Description                        |
+| ----------------------------------- | ---------------------------------- |
+| [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. |
+
 ## using()
 
 ```js
@@ -502,7 +528,7 @@ await Person.query()
   .where('pets.species', 'snake');
 ```
 
-postgres only. The tables a delete query can refer to: `delete from "persons" using "pets" where ...`. See [knex documentation](https://knexjs.org/guide/query-builder.html#using)
+postgres only. The tables a delete query can refer to: `delete from "persons" using "pets" where ...`. On other databases it throws. See [knex documentation](https://knexjs.org/guide/query-builder.html#using) and [knex methods](/fork/knex.md#new-methods).
 
 ##### Return value
 
@@ -559,7 +585,7 @@ Relate (attach) an existing item to another item through a relation.
 This method doesn't create a new item but only updates the foreign keys. In
 the case of a many-to-many relation, creates a join row to the join table.
 
-On Postgres multiple items can be related by giving an array of identifiers.
+For HasMany and ManyToMany relations, several items can be related at once by giving an array of identifiers. A ManyToMany relation can relate items to several owners at once only on postgres.
 
 The return value of the query is the number of affected items.
 
@@ -600,7 +626,7 @@ await actor.$relatedQuery('movies').relate(movie);
 ```
 
 ```sql
-insert into "persons_movies" ("personId", "movieId") values (100, 200)
+insert into "persons_movies" ("movieId", "personId") values (200, 100) returning "movieId"
 ```
 
 You can also pass the id `200` directly to `relate` instead of passing a model instance. A more objectiony way of doing this would be to utilize the static [relatedQuery](/api/model/static-methods.html#static-relatedquery) method:
@@ -612,10 +638,10 @@ await Person.relatedQuery('movies')
 ```
 
 ```sql
-insert into "persons_movies" ("personId", "movieId") values (100, 200)
+insert into "persons_movies" ("movieId", "personId") values (200, 100) returning "movieId"
 ```
 
-The next example four movies to the first person whose first name Arnold. Note that this query only works on Postgres because on other databases it would require multiple queries.
+The next example relates four movies to the first person whose first name is Arnold.
 
 ```js
 await Person.relatedQuery('movies')
@@ -630,15 +656,14 @@ await Person.relatedQuery('movies')
 The `relate` method returns the amount of affected rows.
 
 ```js
-const numRelatedRows = await person
-  .relatedQuery('movies')
+const numRelatedRows = await Person.relatedQuery('movies')
   .for(123)
   .relate(50);
 
 console.log('movie 50 is now related to person 123 through `movies` relation');
 ```
 
-Relate multiple (only works with postgres)
+Relate multiple:
 
 ```js
 const numRelatedRows = await Person.relatedQuery('movies')
@@ -713,10 +738,14 @@ await actor
 
 ```sql
 delete from "persons_movies"
-where "persons_movies"."personId" = 100
 where "persons_movies"."movieId" in (
-  select "movies"."id" from "movies" where "name" like 'Terminator%'
+  select "movies"."id"
+  from "movies"
+  inner join "persons_movies" on "movies"."id" = "persons_movies"."movieId"
+  where "persons_movies"."personId" in (100)
+  and "name" like 'Terminator%'
 )
+and "persons_movies"."personId" in (100)
 ```
 
 The same using the static [relatedQuery](/api/model/static-methods.html#static-relatedquery) method:
@@ -730,12 +759,14 @@ await Person.relatedQuery('movies')
 
 ```sql
 delete from "persons_movies"
-where "persons_movies"."personId" = 100
-and "persons_movies"."movieId" in (
+where "persons_movies"."movieId" in (
   select "movies"."id"
   from "movies"
-  where "name" like 'Terminator%'
+  inner join "persons_movies" on "movies"."id" = "persons_movies"."movieId"
+  where "persons_movies"."personId" in (100)
+  and "name" like 'Terminator%'
 )
+and "persons_movies"."personId" in (100)
 ```
 
 The next query removes all Terminator movies from Arnold Schwarzenegger:
@@ -757,16 +788,23 @@ await Person.relatedQuery('movies')
 
 ```sql
 delete from "persons_movies"
-where "persons_movies"."personId" in (
+where "persons_movies"."movieId" in (
+  select "movies"."id"
+  from "movies"
+  inner join "persons_movies" on "movies"."id" = "persons_movies"."movieId"
+  where "persons_movies"."personId" in (
+    select "persons"."id"
+    from "persons"
+    where "firstName" = 'Arnold'
+    and "lastName" = 'Schwarzenegger'
+  )
+  and "name" like 'Terminator%'
+)
+and "persons_movies"."personId" in (
   select "persons"."id"
   from "persons"
   where "firstName" = 'Arnold'
   and "lastName" = 'Schwarzenegger'
-)
-and "persons_movies"."movieId" in (
-  select "movies"."id"
-  from "movies"
-  where "name" like 'Terminator%'
 )
 ```
 
@@ -787,7 +825,16 @@ console.log(
 
 ## increment()
 
-See [knex documentation](https://knexjs.org/guide/query-builder.html#increment)
+```js
+queryBuilder = queryBuilder.increment(propertyName, amount);
+```
+
+Adds `amount` to a column. This is a [patch](/api/query-builder/mutate-methods.html#patch) query that sets the column to `column + amount`, so the result is the number of affected rows. Both arguments are required. Unlike knex's `increment()`, it doesn't take an object of columns.
+
+```js
+await Person.query().increment('age', 1).where('id', 1);
+// update "persons" set "age" = "age" + 1 where "id" = 1
+```
 
 ##### Return value
 
@@ -797,7 +844,11 @@ See [knex documentation](https://knexjs.org/guide/query-builder.html#increment)
 
 ## decrement()
 
-See [knex documentation](https://knexjs.org/guide/query-builder.html#decrement)
+```js
+queryBuilder = queryBuilder.decrement(propertyName, amount);
+```
+
+Subtracts `amount` from a column. Like [increment](/api/query-builder/mutate-methods.html#increment), this is a patch query.
 
 ##### Return value
 
@@ -819,6 +870,8 @@ See [knex documentation](https://knexjs.org/guide/query-builder.html#truncate)
 
 See [knex documentation](https://knexjs.org/guide/query-builder.html#onconflict)
 
+Use `insert(...).onConflict(columns).merge()` to upsert. It works on postgres, MySQL and SQLite. On MySQL it compiles to `on duplicate key update`, and the columns don't appear in the SQL. See [Upserts](/fork/knex.md#upserts).
+
 ##### Return value
 
 | Type                                | Description                        |
@@ -838,6 +891,8 @@ See [knex documentation](https://knexjs.org/guide/query-builder.html#ignore)
 ## merge()
 
 See [knex documentation](https://knexjs.org/guide/query-builder.html#merge)
+
+The keys of the merge object can be [field expressions](/api/types/#type-fieldexpression). Use [fn.excluded()](/fork/expressions.md#fn-excluded) for the value the upsert tried to insert. See [Upserts](/fork/knex.md#upserts).
 
 ##### Return value
 

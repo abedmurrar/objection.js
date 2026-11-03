@@ -183,6 +183,7 @@ export default defineConfig({
         'multitenancy-using-multiple-databases': 'Multitenancy using multiple databases',
         'default-values': 'Default values',
         'error-handling': 'Error handling',
+        plugins: 'TypeScript plugins',
         'ternary-relationships': 'Ternary relationships',
         'indexing-postgresql-jsonb-columns': 'Indexing PostgreSQL JSONB columns',
       }),

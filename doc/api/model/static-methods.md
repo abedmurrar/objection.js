@@ -14,9 +14,9 @@ See the [query examples](/guide/query-examples.html) section for more examples.
 
 #### Arguments
 
-| Argument          | Type   | Description                                                                                                                                                         |
-| ----------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| transactionOrKnex | object | Optional transaction or knex instance for the query. This can be used to specify a transaction or even a different database. for a query. Falsy values are ignored. |
+| Argument          | Type   | Description                                                                                                                                                        |
+| ----------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| transactionOrKnex | object | Optional transaction or knex instance for the query. This can be used to specify a transaction or even a different database for a query. Falsy values are ignored. |
 
 #### Return value
 
@@ -303,10 +303,10 @@ See the [transaction guide](/guide/transactions.html).
 
 ##### Arguments
 
-| Argument  | Type               | Description                                     |
-| --------- | ------------------ | ----------------------------------------------- |
-| callback  | function           |
-| trxOrKnex | knex or Transation | Optional existing transaction or knex instance. |
+| Argument  | Type                | Description                                                                                                                   |
+| --------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| trxOrKnex | knex or Transaction | Optional existing transaction or knex instance. Defaults to `Person.knex()`.                                                  |
+| callback  | function            | Called with the transaction. The transaction is committed when the returned promise resolves and rolled back when it rejects. |
 
 ##### Examples
 
@@ -339,15 +339,15 @@ try {
 const trx = await Person.startTransaction(trxOrKnex);
 ```
 
-Shortcut for `objection.transaction.start(Model1.knex())`.
+Shortcut for `objection.transaction.start(Person.knex())`.
 
 See the [transaction guide](/guide/transactions.html).
 
 ##### Arguments
 
-| Argument  | Type               | Description                                     |
-| --------- | ------------------ | ----------------------------------------------- |
-| trxOrKnex | knex or Transation | Optional existing transaction or knex instance. |
+| Argument  | Type                | Description                                     |
+| --------- | ------------------- | ----------------------------------------------- |
+| trxOrKnex | knex or Transaction | Optional existing transaction or knex instance. |
 
 ##### Examples
 
@@ -633,16 +633,16 @@ const BoundModel2 = SomeModel.bindKnex(knex2);
 await SomeModel.query();
 
 // Works.
-const models = await BoundModel1.query();
+const models1 = await BoundModel1.query();
 
-console.log(models[0] instanceof SomeModel); // --> true
-console.log(models[0] instanceof BoundModel1); // --> true
+console.log(models1[0] instanceof SomeModel); // --> true
+console.log(models1[0] instanceof BoundModel1); // --> true
 
 // Works.
-const models = await BoundModel2.query();
+const models2 = await BoundModel2.query();
 
-console.log(models[0] instanceof SomeModel); // --> true
-console.log(models[0] instanceof BoundModel2); // --> true
+console.log(models2[0] instanceof SomeModel); // --> true
+console.log(models2[0] instanceof BoundModel2); // --> true
 ```
 
 ## `static` bindTransaction()
@@ -843,7 +843,7 @@ to throw any error you want.
 | Argument     | Type   | Description                                                                                                               |
 | ------------ | ------ | ------------------------------------------------------------------------------------------------------------------------- |
 | queryContext | Object | The context object of query that produced the empty result. See [context](/api/query-builder/other-methods.html#context). |
-| props        | any    | Data passed to the error class constructor.
+| props        | any    | Data passed to the error class constructor.                                                                               |
 
 ##### Return value
 
@@ -937,7 +937,40 @@ const people = await Person.fetchGraph(
   }
 });
 
-console.log(people[1].children.pets[0]);
+console.log(people[1].children[0].pets[0]);
+```
+
+## `static` traverse()
+
+```js
+Person.traverse(filterConstructor, models, traverser);
+```
+
+Traverses the relation tree of a model instance (or a list of model instances) synchronously.
+
+Calls the callback for each related model recursively. The callback is called also for the input models themselves. The return value of the callback is ignored. Use [traverseAsync](/api/model/static-methods.html#static-traverseasync) for async callbacks.
+
+##### Arguments
+
+| Argument          | Type                                             | Description                                                                                                                                                                                                                                 |
+| ----------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| filterConstructor | function                                         | If this optional constructor is given, the `traverser` is only called for models for which `model instanceof filterConstructor` returns `true`.                                                                                               |
+| models            | [Model](/api/model/)&#124;[Model](/api/model/)[] | The model(s) whose relation trees to traverse.                                                                                                                                                                                              |
+| traverser         | function([Model](/api/model/), string, string)   | The traverser function that is called for each model. The first argument is the model itself. If the model is in a relation of some other model the second argument is the parent model and the third argument is the name of the relation. |
+
+##### Examples
+
+```js
+const people = await Person.query().withGraphFetched('pets');
+
+Model.traverse(people, (model, parentModel, relationName) => {
+  delete model.createdAt;
+});
+
+// Only called for the pets.
+Model.traverse(Animal, people, (animal) => {
+  animal.name = animal.name.trim();
+});
 ```
 
 ## `static` traverseAsync()
@@ -985,7 +1018,7 @@ Model.traverseAsync(
 Also works with a single model instance
 
 ```js
-const person = await Person.query();
+const person = await Person.query().findById(1);
 
 await Person.traverseAsync(person, async (model, parentModel, relationName) => {
   await doSomething(model);
@@ -1007,6 +1040,28 @@ This method is mainly useful for plugin developers and for other generic usages.
 | Type                                                              | Description                                                                                           |
 | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | Object&lt;string,&nbsp;[Relation](/api/types/#class-relation)&gt; | Object whose keys are relation names and values are [Relation](/api/types/#class-relation) instances. |
+
+## `static` getRelation()
+
+```js
+const relation = Person.getRelation('pets');
+```
+
+Returns the [Relation](/api/types/#class-relation) object of one relation defined in [relationMappings](/api/model/static-properties.html#static-relationmappings).
+
+Throws an error if the model has no relation with the given name.
+
+##### Arguments
+
+| Argument | Type   | Description               |
+| -------- | ------ | ------------------------- |
+| name     | string | The name of the relation. |
+
+##### Return value
+
+| Type                                    | Description          |
+| --------------------------------------- | -------------------- |
+| [Relation](/api/types/#class-relation) | The relation object. |
 
 ## `static` columnNameToPropertyName()
 
@@ -1133,7 +1188,7 @@ class Person extends Model {
 
 ## `static` raw()
 
-Shortcut for `Person.knex().raw(...args)`
+The [raw](/api/objection/#raw) helper of objection. `Person.raw(...)` is the same as `raw(...)` imported from `objection`. To get a knex raw builder, use `Person.knex().raw(...)`.
 
 ## `static` ref()
 
@@ -1172,9 +1227,19 @@ await Person.query().where(ref('firstName'), 'Jennifer');
 await Person.query().where(Person.ref('firstName'), 'Jennifer');
 ```
 
+Fields of JSON columns can be referenced with [field expressions](/api/types/#type-fieldexpression), on postgres and [MySQL](/fork/mysql.html#json-field-expressions):
+
+```js
+await Person.query().where(Person.ref('address:city').castText(), 'Helsinki');
+```
+
+`Model.ref()` also works in join callbacks. See [`Model.ref()` in join callbacks](/fork/joins.html#model-ref-in-join-callbacks).
+
+In TypeScript, `Model.ref()` only accepts the columns of the model, and the result carries the type of the column. See [`Model.ref()` checks columns](/fork/typescript.html#model-ref-checks-columns).
+
 ## `static` fn()
 
-Shortcut for `Person.knex().fn`
+The [fn](/api/objection/#fn) helper of objection. `Person.fn` is the same object as `fn` imported from `objection`, so `Person.fn.coalesce(...)` and `Person.fn('coalesce', ...)` work like `fn.coalesce(...)` and `fn('coalesce', ...)`.
 
 ## `static` knexQuery()
 

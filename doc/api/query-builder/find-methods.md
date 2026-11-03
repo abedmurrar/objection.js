@@ -40,6 +40,8 @@ await Person.query()
   .patch({ firstName: 'Jennifer' });
 ```
 
+The id condition isn't wrapped in parentheses, so `findById(1).orWhere('b', 2)` finds the rows where `id = 1 or b = 2`. Methods that add the id condition themselves, like `deleteById()`, wrap the other conditions. See [Breaking changes](/fork/breaking-changes.md#orwhere-no-longer-escapes-the-conditions-objection-adds).
+
 ## findByIds()
 
 ```js
@@ -289,6 +291,8 @@ See [knex documentation](https://knexjs.org/guide/query-builder.html#column)
 
 See [knex documentation](https://knexjs.org/guide/query-builder.html#from)
 
+The table can also be a model class, or an object like `{ p: Person }` that gives the model's table an alias. See [Joins and model classes](/fork/joins.md#model-classes-in-place-of-table-names).
+
 ##### Return value
 
 | Type                                | Description                        |
@@ -297,7 +301,7 @@ See [knex documentation](https://knexjs.org/guide/query-builder.html#from)
 
 ## fromRaw()
 
-See [knex documentation](https://knexjs.org/guide/query-builder.html#fromRaw)
+See [knex documentation](https://knexjs.org/guide/query-builder.html#fromraw)
 
 ##### Return value
 
@@ -308,6 +312,9 @@ See [knex documentation](https://knexjs.org/guide/query-builder.html#fromRaw)
 ## updateFrom()
 
 See [knex documentation](https://knexjs.org/guide/query-builder.html#updatefrom)
+
+Only works on postgres. See [knex methods](/fork/knex.md#new-methods) for an example.
+
 ##### Return value
 
 | Type                                | Description                        |
@@ -317,6 +324,8 @@ See [knex documentation](https://knexjs.org/guide/query-builder.html#updatefrom)
 ## into()
 
 See [knex documentation](https://knexjs.org/guide/query-builder.html)
+
+Takes a table name or a model class, like [from](/api/query-builder/find-methods.html#from).
 
 ##### Return value
 
@@ -354,6 +363,20 @@ See [knex documentation](https://knexjs.org/guide/query-builder.html#withnotmate
 | ----------------------------------- | ---------------------------------- |
 | [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. |
 
+## withRecursive()
+
+See [knex documentation](https://knexjs.org/guide/query-builder.html#withrecursive)
+
+##### Return value
+
+| Type                                | Description                        |
+| ----------------------------------- | ---------------------------------- |
+| [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. |
+
+## withWrapped()
+
+The same as [with](/api/query-builder/find-methods.html#with).
+
 ## withSchema()
 
 See [knex documentation](https://knexjs.org/guide/query-builder.html#withschema)
@@ -367,6 +390,8 @@ See [knex documentation](https://knexjs.org/guide/query-builder.html#withschema)
 ## table()
 
 See [knex documentation](https://knexjs.org/guide/query-builder.html)
+
+Takes a table name or a model class, like [from](/api/query-builder/find-methods.html#from).
 
 ##### Return value
 
@@ -442,6 +467,8 @@ See [knex documentation](https://knexjs.org/guide/query-builder.html#where)
 
 See [knex documentation](https://knexjs.org/guide/query-builder.html#where)
 
+The conditions objection adds itself, like the owner condition of `$relatedQuery()` or the id condition of `deleteById()`, are kept apart from yours with parentheses, so an `orWhere()` can't match rows outside them. See [Breaking changes](/fork/breaking-changes.md#orwhere-no-longer-escapes-the-conditions-objection-adds).
+
 ##### Return value
 
 | Type                                | Description                        |
@@ -467,6 +494,10 @@ See [knex documentation](https://knexjs.org/guide/query-builder.html#wherenot)
 | Type                                | Description                        |
 | ----------------------------------- | ---------------------------------- |
 | [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. |
+
+## andWhereNot()
+
+The same as [whereNot](/api/query-builder/find-methods.html#wherenot).
 
 ## whereRaw()
 
@@ -507,6 +538,10 @@ See [knex documentation](https://knexjs.org/guide/query-builder.html#whereraw)
 | Type                                | Description                        |
 | ----------------------------------- | ---------------------------------- |
 | [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. |
+
+## andWhereRaw()
+
+The same as [whereRaw](/api/query-builder/find-methods.html#whereraw).
 
 ## whereExists()
 
@@ -551,6 +586,8 @@ See [knex documentation](https://knexjs.org/guide/query-builder.html#wherenotexi
 ## whereIn()
 
 See [knex documentation](https://knexjs.org/guide/query-builder.html#wherein)
+
+The column can be an expression with bindings, like `whereIn(fn.lower(ref('name')), names)`. The same goes for `orWhereIn()`, `whereNotIn()` and `orWhereNotIn()`. See [Joins and model classes](/fork/joins.md#raw-columns-in-wherein).
 
 ##### Return value
 
@@ -668,6 +705,14 @@ See [knex documentation](https://knexjs.org/guide/query-builder.html#wherenotbet
 | ----------------------------------- | ---------------------------------- |
 | [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. |
 
+## andWhereBetween()
+
+The same as [whereBetween](/api/query-builder/find-methods.html#wherebetween).
+
+## andWhereNotBetween()
+
+The same as [whereNotBetween](/api/query-builder/find-methods.html#wherenotbetween).
+
 ## whereColumn()
 
 See [knex documentation](https://knexjs.org/guide/query-builder.html#where)
@@ -738,6 +783,14 @@ See [knex documentation](https://knexjs.org/guide/query-builder.html#wherelike)
 | ----------------------------------- | ---------------------------------- |
 | [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. |
 
+## andWhereLike()
+
+The same as [whereLike](/api/query-builder/find-methods.html#wherelike).
+
+## orWhereLike()
+
+See [whereLike](/api/query-builder/find-methods.html#wherelike)
+
 ## whereILike()
 
 See [knex documentation](https://knexjs.org/guide/query-builder.html#whereilike)
@@ -747,6 +800,14 @@ See [knex documentation](https://knexjs.org/guide/query-builder.html#whereilike)
 | Type                                | Description                        |
 | ----------------------------------- | ---------------------------------- |
 | [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. |
+
+## andWhereILike()
+
+The same as [whereILike](/api/query-builder/find-methods.html#whereilike).
+
+## orWhereILike()
+
+See [whereILike](/api/query-builder/find-methods.html#whereilike)
 
 ## groupBy()
 
@@ -818,6 +879,15 @@ See [knex documentation](https://knexjs.org/guide/query-builder.html#intersect)
 | ----------------------------------- | ---------------------------------- |
 | [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. |
 
+## except()
+
+See [knex documentation](https://knexjs.org/guide/query-builder.html#except)
+
+##### Return value
+
+| Type                                | Description                        |
+| ----------------------------------- | ---------------------------------- |
+| [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. |
 
 ## having()
 
@@ -859,9 +929,121 @@ See [knex documentation](https://knexjs.org/guide/query-builder.html#havingraw)
 | ----------------------------------- | ---------------------------------- |
 | [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. |
 
+## havingIn()
+
+See [knex documentation](https://knexjs.org/guide/query-builder.html#havingin)
+
+##### Return value
+
+| Type                                | Description                        |
+| ----------------------------------- | ---------------------------------- |
+| [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. |
+
+## orHavingIn()
+
+See [havingIn](/api/query-builder/find-methods.html#havingin). Adds the condition with `or`. In objection 3.1.5 it was added with `and`. See [knex methods](/fork/knex.md#new-methods).
+
+## havingNotIn()
+
+See [knex documentation](https://knexjs.org/guide/query-builder.html#havingnotin)
+
+##### Return value
+
+| Type                                | Description                        |
+| ----------------------------------- | ---------------------------------- |
+| [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. |
+
+## orHavingNotIn()
+
+See [havingNotIn](/api/query-builder/find-methods.html#havingnotin).
+
+## havingNull()
+
+See [knex documentation](https://knexjs.org/guide/query-builder.html#havingnull)
+
+##### Return value
+
+| Type                                | Description                        |
+| ----------------------------------- | ---------------------------------- |
+| [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. |
+
+## orHavingNull()
+
+See [havingNull](/api/query-builder/find-methods.html#havingnull).
+
+## havingNotNull()
+
+See [knex documentation](https://knexjs.org/guide/query-builder.html#havingnotnull)
+
+##### Return value
+
+| Type                                | Description                        |
+| ----------------------------------- | ---------------------------------- |
+| [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. |
+
+## orHavingNotNull()
+
+See [havingNotNull](/api/query-builder/find-methods.html#havingnotnull).
+
+## havingExists()
+
+See [knex documentation](https://knexjs.org/guide/query-builder.html#havingexists)
+
+##### Return value
+
+| Type                                | Description                        |
+| ----------------------------------- | ---------------------------------- |
+| [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. |
+
+## orHavingExists()
+
+See [havingExists](/api/query-builder/find-methods.html#havingexists).
+
+## havingNotExists()
+
+See [knex documentation](https://knexjs.org/guide/query-builder.html#havingnotexists)
+
+##### Return value
+
+| Type                                | Description                        |
+| ----------------------------------- | ---------------------------------- |
+| [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. |
+
+## orHavingNotExists()
+
+See [havingNotExists](/api/query-builder/find-methods.html#havingnotexists).
+
+## havingBetween()
+
+See [knex documentation](https://knexjs.org/guide/query-builder.html#havingbetween)
+
+##### Return value
+
+| Type                                | Description                        |
+| ----------------------------------- | ---------------------------------- |
+| [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. |
+
+## orHavingBetween()
+
+See [havingBetween](/api/query-builder/find-methods.html#havingbetween). Adds the condition with `or`. In objection 3.1.5 it was added with `and`. See [knex methods](/fork/knex.md#new-methods).
+
+## havingNotBetween()
+
+See [knex documentation](https://knexjs.org/guide/query-builder.html#havingnotbetween)
+
+##### Return value
+
+| Type                                | Description                        |
+| ----------------------------------- | ---------------------------------- |
+| [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. |
+
+## orHavingNotBetween()
+
+See [havingNotBetween](/api/query-builder/find-methods.html#havingnotbetween). Adds the condition with `or`. In objection 3.1.5 it was added with `and`. See [knex methods](/fork/knex.md#new-methods).
+
 ## andHaving()
 
-The same as [having](/api/query-builder/find-methods.html#having). There are also `andHavingIn()`, `andHavingNotIn()`, `andHavingNull()`, `andHavingNotNull()`, `andHavingExists()`, `andHavingNotExists()`, `andHavingBetween()` and `andHavingNotBetween()`.
+The same as [having](/api/query-builder/find-methods.html#having). There are also `andHavingIn()`, `andHavingNotIn()`, `andHavingNull()`, `andHavingNotNull()`, `andHavingExists()`, `andHavingNotExists()`, `andHavingBetween()` and `andHavingNotBetween()`, which are the same as the methods without `and`. See [knex methods](/fork/knex.md#new-methods).
 
 ##### Return value
 
@@ -895,7 +1077,7 @@ Removes the `having` calls of the query, including `havingIn`, `orHaving` and th
 queryBuilder = queryBuilder.comment('monthly report');
 ```
 
-Adds an SQL comment before the query: `/* monthly report */ select ...`. See [knex documentation](https://knexjs.org/guide/query-builder.html#comment)
+Adds an SQL comment before the query: `/* monthly report */ select ...`. See [knex documentation](https://knexjs.org/guide/query-builder.html#comment) and [knex methods](/fork/knex.md#new-methods).
 
 ##### Return value
 
@@ -909,7 +1091,7 @@ Adds an SQL comment before the query: `/* monthly report */ select ...`. See [kn
 queryBuilder = queryBuilder.hintComment(['NO_ICP(persons)']);
 ```
 
-Adds optimizer hints to the query: `select /*+ NO_ICP(persons) */ ...`. See [knex documentation](https://knexjs.org/guide/query-builder.html#hintcomment)
+Adds optimizer hints to the query: `select /*+ NO_ICP(persons) */ ...`. MySQL and Oracle use the hints. Other databases read them as plain comments. Takes a string or an array of strings. See [knex documentation](https://knexjs.org/guide/query-builder.html#hintcomment) and [knex methods](/fork/knex.md#new-methods).
 
 ##### Return value
 
@@ -989,6 +1171,16 @@ See [knex documentation](https://knexjs.org/guide/query-builder.html#sum)
 | ----------------------------------- | ---------------------------------- |
 | [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. |
 
+## sumDistinct()
+
+See [knex documentation](https://knexjs.org/guide/query-builder.html#sum)
+
+##### Return value
+
+| Type                                | Description                        |
+| ----------------------------------- | ---------------------------------- |
+| [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. |
+
 ## avg()
 
 See [knex documentation](https://knexjs.org/guide/query-builder.html#avg)
@@ -1013,6 +1205,8 @@ See [knex documentation](https://knexjs.org/guide/query-builder.html#avg)
 
 See [knex documentation](https://knexjs.org/guide/query-builder.html#returning)
 
+MySQL has no `returning()`. knex ignores it there with a warning.
+
 ##### Return value
 
 | Type                                | Description                        |
@@ -1021,13 +1215,19 @@ See [knex documentation](https://knexjs.org/guide/query-builder.html#returning)
 
 ## columnInfo()
 
+```js
+const info = await Person.query().columnInfo();
+```
+
 See [knex documentation](https://knexjs.org/guide/query-builder.html#columninfo)
+
+Returns the column info of the model's table, not this query builder. Calls made on the query builder before `columnInfo()` don't affect it, except `withSchema()` and `debug()`.
 
 ##### Return value
 
-| Type                                | Description                        |
-| ----------------------------------- | ---------------------------------- |
-| [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. |
+| Type               | Description                                                                     |
+| ------------------ | ------------------------------------------------------------------------------- |
+| knex query builder | A separate knex query. Await it to get an object keyed by the column names. |
 
 ## whereComposite()
 
@@ -1094,6 +1294,20 @@ builder.whereInComposite('a', [1, 3, 1]);
 builder.whereInComposite(['a', 'b'], SomeModel.query().select('a', 'b'));
 ```
 
+## whereNotInComposite()
+
+```js
+queryBuilder = queryBuilder.whereNotInComposite(columns, values);
+```
+
+[whereNotIn](/api/query-builder/find-methods.html#wherenotin) for (possibly) composite keys. Takes the same arguments as [whereInComposite](/api/query-builder/find-methods.html#whereincomposite).
+
+##### Return value
+
+| Type                                | Description                        |
+| ----------------------------------- | ---------------------------------- |
+| [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. |
+
 ## jsonExtract()
 
 See [knex documentation](https://knexjs.org/guide/query-builder.html#jsonextract)
@@ -1144,6 +1358,14 @@ See [knex documentation](https://knexjs.org/guide/query-builder.html#wherejsonob
 | ----------------------------------- | ---------------------------------- |
 | [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. |
 
+## orWhereJsonObject()
+
+See [whereJsonObject](/api/query-builder/find-methods.html#wherejsonobject)
+
+## andWhereJsonObject()
+
+The same as [whereJsonObject](/api/query-builder/find-methods.html#wherejsonobject).
+
 ## whereNotJsonObject()
 
 See [knex documentation](https://knexjs.org/guide/query-builder.html#wherejsonobject)
@@ -1154,6 +1376,14 @@ See [knex documentation](https://knexjs.org/guide/query-builder.html#wherejsonob
 | ----------------------------------- | ---------------------------------- |
 | [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. |
 
+## orWhereNotJsonObject()
+
+See [whereNotJsonObject](/api/query-builder/find-methods.html#wherenotjsonobject)
+
+## andWhereNotJsonObject()
+
+The same as [whereNotJsonObject](/api/query-builder/find-methods.html#wherenotjsonobject).
+
 ## whereJsonPath()
 
 See [knex documentation](https://knexjs.org/guide/query-builder.html#wherejsonpath)
@@ -1163,6 +1393,14 @@ See [knex documentation](https://knexjs.org/guide/query-builder.html#wherejsonpa
 | Type                                | Description                        |
 | ----------------------------------- | ---------------------------------- |
 | [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. |
+
+## orWhereJsonPath()
+
+See [whereJsonPath](/api/query-builder/find-methods.html#wherejsonpath)
+
+## andWhereJsonPath()
+
+The same as [whereJsonPath](/api/query-builder/find-methods.html#wherejsonpath).
 
 ## whereJsonSupersetOf()
 
@@ -1175,7 +1413,7 @@ queryBuilder = queryBuilder.whereJsonSupersetOf(
 
 Where left hand json field reference is a superset of the right hand json value or reference.
 
-Works on postgres (`@>`) and MySQL (`JSON_CONTAINS()`). Like on postgres, an object is only contained in an object on MySQL too: `whereJsonSupersetOf('arrayColumn', { a: 1 })` doesn't find `[{ "a": 1 }]`. Below the top level MySQL's rules apply, which also find objects inside arrays.
+Works on postgres (`@>`) and MySQL (`JSON_CONTAINS()`), and throws on other databases. Like on postgres, an object is only contained in an object on MySQL too: `whereJsonSupersetOf('arrayColumn', { a: 1 })` doesn't find `[{ "a": 1 }]`. Below the top level MySQL's rules apply, which also find objects inside arrays. See [MySQL](/fork/mysql.md#the-wherejson-methods).
 
 ##### Arguments
 
@@ -1221,7 +1459,7 @@ For arrays this means that left side matches if it has all the elements listed i
 [1,2,3] isSuperSetOf [] => true
 ```
 
-The `not` variants with jsonb operators behave in a way that they won't match rows, which don't have the referred json key referred in field expression. e.g. for table
+`whereJsonNotSupersetOf()` and `whereJsonNotSubsetOf()` don't match rows where a field in the comparison is missing or `NULL`. For example, for the table
 
 ```
  id |    jsonObject
@@ -1230,24 +1468,32 @@ The `not` variants with jsonb operators behave in a way that they won't match ro
   2 | NULL
   3 | {"a": 1}
   4 | {"a": 1, "b": 2}
-  5 | {"a": ['3'], "b": ['3']}
+  5 | {"a": ["3"], "b": ["3"]}
 ```
 
 this query:
 
 ```js
-builder.whereJsonNotEquals('jsonObject:a', 'jsonObject:b');
+builder.whereJsonNotSupersetOf('jsonObject:a', 'jsonObject:b');
 ```
 
-Returns only the row `4` which has keys `a` and `b` and `a` != `b`, but it won't return any rows that don't have `jsonObject.a` or `jsonObject.b`.
+returns only the row `4`, which has the keys `a` and `b`, and `a` doesn't contain `b`. It doesn't return the rows that don't have `jsonObject.a` or `jsonObject.b`.
 
 ## orWhereJsonSupersetOf()
 
 See [whereJsonSupersetOf](/api/query-builder/find-methods.html#wherejsonsupersetof)
 
+## andWhereJsonSupersetOf()
+
+The same as [whereJsonSupersetOf](/api/query-builder/find-methods.html#wherejsonsupersetof).
+
 ## whereJsonNotSupersetOf()
 
 See [whereJsonSupersetOf](/api/query-builder/find-methods.html#wherejsonsupersetof)
+
+## andWhereJsonNotSupersetOf()
+
+The same as [whereJsonNotSupersetOf](/api/query-builder/find-methods.html#wherejsonnotsupersetof).
 
 ## orWhereJsonNotSupersetOf()
 
@@ -1264,16 +1510,16 @@ queryBuilder = queryBuilder.whereJsonSubsetOf(
 
 Where left hand json field reference is a subset of the right hand json value or reference.
 
-Object and array are always their own subsets.
+Object and array are always their own subsets. Works on postgres and MySQL, and throws on other databases.
 
 See [whereJsonSupersetOf](/api/query-builder/find-methods.html#wherejsonsupersetof)
 
 ##### Arguments
 
-| Argument                    | Type                                                                                               | Description                                                            |
-| --------------------------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| fieldExpression             | [FieldExpression](/api/types/#type-fieldexpression)                                                | Reference to column / json field, which is tested for being a superset |
-| jsonObjectOrFieldExpression | Object&nbsp;&#124;&nbsp;Array&nbsp;&#124;&nbsp;[FieldExpression](/api/types/#type-fieldexpression) | To which to compare                                                    |
+| Argument                    | Type                                                                                               | Description                                                          |
+| --------------------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| fieldExpression             | [FieldExpression](/api/types/#type-fieldexpression)                                                | Reference to column / json field, which is tested for being a subset |
+| jsonObjectOrFieldExpression | Object&nbsp;&#124;&nbsp;Array&nbsp;&#124;&nbsp;[FieldExpression](/api/types/#type-fieldexpression) | To which to compare                                                  |
 
 ##### Return value
 
@@ -1285,9 +1531,17 @@ See [whereJsonSupersetOf](/api/query-builder/find-methods.html#wherejsonsuperset
 
 See [whereJsonSubsetOf](/api/query-builder/find-methods.html#wherejsonsubsetof)
 
+## andWhereJsonSubsetOf()
+
+The same as [whereJsonSubsetOf](/api/query-builder/find-methods.html#wherejsonsubsetof).
+
 ## whereJsonNotSubsetOf()
 
 See [whereJsonSubsetOf](/api/query-builder/find-methods.html#wherejsonsubsetof)
+
+## andWhereJsonNotSubsetOf()
+
+The same as [whereJsonNotSubsetOf](/api/query-builder/find-methods.html#wherejsonnotsubsetof).
 
 ## orWhereJsonNotSubsetOf()
 
@@ -1299,7 +1553,7 @@ See [whereJsonSubsetOf](/api/query-builder/find-methods.html#wherejsonsubsetof)
 queryBuilder = queryBuilder.whereJsonIsArray(fieldExpression);
 ```
 
-Where json field reference is an array.
+Where json field reference is an array. Works on postgres and MySQL, and throws on other databases.
 
 ##### Arguments
 
@@ -1319,7 +1573,7 @@ See [whereJsonIsArray](/api/query-builder/find-methods.html#wherejsonisarray)
 
 ## whereJsonNotArray()
 
-See [whereJsonIsArray](/api/query-builder/find-methods.html#wherejsonisarray)
+Where json field reference isn't an array. A `NULL` or missing field isn't an array, so those rows are found too. See [whereJsonIsArray](/api/query-builder/find-methods.html#wherejsonisarray)
 
 ## orWhereJsonNotArray()
 
@@ -1331,7 +1585,7 @@ See [whereJsonIsArray](/api/query-builder/find-methods.html#wherejsonisarray)
 queryBuilder = queryBuilder.whereJsonIsObject(fieldExpression);
 ```
 
-Where json field reference is an object.
+Where json field reference is an object. Works on postgres and MySQL, and throws on other databases.
 
 ##### Arguments
 
@@ -1351,7 +1605,7 @@ See [whereJsonIsObject](/api/query-builder/find-methods.html#wherejsonisobject)
 
 ## whereJsonNotObject()
 
-See [whereJsonIsObject](/api/query-builder/find-methods.html#wherejsonisobject)
+Where json field reference isn't an object. A `NULL` or missing field isn't an object, so those rows are found too. See [whereJsonIsObject](/api/query-builder/find-methods.html#wherejsonisobject)
 
 ## orWhereJsonNotObject()
 
@@ -1363,7 +1617,7 @@ See [whereJsonIsObject](/api/query-builder/find-methods.html#wherejsonisobject)
 queryBuilder = queryBuilder.whereJsonHasAny(fieldExpression, keys);
 ```
 
-Where any of given strings is found from json object keys, the string items of an array, or a string.
+Where any of given strings is found from json object keys, the string items of an array, or a string. Works on postgres and MySQL, and throws on other databases.
 
 ::: tip
 Only the string items of arrays are matched. To check if an array contains an item of another type, use [whereJsonSupersetOf](/api/query-builder/find-methods.html#wherejsonsupersetof) with an array: `whereJsonSupersetOf('numbers', [1])`.
@@ -1392,7 +1646,7 @@ See [whereJsonHasAny](/api/query-builder/find-methods.html#wherejsonhasany)
 queryBuilder = queryBuilder.whereJsonHasAll(fieldExpression, keys);
 ```
 
-Where all of given strings are found from json object keys, the string items of an array, or a string.
+Where all of given strings are found from json object keys, the string items of an array, or a string. Works on postgres and MySQL, and throws on other databases.
 
 ::: tip
 Only the string items of arrays are matched. To check if an array contains items of another type, use [whereJsonSupersetOf](/api/query-builder/find-methods.html#wherejsonsupersetof) with an array: `whereJsonSupersetOf('numbers', [1, 2])`.
@@ -1424,14 +1678,14 @@ queryBuilder = queryBuilder.whereJsonOverlaps(
 );
 ```
 
-MySQL only. Where the json field and the json value or reference overlap: two arrays share an item, two objects share a key and value, or an array contains a scalar. Uses `JSON_OVERLAPS()`, which can use multi-valued indexes.
+MySQL only. Where the json field and the json value or reference overlap: two arrays share an item, two objects share a key and value, or an array contains a scalar. Uses `JSON_OVERLAPS()`, which can use multi-valued indexes. On postgres it throws `whereJsonOverlaps is only supported on mysql.`, and on MariaDB it needs 10.9 or newer. See [MySQL](/fork/mysql.md#wherejsonoverlaps-and-wherejsonnotoverlaps).
 
 ##### Arguments
 
-| Argument                    | Type                                                                                               | Description           |
-| --------------------------- | -------------------------------------------------------------------------------------------------- | --------------------- |
-| fieldExpression             | [FieldExpression](/api/types/#type-fieldexpression)                                                | Reference to a field  |
-| jsonObjectOrFieldExpression | Object&nbsp;&#124;&nbsp;Array&nbsp;&#124;&nbsp;[FieldExpression](/api/types/#type-fieldexpression) | To which to compare   |
+| Argument                    | Type                                                                                               | Description          |
+| --------------------------- | -------------------------------------------------------------------------------------------------- | -------------------- |
+| fieldExpression             | [FieldExpression](/api/types/#type-fieldexpression)                                                | Reference to a field |
+| jsonObjectOrFieldExpression | Object&nbsp;&#124;&nbsp;Array&nbsp;&#124;&nbsp;[FieldExpression](/api/types/#type-fieldexpression) | To which to compare  |
 
 ##### Return value
 
@@ -1449,6 +1703,10 @@ const jobs = await Job.query().whereJsonOverlaps('attributes:countryCodes', ['FI
 
 See [whereJsonOverlaps](/api/query-builder/find-methods.html#wherejsonoverlaps)
 
+## andWhereJsonOverlaps()
+
+The same as [whereJsonOverlaps](/api/query-builder/find-methods.html#wherejsonoverlaps).
+
 ## whereJsonNotOverlaps()
 
 MySQL only. The negation of [whereJsonOverlaps](/api/query-builder/find-methods.html#wherejsonoverlaps). A NULL or missing field doesn't overlap anything, so rows without the field are found.
@@ -1457,6 +1715,10 @@ MySQL only. The negation of [whereJsonOverlaps](/api/query-builder/find-methods.
 // Jobs that aren't restricted to any of the countries.
 const jobs = await Job.query().whereJsonNotOverlaps('attributes:countryCodes', ['FI', 'SE']);
 ```
+
+## andWhereJsonNotOverlaps()
+
+The same as [whereJsonNotOverlaps](/api/query-builder/find-methods.html#wherejsonnotoverlaps).
 
 ## orWhereJsonNotOverlaps()
 

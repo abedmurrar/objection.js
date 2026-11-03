@@ -9,16 +9,20 @@ This page contains the documentation of all other types and classes than [Model]
 1. `type`: A type is just a POJO (Plain Old Javascript Object) with a set of properties.
 2. `class`: A class is a JavaScript class with properties and methods.
 
+The TypeScript-only types are listed in [TypeScript types](#typescript-types) at the end of the page.
+
 ## `type` RelationMapping
 
 | Property     | Type                                                                                               | Description                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | ------------ | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | relation     | function                                                                                           | The relation type. One of `Model.BelongsToOneRelation`, `Model.HasOneRelation`, `Model.HasManyRelation`, `Model.ManyToManyRelation` and `Model.HasOneThroughRelation`.                                                                                                                                                                                                                                                             |
-| modelClass   | [Model](/api/model/)<br>string                                                                     | Constructor of the related model class, an absolute path to a module that exports one or a path relative to [modelPaths](/api/model/static-properties.html#static-modelpaths) that exports a model class.                                                                                                                                                                                                                          |
+| modelClass   | [Model](/api/model/)<br>function<br>string                                                         | Constructor of the related model class, a function that returns one, an absolute path to a module that exports one or a path relative to [modelPaths](/api/model/static-properties.html#static-modelpaths) that exports a model class.                                                                                                                                                                                             |
 | join         | [RelationJoin](/api/types/#type-relationjoin)                                                      | Describes how the models are related to each other. See [RelationJoin](/api/types/#type-relationjoin).                                                                                                                                                                                                                                                                                                                             |
 | modify       | function([QueryBuilder](/api/query-builder/))<br>string<br>object                                  | Optional modifier for the relation query. If specified as a function, it will be called each time before fetching the relation. If specified as a string, modifier with specified name will be applied each time when fetching the relation. If specified as an object, it will be used as an additional query parameter - e. g. passing {name: 'Jenny'} would additionally narrow fetched rows to the ones with the name 'Jenny'. |
 | filter       | function([QueryBuilder](/api/query-builder/))<br>string<br>object                                  | Alias for modify.                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | beforeInsert | function([Model](/api/model/),&nbsp;[QueryContext](/api/query-builder/other-methods.html#context)) | Optional insert hook that is called for each inserted model instance. This function can be async.                                                                                                                                                                                                                                                                                                                                  |
+
+In TypeScript, the types of the relation properties are inferred from the mappings when `relationMappings` has no type annotation. Wrap them in [defineRelations()](/api/objection/#definerelations) to also keep the names of `extra` columns. See [Relations inferred from `relationMappings`](/fork/typescript.html#relations-inferred-from-relationmappings).
 
 ## `type` RelationJoin
 
@@ -106,6 +110,7 @@ This page contains the documentation of all other types and classes than [Model]
 | -------- | ------------------- | ----------------------------------------------------------- |
 | table    | string              | A custom table name. If not given, Model.tableName is used. |
 | knex     | knex<br>Transaction | A knex instance or a transaction                            |
+| force    | boolean             | If `true`, the metadata is fetched again even if it's cached. |
 
 ## `type` TableMetadataOptions
 
@@ -128,13 +133,14 @@ This page contains the documentation of all other types and classes than [Model]
 | asFindQuery | ()&nbsp;=>&nbsp;[QueryBuilder](/api/query-builder/) | A function that returns a query builder that can be used to fetch the items that were/would get affected by the query being executed. Modifying this query builder doesn't affect the query being executed. For example calling `await asFindQuery().select('id')` in a `beforeDelete` hook would get you the identifiers of all the items that will get deleted by the query. This query is automatically executed inside any existing transaction. This query builder always returns an array even if the query being executed would return an object, a number or something else. |
 | transaction | knex<br>Transaction                                 | If the query being executed has a transaction, this property will contain it. Otherwise this holds the knex instance installed for the query. Either way, this can and should be passed to any queries executed in the static hooks.                                                                                                                                                                                                                                                                                                                                                 |
 | context     | object                                              | The context of the query. See [context](/api/query-builder/other-methods.html#context).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| modelOptions | [ModelOptions](#type-modeloptions)                 | The model options of an insert, update or patch query, like `{ patch: true }` for a patch. `undefined` for other queries.                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | relation    | [Relation](#class-relation)                         | If the query is for a relation, this property holds the [Relation](#class-relation) object. For example when you call `person.$relatedQuery('pets)` or `Person.relatedQuery('movies')` the `relation` will be a relation object for pets and movies relation of `Person` respectively.                                                                                                                                                                                                                                                                                               |
 | cancelQuery | function(any)                                       | Cancels the query being executed. You can pass an arugment for the function and that value will be the result of the query.                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | result      | any[]                                               | The result of the query. Only available in `after*` hooks.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 
 ## `type` FieldExpression
 
-Field expressions are strings that allow you to refer to fields inside JSON columns. They work on postgres (`jsonb` columns) and MySQL (`json` columns).
+Field expressions are strings that allow you to refer to fields inside JSON columns. They work on postgres (`jsonb` columns) and MySQL (`json` columns). On other databases they throw an error. The keys are escaped, so a key can't change the SQL. See [JSON field expression keys are escaped](/fork/breaking-changes.html#security-json-field-expression-keys-are-escaped).
 
 Syntax: `<column reference>[:<json field reference>]`
 
@@ -147,13 +153,13 @@ Second part describes a path to an attribute inside the referred column. It is o
 
 Syntax supports `[<key or index>]` and `.<key or index>` flavors of reference to json keys / array indexes:
 
-e.g. both `Table.myColumn:[1][3]` and `Table.myColumn:1.3` would access correctly both of the following objects `[null, [null,null,null, "I was accessed"]]` and `{ "1": { "3" : "I was accessed" } }`
+e.g. on postgres both `Table.myColumn:[1][3]` and `Table.myColumn:1.3` would access correctly both of the following objects `[null, [null,null,null, "I was accessed"]]` and `{ "1": { "3" : "I was accessed" } }`. On MySQL, `[1]` only accesses an array item and `.1` only an object key.
 
 Caveats when using special characters in keys:
 
 1. `objectColumn.key` This is the most common syntax, good if you are not using dots or square brackets `[]` in your json object key name.
 2. Keys containing dots `objectColumn:[keywith.dots]` Column `{ "keywith.dots" : "I was referred" }`
-3. Keys containing square brackets `column['[]']` `{ "[]" : "This is getting ridiculous..." }`
+3. Keys containing square brackets `objectColumn:['[]']` `{ "[]" : "This is getting ridiculous..." }`
 4. Keys containing square brackets and quotes `objectColumn:['Double."Quote".[]']` and `objectColumn:["Sinlge.'Quote'.[]"]` Column `{ "Double.\"Quote\".[]" : "I was referred", "Sinlge.'Quote'.[]" : "Mee too!" }`
 5. Keys containing dots, square brackets, single quotes and double quotes in one json key is not currently supported
 
@@ -255,7 +261,7 @@ const people = await Person.query().withGraphFetched(
 console.log(people[0].children[0].movies[0].actors[0].pets[0].name);
 ```
 
-Relation expressions can have arguments. Arguments are used to refer to modifier functions (either [global](/api/model/static-properties.html#static-modifiers) or [local](/api/query-builder/other-methods.md#modifiers). Arguments are listed in parenthesis after the relation names like this:
+Relation expressions can have arguments. Arguments are used to refer to modifier functions (either [global](/api/model/static-properties.html#static-modifiers) or [local](/api/query-builder/other-methods.md#modifiers)). Arguments are listed in parenthesis after the relation names like this:
 
 ```js
 Person.query().withGraphFetched(
@@ -302,7 +308,7 @@ The string expression in the comment is equivalent to the object expression belo
 ```js
 // `children`
 {
-  children: true;
+  children: true
 }
 ```
 
@@ -310,7 +316,7 @@ The string expression in the comment is equivalent to the object expression belo
 // `children.movies`
 {
   children: {
-    movies: true;
+    movies: true
   }
 }
 ```
@@ -318,8 +324,8 @@ The string expression in the comment is equivalent to the object expression belo
 ```js
 // `[children, pets]`
 {
-  children: true;
-  pets: true;
+  children: true,
+  pets: true
 }
 ```
 
@@ -329,7 +335,7 @@ The string expression in the comment is equivalent to the object expression belo
   children: {
     movies: true,
     pets: true
-  }
+  },
   pets: true
 }
 ```
@@ -338,7 +344,7 @@ The string expression in the comment is equivalent to the object expression belo
 // `parent.^`
 {
   parent: {
-    $recursive: true;
+    $recursive: true
   }
 }
 ```
@@ -347,7 +353,7 @@ The string expression in the comment is equivalent to the object expression belo
 // `parent.^5`
 {
   parent: {
-    $recursive: 5;
+    $recursive: 5
   }
 }
 ```
@@ -356,7 +362,7 @@ The string expression in the comment is equivalent to the object expression belo
 // `parent.*`
 {
   parent: {
-    $allRecursive: true;
+    $allRecursive: true
   }
 }
 ```
@@ -407,7 +413,7 @@ const { ValidationError } = require('objection');
 throw new ValidationError({ type, message, data });
 ```
 
-For each `key`, a list of errors is given. Each error contains the default `message` (as returned by the validator), an optional `keyword` string to identify the validation rule which didn't pass and a `param` object which optionally contains more details about the context of the validation error.
+For each `key`, a list of errors is given. Each error contains the default `message` (as returned by the validator), an optional `keyword` string to identify the validation rule which didn't pass and a `params` object which optionally contains more details about the context of the validation error.
 
 If `type` is anything else but `"ModelValidation"`, `data` can be any object that describes the error.
 
@@ -472,7 +478,7 @@ See the [error handling recipe](/recipes/error-handling.html) for more info.
 
 `Relation` holds a [RelationProperty](/api/types/#class-relationproperty) instance for each property that is used to create the relationship between two tables.
 
-`Relation` is actually a base class for all relation types `BelongsToOneRelation`, `HasManyRelation` etc. You can use `instanceof` to determine the type of the relations (see the example on the right). Note that `HasOneRelation` is a subclass of `HasManyRelation` and `HasOneThroughRelation` is a subclass of `ManyToManyRelation`. Arrange your `instanceof` checks accordingly.
+`Relation` is actually a base class for all relation types `BelongsToOneRelation`, `HasManyRelation` etc. You can use `instanceof` to determine the type of the relations (see the example below). Note that `HasOneRelation` is a subclass of `HasManyRelation` and `HasOneThroughRelation` is a subclass of `ManyToManyRelation`. Arrange your `instanceof` checks accordingly.
 
 | Property             | Type                                                   | Description                                                                                                                                                                                                                                    |
 | -------------------- | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -546,15 +552,6 @@ property.setProp(obj, index, value);
 Sets this property's index:th value in an object. For example if the property represents a composite key `[a, b.d.e, c]`
 and obj is `{a: 1, b: {d: {e: 2}}, c: 3}` then `setProp(obj, 1, 'foo')` would mutate `obj` into `{a: 1, b: {d: {e: 'foo'}}, c: 3}`.
 
-#### fullCol()
-
-```js
-const col = property.fullCol(builder, index);
-```
-
-Returns the property's index:th column name with the correct table reference. Something like `"Table.column"`.
-The first argument must be an objection [QueryBuilder](/api/types/#querybuilder) instance.
-
 #### ref()
 
 ```js
@@ -590,7 +587,9 @@ Appends an update operation for the index:th column into `patchObj` object.
 
 ## `class` ReferenceBuilder
 
-An instance of this is returned from the [ref](/api/objection/#ref) helper function.
+An instance of this is returned from the [ref](/api/objection/#ref) helper function. It also has the [expression methods](/api/objection/#expressions), like `eq()` and `plus()`.
+
+On MySQL, the casts use MySQL's types: `castInt()` and `castBigInt()` cast to `SIGNED`, `castText()` to `CHAR`, `castDecimal()` to `DECIMAL(65,30)` and `castReal()` to `DOUBLE`. `castBool()` compares the value instead, since MySQL can't cast to a boolean. See [Casts use MySQL types](/fork/mysql.html#casts-use-mysql-types).
 
 ### Instance Methods
 
@@ -630,12 +629,11 @@ Give custom type to which referenced value is cast to.
 
 #### castJson()
 
-In addition to other casts wrap reference to_jsonb() function so that final value
-reference will be json type.
+In addition to other casts, wraps the reference in `to_jsonb()` on postgres and `CAST(... AS JSON)` on MySQL, so that the final value is JSON.
 
 #### as()
 
-Gives an alias for the reference `.select(ref('age').as('yougness'))`
+Gives an alias for the reference `.select(ref('age').as('youngness'))`
 
 #### from()
 
@@ -646,7 +644,7 @@ See [this](/api/objection/#ref) for some examples.
 ## `class` ValueBuilder
 
 An instance of this is returned from the [val](/api/objection/#val) helper function. If an object
-is given as a value, it is cast to json by default.
+is given as a value, it is cast to json by default. It also has the [expression methods](/api/objection/#expressions), like `eq()` and `plus()`. On MySQL, the casts use MySQL's types, like those of [ReferenceBuilder](#class-referencebuilder).
 
 ### Instance Methods
 
@@ -686,12 +684,12 @@ Give custom type to which referenced value is cast to.
 
 #### castJson()
 
-Converts the value to json (jsonb in case of postgresql). The default
+Converts the value to json (jsonb in case of postgresql, JSON on MySQL). The default
 cast type for object values.
 
 #### asArray()
 
-Converts the value to an array.
+Converts the value to a postgres array.
 
 `val([1, 2, 3]).asArray() --> ARRAY[?, ?, ?]`
 
@@ -701,11 +699,11 @@ Can be used in conjuction with `castTo`.
 
 #### as()
 
-Gives an alias for the reference `.select(ref('age').as('yougness'))`
+Gives an alias for the value `.select(val('lesson').as('type'))`
 
 ## `class` RawBuilder
 
-An instance of this is returned from the [raw](/api/objection/#raw) helper function.
+An instance of this is returned from the [raw](/api/objection/#raw) helper function. It also has the [expression methods](/api/objection/#expressions), like `eq()` and `plus()`.
 
 ### Instance Methods
 
@@ -717,7 +715,7 @@ You should use this instead of inserting the alias to the SQL to give objection 
 
 ## `class` FunctionBuilder
 
-An instance of this is returned from the [fn](/api/objection/#fn) helper function.
+An instance of this is returned from the [fn](/api/objection/#fn) helper function and from the [expression methods](/api/objection/#expressions), which it also has.
 
 ### Instance Methods
 
@@ -727,6 +725,30 @@ Gives an alias for the raw expression `.select(fn('concat', 'foo', 'bar').as('fo
 
 You should use this instead of inserting the alias to the SQL to give objection more information about the query. Some edge cases, like using `fn` in `select` inside a `withGraphJoined` modifier won't work unless you use this method.
 
+#### filter()
+
+```js
+fn.count().filter(condition);
+```
+
+Only aggregates the rows that match `condition`. Only the aggregate functions have it. See [Filtered aggregates](/api/objection/#filtered-aggregates).
+
+#### over()
+
+```js
+fn.rowNumber().over({ partitionBy, orderBy });
+```
+
+Turns an aggregate or a window function into a window function call. See [Window functions](/api/objection/#window-functions).
+
+#### when() and else()
+
+```js
+fn.case().when(condition, result).else(result);
+```
+
+The methods of the builder that [fn.case()](/api/objection/#fn-case) returns. At least one `when()` is required.
+
 ## `class` Validator
 
 ```js
@@ -734,6 +756,8 @@ const { Validator } = require('objection');
 ```
 
 Abstract class from which model validators must be inherited. See the example for explanation. Also check out the [createValidator](/api/model/static-methods.html#static-createvalidator) method.
+
+`Validator` and `AjvValidator` are ES classes, so they must be extended with `class ... extends`. ES5-style subclasses that call `Validator.call(this)` throw. See [The exported classes are real classes](/fork/breaking-changes.html#the-exported-classes-are-real-classes).
 
 #### Examples
 
@@ -797,7 +821,7 @@ class BaseModel extends Model {
 const { AjvValidator } = require('objection');
 ```
 
-The default [Ajv](https://github.com/epoberezkin/ajv) based json schema
+The default [Ajv](https://github.com/ajv-validator/ajv) based json schema
 validator. You can override the [createValidator](/api/model/static-methods.html#static-createvalidator)
 method of [Model](/api/model/) like in the example to modify the validator.
 
@@ -822,3 +846,24 @@ class BaseModel extends Model {
   }
 }
 ```
+
+## TypeScript types
+
+These types only exist in the typings. Import them from `'objection'` like the classes: `import { Loaded, ModelRow } from 'objection'`.
+
+| Type                                         | Description                                                                                                                                                                                                                     |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ModelRow<M>`                                | A row of model `M`: the model without its relation properties. This is the type of query results that don't load relations. See [Results only contain the relations the query loaded](/fork/typescript.html#results-only-contain-the-relations-the-query-loaded). |
+| `Loaded<M, E>`                               | Model `M` with the relations of the relation expression `E` loaded, like `Loaded<PersonModel, '[pets.toys, mom]'>`. See [`Loaded<M, E>`](/fork/typescript.html#loaded-m-e).                                                     |
+| `ModelInstance<MC>`                          | The instance type of model class `MC`, with the relation properties inferred from its `relationMappings`. See [Relations inferred from `relationMappings`](/fork/typescript.html#relations-inferred-from-relationmappings). |
+| `RelationsOf<MC>`                            | The relation properties inferred from the `relationMappings` of model class `MC`, for `interface Person extends RelationsOf<typeof Person> {}`.                                                                                  |
+| `AnyQueryBuilder<M>`                         | A query builder of model `M` of any result kind. Use it for functions that take query builders. See [`AnyQueryBuilder<M>`](/fork/typescript.html#anyquerybuilder-m).                                                            |
+| `QueryBuilderState`, `DefaultQueryBuilderState<M, R>` | The type-level state of a query builder. Custom query builders take it as their third type parameter. See [Custom query builders need one declaration](/fork/typescript.html#custom-query-builders-need-one-declaration). |
+| `ModelProps<M>`, `ModelRelations<M>`         | The names of the properties of model `M` that aren't relations, and the names of the relation properties. See [`ModelProps` and `ModelRelations`](/fork/typescript.html#modelprops-and-modelrelations-recognize-more-relation-types). |
+| `ModelObject<M>`, `PartialModelObject<M>`, `PartialModelGraph<M>` | A POJO with the data properties of model `M`, one with some of them (the input of `insert()` and `patch()`), and a graph of them (the input of `insertGraph()` and `upsertGraph()`).                         |
+| `JoinBuilder`                                | The builder passed to join callbacks. Every column can be a `ref()` or `Model.ref()`. See [Join callbacks are typed as `JoinBuilder`](/fork/typescript.html#join-callbacks-are-typed-as-joinbuilder).                           |
+| `ReferenceBuilder<T>`, `FunctionBuilder<T>`, `CaseBuilder<T>` | The builders of `ref()`, `fn()` and `fn.case()`. `T` is the type of the value, which the [expression methods](/api/objection/#expressions) check values against. See [Typed `fn` and `ref`](/fork/typescript.html#typed-fn-and-ref). |
+| `RelationMappings`, `RelationMappingsThunk`  | The type of `relationMappings`. Annotating `relationMappings` with them turns off the inference of the relation types.                                                                                                          |
+| `Modifier<QB>`, `Modifiers<QB>`              | A modifier (a function, a name, a list of names or an object), and an object of named modifiers. Annotating `modifiers` with `Modifiers` turns off the checks of modifier names. See [Named modifiers are checked](/fork/typescript.html#named-modifiers-are-checked). |
+| `Page<T>`                                    | The result of [page()](/api/query-builder/other-methods.html#page): `{ results: T[], total: number }`.                                                                                                                          |
+| `Transaction`, `TransactionOrKnex`           | A knex transaction, and a knex transaction or a knex instance.                                                                                                                                                                 |

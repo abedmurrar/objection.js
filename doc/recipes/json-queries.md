@@ -4,7 +4,7 @@ You can use the [ref](/api/objection/#ref) function from the main module to refe
 
 See [FieldExpression](/api/types/#type-fieldexpression) for more information about how to refer to json fields.
 
-Json queries currently only work with postgres.
+JSON queries work on postgres, MySQL 8.0.17 or newer and MariaDB 10.6 or newer. On other databases, JSON field expressions and the `whereJson*` methods throw an error. See [MySQL](/fork/mysql.md#json-field-expressions) for the SQL they generate on MySQL.
 
 ```js
 const { ref } = require('objection');
@@ -28,7 +28,7 @@ await Person.query()
   .where('age', '>', ref('animals.jsonData:details.ageLimit'));
 ```
 
-Individual json fields can be updated like this:
+Individual json fields can be updated like this. The other fields of the column are kept. The objects along the path must exist, since `jsonb_set()` and MySQL's `JSON_SET()` only add the last key of the path. A `NULL` column starts as an empty object, or an empty array when the path starts with an index:
 
 ```js
 await Person.query().patch({

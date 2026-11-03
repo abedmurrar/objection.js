@@ -20,7 +20,9 @@ knexQueryBuilder = queryBuilder.toKnexQuery();
 
 Compiles the query into a knex query and returns the knex query builder instance.
 
-Some objection queries, like when `withGraphFetched` is used, actually execute multiple queries. In these cases, the query builer of the first query is returned
+Some objection queries, like when `withGraphFetched` is used, actually execute multiple queries. In these cases, the query builder of the first query is returned.
+
+`toKnexQuery()` throws the errors of [for()](/api/query-builder/other-methods.html#for), so no SQL is generated for a query that would be rejected.
 
 In some rare cases the knex query cannot be built synchronously. In these cases you will get a clear error message. These cases can be handled by calling the optional [initialize](/api/objection/#initialize) method once before the failing `toKnexQuery` method is called.
 
@@ -59,6 +61,8 @@ await Person.relatedQuery('pets').for(1).delete();
 await Person.relatedQuery('pets').delete().for(1);
 await Person.query().for(1).delete();
 ```
+
+See [Breaking changes](/fork/breaking-changes.md#for-is-checked) for the error messages.
 
 ## context()
 
@@ -367,14 +371,14 @@ Returns `true` if the query contains where statements.
 const hasSelects = queryBuilder.hasSelects();
 ```
 
-Returns `true` if the query contains any specific select staments, such as:
+Returns `true` if the query contains any specific select statements, such as:
 `'select'`, `'columns'`, `'column'`, `'distinct'`, `'count'`, `'countDistinct'`, `'min'`, `'max'`, `'sum'`, `'sumDistinct'`, `'avg'`, `'avgDistinct'`
 
 ##### Return value
 
 | Type    | Description                                              |
 | ------- | -------------------------------------------------------- |
-| boolean | `true` if the query contains any specific select staments. |
+| boolean | `true` if the query contains any specific select statements. |
 
 ## hasWithGraph()
 
@@ -449,6 +453,50 @@ console.log(
 );
 ```
 
+## clearSelect()
+
+```js
+queryBuilder = queryBuilder.clearSelect();
+```
+
+Removes the select calls of the query: `select`, `columns`, `column`, `distinct`, `count`, `countDistinct`, `min`, `max`, `sum`, `sumDistinct`, `avg` and `avgDistinct`.
+
+##### Return value
+
+| Type                                | Description                        |
+| ----------------------------------- | ---------------------------------- |
+| [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. |
+
+## clearWhere()
+
+```js
+queryBuilder = queryBuilder.clearWhere();
+```
+
+Removes the where calls of the query: the `where*`, `orWhere*` and `andWhere*` methods, `findById`, `findByIds` and the where of `findOne`. The where clauses objection adds, like the owner condition of a relation query, are kept.
+
+##### Return value
+
+| Type                                | Description                        |
+| ----------------------------------- | ---------------------------------- |
+| [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. |
+
+## clearOrder()
+
+```js
+queryBuilder = queryBuilder.clearOrder();
+```
+
+Removes the `orderBy` and `orderByRaw` calls of the query.
+
+Also see [clearGroup](/api/query-builder/find-methods.html#cleargroup) and [clearHaving](/api/query-builder/find-methods.html#clearhaving).
+
+##### Return value
+
+| Type                                | Description                        |
+| ----------------------------------- | ---------------------------------- |
+| [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. |
+
 ## runBefore()
 
 ```js
@@ -478,7 +526,7 @@ query
   .runBefore(async result => {
     console.log('hello 1');
 
-    await Promise.delay(10);
+    await new Promise((resolve) => setTimeout(resolve, 10));
 
     console.log('hello 2');
     return result;
@@ -518,7 +566,7 @@ Unlike the `run` methods (`runAfter`, `runBefore` etc.) these must be synchronou
 | ----------------------------------- | ---------------------------------- |
 | [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. |
 
-##### Eamples
+##### Examples
 
 ```js
 const query = Person.query();
@@ -609,6 +657,8 @@ query
 const models = await query;
 ```
 
+The return value of the callback replaces the result. In TypeScript, it also becomes the result type, so `Person.query().runAfter((people) => people.map((it) => it.firstName))` is a `string[]`. A callback that returns nothing makes the result `undefined`. See [runAfter() and castTo&lt;T&gt;() set the result type](/fork/typescript.md#runafter-and-castto-t-set-the-result-type).
+
 ## onError()
 
 ```js
@@ -661,11 +711,11 @@ queryBuilder = queryBuilder.castTo<SomeType>();
 Sets the model class of the result rows or if no arguments are provided, simply casts the
 result type to the provided type.
 
-##### Return value
+##### Arguments
 
-| Type                      | Description                         |
-| ------------------------- | ----------------------------------- |
-| [ModelClass](/api/model/) | The model class of the result rows. |
+| Argument   | Type                      | Description                                   |
+| ---------- | ------------------------- | --------------------------------------------- |
+| modelClass | [ModelClass](/api/model/) | The model class of the result rows. Optional. |
 
 ##### Return value
 
@@ -700,6 +750,8 @@ const result = await Person.query()
 
 console.log(result[0].name);
 ```
+
+The rows are still `Person` instances at runtime. Methods called after `castTo<T>()`, like `first()` and `throwIfNotFound()`, start from the type `T`. After `castTo(ModelClass)`, relation expressions aren't checked and the result has all relations as optional properties. See [runAfter() and castTo&lt;T&gt;() set the result type](/fork/typescript.md#runafter-and-castto-t-set-the-result-type).
 
 ## modelClass()
 
@@ -759,6 +811,20 @@ Sets the transaction for a query.
 | ----------------------------------- | --------------------------------- |
 | [QueryBuilder](/api/query-builder/) | `this` query builder for chaining |
 
+## knex()
+
+```js
+const knex = queryBuilder.knex();
+```
+
+Returns the knex instance or transaction the query runs with: the one given to [transacting](/api/query-builder/other-methods.html#transacting), or else the one the model class is bound to. Throws if there is none.
+
+##### Return value
+
+| Type   | Description                              |
+| ------ | ---------------------------------------- |
+| object | The knex instance or transaction object. |
+
 ## clone()
 
 ```js
@@ -781,9 +847,9 @@ Executes the query and returns a Promise.
 
 ##### Return value
 
-| Type      | Description                                                |
-| --------- | ---------------------------------------------------------- |
-| `Promise` | Promise the will be resolved with the result of the query. |
+| Type      | Description                                                 |
+| --------- | ----------------------------------------------------------- |
+| `Promise` | Promise that will be resolved with the result of the query. |
 
 ## then()
 
@@ -802,9 +868,9 @@ Executes the query and returns a Promise.
 
 ##### Return value
 
-| Type      | Description                                                |
-| --------- | ---------------------------------------------------------- |
-| `Promise` | Promise the will be resolved with the result of the query. |
+| Type      | Description                                                 |
+| --------- | ----------------------------------------------------------- |
+| `Promise` | Promise that will be resolved with the result of the query. |
 
 ## catch()
 
@@ -822,9 +888,9 @@ Executes the query and calls `catch(errorHandler)` for the returned promise.
 
 ##### Return value
 
-| Type      | Description                                                |
-| --------- | ---------------------------------------------------------- |
-| `Promise` | Promise the will be resolved with the result of the query. |
+| Type      | Description                                                 |
+| --------- | ----------------------------------------------------------- |
+| `Promise` | Promise that will be resolved with the result of the query. |
 
 ## finally()
 
@@ -832,33 +898,19 @@ Executes the query and calls `catch(errorHandler)` for the returned promise.
 const promise = queryBuilder.finally(callback);
 ```
 
-Executes the query and calls `finally(callback)` for the returned promise.
-
-##### Return value
-
-| Type      | Description                                                |
-| --------- | ---------------------------------------------------------- |
-| `Promise` | Promise the will be resolved with the result of the query. |
-
-## bind()
-
-```js
-const promise = queryBuilder.bind(returnValue);
-```
-
-Executes the query and calls `bind(context)` for the returned promise.
+Executes the query and calls `finally(callback)` for the returned promise. The callback is called whether the query succeeded or failed. See [knex methods](/fork/knex.md#new-methods).
 
 ##### Arguments
 
-| Argument | Type | Default   | Description  |
-| -------- | ---- | --------- | ------------ |
-| context  |      | undefined | Bind context |
+| Argument | Type     | Description                                    |
+| -------- | -------- | ---------------------------------------------- |
+| callback | function | Called after the query has succeeded or failed |
 
 ##### Return value
 
-| Type      | Description                                                |
-| --------- | ---------------------------------------------------------- |
-| `Promise` | Promise the will be resolved with the result of the query. |
+| Type      | Description                                                 |
+| --------- | ----------------------------------------------------------- |
+| `Promise` | Promise that will be resolved with the result of the query. |
 
 ## resultSize()
 
@@ -872,9 +924,9 @@ This method is often more convenient than `count` which returns an array of obje
 
 ##### Return value
 
-| Type              | Description                                        |
-| ----------------- | -------------------------------------------------- |
-| `Promise<number>` | Promise the will be resolved with the result size. |
+| Type              | Description                                         |
+| ----------------- | --------------------------------------------------- |
+| `Promise<number>` | Promise that will be resolved with the result size. |
 
 ##### Examples
 
@@ -904,6 +956,8 @@ console.log(result.total); // --> 3341
 
 Two queries are performed by this method: the actual query and a query to get the `total` count.
 
+On a delete query, knex rejects `page()` on postgres and SQLite, and leaves the offset out on MySQL. See [Deletes with a limit](/fork/knex.md#deletes-with-a-limit).
+
 Mysql has the `SQL_CALC_FOUND_ROWS` option and `FOUND_ROWS()` function that can be used to calculate the result size, but according to my tests and [the interwebs](https://www.google.com/search?q=SQL_CALC_FOUND_ROWS+performance) the performance is significantly worse than just executing a separate count query.
 
 Postgresql has window functions that can be used to get the total count like this `select count(*) over () as total`. The problem with this is that if the result set is empty, we don't get the total count either. (If someone can figure out a way around this, a PR is very welcome).
@@ -930,6 +984,8 @@ queryBuilder = queryBuilder.range(start, end);
 Only returns the given range of results.
 
 Two queries are performed by this method: the actual query and a query to get the `total` count.
+
+On a delete query, knex rejects `range()` on postgres and SQLite, and leaves the offset out on MySQL. See [Deletes with a limit](/fork/knex.md#deletes-with-a-limit).
 
 Mysql has the `SQL_CALC_FOUND_ROWS` option and `FOUND_ROWS()` function that can be used to calculate the result size, but according to my tests and [the interwebs](https://www.google.com/search?q=SQL_CALC_FOUND_ROWS+performance) the performance is significantly worse than just executing a separate count query.
 
@@ -967,7 +1023,7 @@ const result = await Person.query()
   .limit(10)
   .range();
 
-console.log(result.results.length); // --> 101
+console.log(result.results.length); // --> 10
 console.log(result.total); // --> 3341
 ```
 
@@ -1038,7 +1094,7 @@ try {
 
 ## timeout()
 
-See [knex documentation](https://knexjs.org/guide/query-builder.html#debug)
+See [knex documentation](https://knexjs.org/guide/query-builder.html#timeout)
 
 ##### Return value
 
@@ -1049,6 +1105,26 @@ See [knex documentation](https://knexjs.org/guide/query-builder.html#debug)
 ## connection()
 
 See [knex documentation](https://knexjs.org/guide/query-builder.html#connection)
+
+##### Return value
+
+| Type                                | Description                        |
+| ----------------------------------- | ---------------------------------- |
+| [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. |
+
+## options()
+
+Passes options to the database driver, like `{ nestTables: true }` for mysql2. See [knex documentation](https://knexjs.org/guide/query-builder.html#options)
+
+##### Return value
+
+| Type                                | Description                        |
+| ----------------------------------- | ---------------------------------- |
+| [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. |
+
+## off()
+
+Calls knex's `off()` on the knex query when the query is built. It isn't in the TypeScript types.
 
 ##### Return value
 

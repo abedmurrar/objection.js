@@ -38,7 +38,7 @@ const knex = Knex({
     host: '127.0.0.1',
     user: 'objection',
     database: 'objection_test'
-  }
+  },
 
   // If your columns are UPPER_SNAKE_CASE you can use
   // knexSnakeCaseMappers({ upperCase: true })

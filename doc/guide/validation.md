@@ -50,7 +50,7 @@ try {
   await Person.query().insert({ firstName: 'jennifer' });
 } catch (err) {
   console.log(err instanceof objection.ValidationError); // --> true
-  console.log(err.data); // --> {lastName: [{message: 'required property missing', ...}]}
+  console.log(err.data); // --> {lastName: [{message: "must have required property 'lastName'", ...}]}
 }
 ```
 

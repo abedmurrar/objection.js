@@ -30,6 +30,8 @@ The `modelClass` passed to the relation mappings is the class of the related mod
 
 The file path versions are handy for avoiding require loops.
 
+In TypeScript, the types of the relation properties are inferred from `relationMappings` when it has no type annotation. Wrap the mappings in [defineRelations()](/api/objection/#definerelations) to also keep the names of `extra` columns. See [Relations inferred from `relationMappings`](/fork/typescript.html#relations-inferred-from-relationmappings).
+
 Further reading:
 
 - [the relation guide](/guide/relations.html)
@@ -286,7 +288,7 @@ Person.query().withGraphFetched(
 );
 ```
 
-Modifiers can also be used through [modifyGraph](/api/query-builder/other-methods.html#modifygraph):
+Modifiers can also be used through [modifyGraph](/api/query-builder/eager-methods.html#modifygraph):
 
 ```js
 Person.query()
@@ -294,6 +296,8 @@ Person.query()
   .modifyGraph('movies', ['goodMovies', 'orderByName'])
   .modifyGraph('pets', 'dogs');
 ```
+
+In TypeScript, modifier names and their arguments are checked when `modifiers` is an object without a type annotation, or a getter. See [Named modifiers are checked](/fork/typescript.html#named-modifiers-are-checked).
 
 ## `static` modelPaths
 
@@ -550,6 +554,34 @@ class Animal extends Model {
 
 If `true`, `limit(1)` is added to the query when [first()](/api/query-builder/other-methods.html#first) is called. Defaults to `false` for legacy reasons.
 
+## `static` relatedFindQueryMutates
+
+```js
+class Person extends Model {
+  static get relatedFindQueryMutates() {
+    return true;
+  }
+}
+```
+
+If `true`, the result of a find query started with [\$relatedQuery](/api/model/instance-methods.html#relatedquery) is also set to the relation property of the owner, as objection 1.x did. Defaults to `false`.
+
+Deprecated. Use [withGraphFetched](/api/query-builder/eager-methods.html#withgraphfetched) or [\$fetchGraph](/api/model/instance-methods.html#fetchgraph) to load relations into a model.
+
+## `static` relatedInsertQueryMutates
+
+```js
+class Person extends Model {
+  static get relatedInsertQueryMutates() {
+    return true;
+  }
+}
+```
+
+If `true`, the models inserted with [\$relatedQuery](/api/model/instance-methods.html#relatedquery) are also added to the relation property of the owner, as objection 1.x did. Defaults to `false`.
+
+Deprecated, like [relatedFindQueryMutates](/api/model/static-properties.html#static-relatedfindquerymutates).
+
 ## `static` QueryBuilder
 
 ```js
@@ -564,17 +596,19 @@ class Person extends Model {
 
 This constructor is used whenever a query builder is created using [query](/api/model/static-methods.html#static-query), [\$query](/api/model/instance-methods.html#query), [\$relatedQuery](/api/model/instance-methods.html#relatedquery) or any other method that creates a query. You can override this to use your own [QueryBuilder](/api/query-builder/) subclass.
 
-[Usage example](/recipes/custom-query-builder.html).
+[Usage example](/recipes/custom-query-builder.html). In TypeScript, the custom query builder also needs a `'~rebind'` declaration. See [Custom query builders need one declaration](/fork/typescript.html#custom-query-builders-need-one-declaration).
 
 ## `static` BelongsToOneRelation
 
 ```js
 class Person extends Model {
   static get relationMappings() {
-    parent: {
-      relation: Model.BelongsToOneRelation,
-      ...
-    }
+    return {
+      parent: {
+        relation: Model.BelongsToOneRelation,
+        ...
+      }
+    };
   }
 }
 ```
@@ -586,10 +620,12 @@ A relation type that can be used in [relationMappings](/api/model/static-propert
 ```js
 class Person extends Model {
   static get relationMappings() {
-    parent: {
-      relation: Model.HasOneRelation,
-      ...
-    }
+    return {
+      parent: {
+        relation: Model.HasOneRelation,
+        ...
+      }
+    };
   }
 }
 ```
@@ -601,10 +637,12 @@ A relation type that can be used in [relationMappings](/api/model/static-propert
 ```js
 class Person extends Model {
   static get relationMappings() {
-    pets: {
-      relation: Model.HasManyRelation,
-      ...
-    }
+    return {
+      pets: {
+        relation: Model.HasManyRelation,
+        ...
+      }
+    };
   }
 }
 ```
@@ -616,10 +654,12 @@ A relation type that can be used in [relationMappings](/api/model/static-propert
 ```js
 class Person extends Model {
   static get relationMappings() {
-    movies: {
-      relation: Model.ManyToManyRelation,
-      ...
-    }
+    return {
+      movies: {
+        relation: Model.ManyToManyRelation,
+        ...
+      }
+    };
   }
 }
 ```
@@ -631,10 +671,12 @@ A relation type that can be used in [relationMappings](/api/model/static-propert
 ```js
 class Person extends Model {
   static get relationMappings() {
-    favoriteMovie: {
-      relation: Model.HasOneThroughRelation,
-      ...
-    }
+    return {
+      favoriteMovie: {
+        relation: Model.HasOneThroughRelation,
+        ...
+      }
+    };
   }
 }
 ```

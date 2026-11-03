@@ -114,7 +114,7 @@ Right join version of the [joinRelated](/api/query-builder/join-methods.html#joi
 
 ## rightOuterJoinRelated()
 
-Left outer join version of the [joinRelated](/api/query-builder/join-methods.html#joinrelated) method.
+Right outer join version of the [joinRelated](/api/query-builder/join-methods.html#joinrelated) method.
 
 ## fullOuterJoinRelated()
 
@@ -123,6 +123,28 @@ Full outer join version of the [joinRelated](/api/query-builder/join-methods.htm
 ## join()
 
 See [knex documentation](https://knexjs.org/guide/query-builder.html#join)
+
+The table can be a table name, a model class, an object like `{ parent: Person }` that gives the table an alias, or a subquery named with `as()`. See [Joins and model classes](/fork/joins.md#model-classes-in-place-of-table-names).
+
+```js
+await Person.query()
+  .innerJoin(Pet, Pet.ref('ownerId'), Person.ref('id'))
+  .leftJoin({ parent: Person }, 'parent.id', Person.ref('parentId'));
+```
+
+A join callback gets a join builder with knex's `on*` methods: `on()`, `andOn()`, `orOn()`, `onIn()`, `onNull()`, `onExists()`, `onBetween()`, their `and`, `or` and `not` variants, `onVal()`, `andOnVal()`, `orOnVal()`, `onJsonPathEquals()`, `andOnJsonPathEquals()`, `orOnJsonPathEquals()`, `using()` and `type()`. `ref()`, `Model.ref()` and the [expressions](/fork/expressions.md) work in them, and `join.on(a, b).or.on(c, d)` is the same as `join.on(a, b).orOn(c, d)`.
+
+```js
+await Person.query().join(Pet, (join) =>
+  join
+    .on(Pet.ref('ownerId'), Person.ref('id'))
+    .andOnVal(Pet.ref('species'), 'dog'),
+);
+// select "persons".* from "persons"
+// inner join "pets" on "pets"."ownerId" = "persons"."id" and "pets"."species" = 'dog'
+```
+
+See [`Model.ref()` in join callbacks](/fork/joins.md#model-ref-in-join-callbacks) and [`onJsonPathEquals()` in join callbacks](/fork/joins.md#onjsonpathequals-in-join-callbacks).
 
 ##### Return value
 
@@ -144,6 +166,8 @@ See [knex documentation](https://knexjs.org/guide/query-builder.html#joinraw)
 
 See [knex documentation](https://knexjs.org/guide/query-builder.html#innerjoin)
 
+Takes the same arguments as [join](/api/query-builder/join-methods.html#join).
+
 ##### Return value
 
 | Type                                | Description                        |
@@ -153,6 +177,8 @@ See [knex documentation](https://knexjs.org/guide/query-builder.html#innerjoin)
 ## leftJoin()
 
 See [knex documentation](https://knexjs.org/guide/query-builder.html#leftjoin)
+
+Takes the same arguments as [join](/api/query-builder/join-methods.html#join).
 
 ##### Return value
 
@@ -164,6 +190,8 @@ See [knex documentation](https://knexjs.org/guide/query-builder.html#leftjoin)
 
 See [knex documentation](https://knexjs.org/guide/query-builder.html#leftouterjoin)
 
+Takes the same arguments as [join](/api/query-builder/join-methods.html#join).
+
 ##### Return value
 
 | Type                                | Description                        |
@@ -173,6 +201,8 @@ See [knex documentation](https://knexjs.org/guide/query-builder.html#leftouterjo
 ## rightJoin()
 
 See [knex documentation](https://knexjs.org/guide/query-builder.html#rightjoin)
+
+Takes the same arguments as [join](/api/query-builder/join-methods.html#join).
 
 ##### Return value
 
@@ -184,6 +214,8 @@ See [knex documentation](https://knexjs.org/guide/query-builder.html#rightjoin)
 
 See [knex documentation](https://knexjs.org/guide/query-builder.html#rightouterjoin)
 
+Takes the same arguments as [join](/api/query-builder/join-methods.html#join).
+
 ##### Return value
 
 | Type                                | Description                        |
@@ -193,6 +225,8 @@ See [knex documentation](https://knexjs.org/guide/query-builder.html#rightouterj
 ## outerJoin()
 
 See [knex documentation](https://knexjs.org/guide/query-builder.html#fullouterjoin)
+
+Takes the same arguments as [join](/api/query-builder/join-methods.html#join).
 
 ##### Return value
 
@@ -204,6 +238,8 @@ See [knex documentation](https://knexjs.org/guide/query-builder.html#fullouterjo
 
 See [knex documentation](https://knexjs.org/guide/query-builder.html#fullouterjoin)
 
+Takes the same arguments as [join](/api/query-builder/join-methods.html#join).
+
 ##### Return value
 
 | Type                                | Description                        |
@@ -213,6 +249,8 @@ See [knex documentation](https://knexjs.org/guide/query-builder.html#fullouterjo
 ## crossJoin()
 
 See [knex documentation](https://knexjs.org/guide/query-builder.html#crossjoin)
+
+Takes the same arguments as [join](/api/query-builder/join-methods.html#join).
 
 ##### Return value
 
