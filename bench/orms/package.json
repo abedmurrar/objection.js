@@ -1,0 +1,19 @@
+{
+  "name": "objection-bench-orms",
+  "private": true,
+  "description": "Benchmarks @abedmurrar/objection against other Node.js ORMs and query builders on MySQL. Installed on demand: npm --prefix bench/orms install",
+  "type": "commonjs",
+  "dependencies": {
+    "@mikro-orm/core": "7.2.6",
+    "@mikro-orm/mysql": "7.2.6",
+    "drizzle-orm": "0.45.4",
+    "knex": "3.3.0",
+    "kysely": "0.29.8",
+    "mysql2": "3.24.6",
+    "objection-3.1.5": "npm:objection@3.1.5",
+    "objection-4.4.2": "npm:objection@4.4.2",
+    "reflect-metadata": "0.2.2",
+    "sequelize": "6.37.8",
+    "typeorm": "1.1.2"
+  }
+}
