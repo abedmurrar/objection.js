@@ -1,5 +1,6 @@
 import { RelationInsertOperation } from '../RelationInsertOperation';
 import { BelongsToOneRelateOperation } from './BelongsToOneRelateOperation';
+import { InsertGraphOperation } from '../../queryBuilder/operations/InsertGraphOperation';
 import type { RelationQueryBuilder } from '../Relation';
 
 class BelongsToOneInsertOperation extends RelationInsertOperation {
@@ -16,7 +17,10 @@ class BelongsToOneInsertOperation extends RelationInsertOperation {
   async onAfter1(builder: RelationQueryBuilder, ret: unknown) {
     const inserted = await super.onAfter1(builder, ret);
 
-    if (!builder.isExecutable()) {
+    // A query resolved without executing it, e.g. with `resolve()`, inserted
+    // nothing. `insertGraph()` resolves the query itself, but always inserts
+    // the graph.
+    if (!builder.isExecutable() && !builder.has(InsertGraphOperation)) {
       return inserted;
     }
 
