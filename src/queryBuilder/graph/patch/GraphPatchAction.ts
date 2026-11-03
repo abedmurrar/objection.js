@@ -1,4 +1,5 @@
 import { getModel } from '../../../model/getModel';
+import { restoreOmitFromDatabaseJson } from '../../../model/modelUtils';
 import { GraphAction } from '../GraphAction';
 import { isInternalProp } from '../../../utils/internalPropUtils';
 import { difference, isObject, jsonEquals } from '../../../utils/objectUtils';
@@ -15,10 +16,24 @@ class GraphPatchAction extends GraphAction {
     this.nodes = nodes;
   }
 
-  run(builder: QueryBuilder): PromiseLike<unknown> {
-    return promiseUtils.map(this.nodes, (node: GraphNode) => this._runForNode(builder, node), {
-      concurrency: this._getConcurrency(builder, this.nodes),
-    });
+  async run(builder: QueryBuilder): Promise<unknown> {
+    // The patches leave out the props that don't change, but the models that
+    // the graph returns get them back once the patches are written (#371).
+    const omittedProps = new Map(
+      this.nodes.map((node) => [node, node.obj.$omitFromDatabaseJson()] as const),
+    );
+
+    try {
+      return await promiseUtils.map(
+        this.nodes,
+        (node: GraphNode) => this._runForNode(builder, node),
+        { concurrency: this._getConcurrency(builder, this.nodes) },
+      );
+    } finally {
+      for (const [node, props] of omittedProps) {
+        restoreOmitFromDatabaseJson(node.obj, props);
+      }
+    }
   }
 
   _runForNode(builder: QueryBuilder, node: GraphNode): Promise<unknown> | null {
