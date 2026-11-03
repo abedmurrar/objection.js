@@ -4,6 +4,8 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+## 4.0.4 (2026-11-03)
+
 ### Bug fixes
 
 - An offset on a delete query throws `offset() can't be used with a delete query`. Deletes have no offset, and knex left it out: `delete().page(2, 10)` deleted the first 10 rows on MySQL, and `delete().offset(10)` deleted every matching row on every database. `page(0, n)` and `offset(0)` still work. See [Deletes with a limit](/fork/knex.md#deletes-with-a-limit).
