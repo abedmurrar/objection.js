@@ -38,6 +38,7 @@ declare namespace Objection {
 
   const snakeCaseMappers: SnakeCaseMappersFactory;
   const knexSnakeCaseMappers: KnexSnakeCaseMappersFactory;
+  const knexIdentifierMapping: KnexIdentifierMappingFactory;
 
   const transaction: transaction;
   const initialize: initialize;
@@ -2658,6 +2659,11 @@ declare namespace Objection {
     static forClass: ForClassMethod;
 
     /**
+     * Parses a relation expression into its object notation.
+     */
+    static parseRelationExpression(expr: RelationExpression<any>): object;
+
+    /**
      * Type-only members used to compute the type of the query builder after
      * methods that change the result type, like `first()` or `patch()`.
      *
@@ -3469,6 +3475,14 @@ declare namespace Objection {
     (options?: SnakeCaseMappersOptions): KnexMappers;
   }
 
+  /**
+   * Maps the column names of the database to property names and back, using
+   * an object whose keys are column names and whose values are property names.
+   */
+  export interface KnexIdentifierMappingFactory {
+    (colToProp: Record<string, string>): KnexMappers;
+  }
+
   export type ValidationErrorType =
     | 'ModelValidation'
     | 'RelationExpression'
@@ -3574,6 +3588,8 @@ declare namespace Objection {
     relatedFindQueryMutates: boolean;
     relatedInsertQueryMutates: boolean;
     useLimitInFirst: boolean;
+    cloneObjectAttributes: boolean;
+    concurrency: number | (() => number) | null;
     modifiers: Modifiers;
     columnNameMappers: ColumnNameMappers;
 
@@ -3688,6 +3704,13 @@ declare namespace Objection {
     static relatedFindQueryMutates: boolean;
     static relatedInsertQueryMutates: boolean;
     static useLimitInFirst: boolean;
+    static cloneObjectAttributes: boolean;
+    /**
+     * How many queries graph operations and eager loading run at a time. The
+     * default, `null`, means 4, except for graph writes on MySQL and mssql,
+     * which run one at a time.
+     */
+    static concurrency: number | (() => number) | null;
     static modifiers: Modifiers;
     static columnNameMappers: ColumnNameMappers;
 
@@ -3873,7 +3896,15 @@ declare namespace Objection {
     $omitFromDatabaseJson(keys: string | string[] | { [key: string]: boolean }): this;
 
     $knex(): Knex;
-    $transaction(): Knex;
+
+    /**
+     * Shortcut for `this.constructor.transaction()`.
+     */
+    $transaction<T>(callback: (trx: Transaction) => Promise<T>): Promise<T>;
+    $transaction<T>(
+      trxOrKnex: TransactionOrKnex | undefined,
+      callback: (trx: Transaction) => Promise<T>,
+    ): Promise<T>;
 
     QueryBuilderType: QueryBuilder<this, this[], QueryBuilderItemState<this>>;
   }

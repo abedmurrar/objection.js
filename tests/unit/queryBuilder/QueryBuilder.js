@@ -1041,6 +1041,48 @@ describe('QueryBuilder', () => {
       .catch(done);
   });
 
+  it('delete should throw with an offset, before running any query', async () => {
+    const queries = [
+      () => QueryBuilder.forClass(TestModel).delete().page(1, 10),
+      () => QueryBuilder.forClass(TestModel).page(2, 10).delete(),
+      () => QueryBuilder.forClass(TestModel).delete().range(5, 9),
+      () => QueryBuilder.forClass(TestModel).delete().where('a', 1).offset(3),
+      () => QueryBuilder.forClass(TestModel).offset('3').limit(2).delete(),
+    ];
+
+    for (const query of queries) {
+      expect(() => query().toKnexQuery()).to.throwException((err) => {
+        expect(err.message).to.contain("offset() can't be used with a delete query");
+      });
+
+      let error = null;
+      try {
+        await query();
+      } catch (err) {
+        error = err;
+      }
+
+      expect(error.message).to.contain("offset() can't be used with a delete query");
+    }
+
+    expect(executedQueries).to.have.length(0);
+  });
+
+  it('delete should allow page(0, n), offset(0) and limit()', () => {
+    // Only MySQL supports a limit on deletes.
+    const mysql = Knex({ client: 'mysql2' });
+
+    expect(TestModel.query(mysql).delete().page(0, 10).toKnexQuery().toString()).to.equal(
+      'delete from `Model` limit 10',
+    );
+    expect(TestModel.query(mysql).delete().limit(10).toKnexQuery().toString()).to.equal(
+      'delete from `Model` limit 10',
+    );
+    expect(TestModel.query().delete().offset(0).toKnexQuery().toString()).to.equal(
+      'delete from "Model"',
+    );
+  });
+
   it('isFind, isInsert, isUpdate, isPatch, isDelete, isRelate, isUnrelate should return true only for the right operations', () => {
     TestModel.relationMappings = {
       someRel: {

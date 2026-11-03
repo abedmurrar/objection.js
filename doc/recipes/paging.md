@@ -41,9 +41,12 @@ const result = await Person.query()
 3. On delete queries:
 
 ```js
+// Throws: offset() can't be used with a delete query.
+// Deletes have no offset, so the query would delete the wrong rows.
+await Person.query().delete().page(2, 10);
+
+// MySQL: page 0 has no offset, so this works like limit(10).
 // postgres and SQLite: knex rejects a limit on a delete with
 // "Aborted query compilation: `limit` has no effect on a `delete` statement".
-// MySQL supports a limit on deletes, but not an offset. This deletes
-// the first 10 rows: delete from `persons` limit 10
-await Person.query().delete().page(2, 10);
+await Person.query().delete().page(0, 10);
 ```
