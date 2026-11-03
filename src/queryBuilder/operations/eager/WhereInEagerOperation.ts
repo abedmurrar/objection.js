@@ -147,7 +147,7 @@ class WhereInEagerOperation extends EagerOperation {
     models: Model[],
     relation: Relation,
     expr: ChildExpression,
-  ): QueryBuilder {
+  ): QueryBuilder | PromiseLike<unknown> {
     if (this.shouldSkipFetched(models, relation, expr)) {
       return this.createSkippedQuery(builder, models, relation, expr);
     }
@@ -162,6 +162,9 @@ class WhereInEagerOperation extends EagerOperation {
     findOperation.alwaysReturnArray = true;
     findOperation.assignResultToOwner = true;
     findOperation.relationProperty = expr.node.$name!;
+    // The related models are assigned after the hooks of the query, so that
+    // what `afterFind()` returns, e.g. filtered models, ends up in the graph.
+    findOperation.assignAfterHooks = !!relation.relatedModelClass.useAfterFindInGraphs;
 
     queryBuilder.addOperation(findOperation, []);
 
@@ -188,7 +191,11 @@ class WhereInEagerOperation extends EagerOperation {
       }
     }
 
-    return queryBuilder;
+    if (findOperation.assignAfterHooks) {
+      return queryBuilder.then((result) => findOperation.assignResult(queryBuilder, result));
+    } else {
+      return queryBuilder;
+    }
   }
 
   shouldSkipFetched(models: Model[], relation: Relation, expr: ChildExpression): boolean {

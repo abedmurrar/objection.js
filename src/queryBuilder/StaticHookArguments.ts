@@ -118,6 +118,62 @@ class StaticHookArguments {
   }
 }
 
+interface JoinedStaticHookArgumentsOptions extends StaticHookArgumentsOptions {
+  relation: unknown;
+  items: unknown[];
+}
+
+// The relations that `withGraphJoined()` fetches have no query of their own, so
+// the hooks of their model classes get the relation and its owners instead.
+class JoinedStaticHookArguments extends StaticHookArguments {
+  declare readonly joinedRelation: unknown;
+  declare readonly joinedItems: unknown[];
+
+  constructor({ builder, result, relation, items }: JoinedStaticHookArgumentsOptions) {
+    super({ builder, result });
+
+    Object.defineProperty(this, 'joinedRelation', { value: relation });
+    Object.defineProperty(this, 'joinedItems', { value: items });
+  }
+
+  static create(args: JoinedStaticHookArgumentsOptions): JoinedStaticHookArguments {
+    return new JoinedStaticHookArguments(args);
+  }
+
+  get asFindQuery(): () => QueryBuilder {
+    return () => {
+      throw new Error(
+        'asFindQuery() is not available for relations fetched with withGraphJoined().',
+      );
+    };
+  }
+
+  get relation(): unknown {
+    return this.joinedRelation;
+  }
+
+  get modelOptions(): unknown {
+    return undefined;
+  }
+
+  // The owners of the related models.
+  get items(): unknown[] {
+    return this.joinedItems;
+  }
+
+  get inputItems(): unknown[] {
+    return [];
+  }
+
+  get cancelQuery(): (cancelValue?: unknown) => void {
+    return () => {
+      throw new Error(
+        'cancelQuery() is not available for relations fetched with withGraphJoined().',
+      );
+    };
+  }
+}
+
 // What some of the operations have: the relation operations have a relation
 // and an owner, the instance operations an instance, and the insert and update
 // operations models and model options.
@@ -162,4 +218,4 @@ function hasInputItems(op: ItemOperation): boolean {
   return !!getInputItems(op);
 }
 
-export { StaticHookArguments, markDefaultStaticHook, hasStaticHook };
+export { StaticHookArguments, JoinedStaticHookArguments, markDefaultStaticHook, hasStaticHook };

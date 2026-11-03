@@ -1,4 +1,6 @@
 import { FindOperation } from '../queryBuilder/operations/FindOperation';
+import { RangeOperation } from '../queryBuilder/operations/RangeOperation';
+import { asArray } from '../utils/objectUtils';
 import type {
   Relation,
   RelationModel,
@@ -16,6 +18,12 @@ class RelationFindOperation extends FindOperation {
   declare relationProperty: string;
   declare omitProps: string[];
   declare alias: string | null;
+  // Set by `withGraphFetched()` for related model classes with
+  // `useAfterFindInGraphs`: the related models are assigned to the owners by
+  // `assignResult()`, after the hooks of the query.
+  declare assignAfterHooks: boolean;
+  // Shared with the clones that execute the query.
+  declare ownerKeyByRelated: Map<RelationModel, string>;
 
   constructor(name: string, opt: RelationOperationOptions) {
     super(name, opt);
@@ -27,6 +35,8 @@ class RelationFindOperation extends FindOperation {
     this.relationProperty = opt.relationProperty || this.relation.name;
     this.omitProps = [];
     this.alias = null;
+    this.assignAfterHooks = false;
+    this.ownerKeyByRelated = new Map();
   }
 
   onBuild(builder: RelationQueryBuilder): void {
@@ -39,39 +49,79 @@ class RelationFindOperation extends FindOperation {
   }
 
   onAfter2(_: RelationQueryBuilder, related: RelationModel[]): RelationModel[] {
-    const isOneToOne = this.relation.isOneToOne();
-
     if (this.assignResultToOwner && this.owner.isModels) {
-      const owners = this.owner.modelArray;
-      const relatedByOwnerId = new Map<string, RelationModel[]>();
-
-      for (let i = 0, l = related.length; i < l; ++i) {
-        const rel = related[i];
-        const key = this.relation.relatedProp.propKey(rel);
-        let arr = relatedByOwnerId.get(key);
-
-        if (!arr) {
-          arr = [];
-          relatedByOwnerId.set(key, arr);
+      if (this.assignAfterHooks) {
+        // Read the owner keys now, before the join columns that were only
+        // selected for them are omitted from the related models.
+        for (const rel of related) {
+          this.ownerKeyByRelated.set(rel, this.getOwnerKey(rel));
         }
-
-        arr.push(rel);
-      }
-
-      for (let i = 0, l = owners.length; i < l; ++i) {
-        const own = owners[i];
-        const key = this.relation.ownerProp.propKey(own);
-        const related = relatedByOwnerId.get(key);
-
-        if (isOneToOne) {
-          own[this.relationProperty] = (related && related[0]) || null;
-        } else {
-          own[this.relationProperty] = related || [];
-        }
+      } else {
+        this.assignToOwners(related, (rel) => this.getOwnerKey(rel));
       }
     }
 
     return related;
+  }
+
+  // Assigns what the query returns to the owners, after the `afterFind()` hooks
+  // and `runAfter()` callbacks of the query, which may filter or reorder the
+  // related models. Used with `useAfterFindInGraphs`.
+  assignResult(builder: RelationQueryBuilder, result: unknown): unknown {
+    if (this.assignAfterHooks && this.assignResultToOwner && this.owner.isModels) {
+      // `range()` and `page()` wrap the models in `{ results, total }`.
+      const models = builder.has(RangeOperation)
+        ? (result as { results: RelationModel[] }).results
+        : (result as RelationModel | RelationModel[] | null | undefined);
+      const related = asArray(models).filter((rel) => rel !== null && rel !== undefined);
+
+      this.assignToOwners(related, (rel) => {
+        const key = this.ownerKeyByRelated.get(rel);
+
+        if (key === undefined) {
+          throw new Error(
+            `Unable to assign the result to relation "${this.relation.name}" of ` +
+              `${this.relation.ownerModelClass.name}: afterFind() and runAfter() can only ` +
+              'return the related models that the query found, filtered or reordered.',
+          );
+        }
+
+        return key;
+      });
+    }
+
+    return result;
+  }
+
+  assignToOwners(related: RelationModel[], ownerKeyOf: (rel: RelationModel) => string): void {
+    const isOneToOne = this.relation.isOneToOne();
+    const relatedByOwnerKey = new Map<string, RelationModel[]>();
+
+    for (const rel of related) {
+      const key = ownerKeyOf(rel);
+      const arr = relatedByOwnerKey.get(key);
+
+      if (arr) {
+        arr.push(rel);
+      } else {
+        relatedByOwnerKey.set(key, [rel]);
+      }
+    }
+
+    for (const owner of this.owner.modelArray) {
+      const related = relatedByOwnerKey.get(this.relation.ownerProp.propKey(owner));
+
+      if (isOneToOne) {
+        owner[this.relationProperty] = (related && related[0]) || null;
+      } else {
+        owner[this.relationProperty] = related || [];
+      }
+    }
+  }
+
+  // The key of the owner that a related model belongs to.
+  getOwnerKey(related: RelationModel): string {
+    return this.relation.relatedProp.propKey(related);
   }
 
   // `related` is the array of the found models. It becomes a single model
@@ -160,6 +210,8 @@ class RelationFindOperation extends FindOperation {
     clone.relationProperty = this.relationProperty;
     clone.omitProps = this.omitProps.slice();
     clone.alias = this.alias;
+    clone.assignAfterHooks = this.assignAfterHooks;
+    clone.ownerKeyByRelated = this.ownerKeyByRelated;
 
     return clone;
   }

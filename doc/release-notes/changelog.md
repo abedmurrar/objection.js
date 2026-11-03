@@ -4,6 +4,10 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+### What's new
+
+- `static useAfterFindInGraphs`: with it, eager loading respects the static `afterFind()` hook of a related model class. `withGraphJoined()` calls the hook for the joined relations of the class, which it didn't at all, and the related models that the hook returns, e.g. filtered ones, are what `withGraphJoined()` and `withGraphFetched()` put in the graph. Before, `withGraphFetched()` assigned the related models before the hook ran, so an `afterFind()` that filters out models the user may not see didn't filter them in eager loading. Off by default; it will be on in 5.0. See [afterFind() with eager loading](/api/model/static-methods.html#with-eager-loading). The bug and the design are from Jürg Lehni's [ditojs/objection](https://github.com/ditojs/objection) (#1963).
+
 ## 4.1.4 (2026-11-03)
 
 ### Bug fixes

@@ -174,6 +174,10 @@ class Model {
   declare static defaultFindOptions: Readonly<Record<string, unknown>>;
   declare static modifiers: Record<string, unknown> | null;
   declare static useLimitInFirst: boolean;
+  // Calls the static `afterFind()` hook of the class for the models that
+  // `withGraphJoined()` fetches, and assigns what the hook returns in
+  // `withGraphJoined()` and `withGraphFetched()`. Off by default in 4.x.
+  declare static useAfterFindInGraphs: boolean;
   declare static columnNameMappers: ColumnNameMappers | null;
   declare static relatedFindQueryMutates: boolean;
   declare static relatedInsertQueryMutates: boolean;
@@ -933,6 +937,7 @@ Model.defaultGraphOptions = null;
 Model.defaultFindOptions = Object.freeze({});
 Model.modifiers = null;
 Model.useLimitInFirst = false;
+Model.useAfterFindInGraphs = false;
 Model.columnNameMappers = null;
 Model.relatedFindQueryMutates = false;
 Model.relatedInsertQueryMutates = false;

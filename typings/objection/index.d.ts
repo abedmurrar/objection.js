@@ -3645,6 +3645,7 @@ declare namespace Objection {
     relatedFindQueryMutates: boolean;
     relatedInsertQueryMutates: boolean;
     useLimitInFirst: boolean;
+    useAfterFindInGraphs: boolean;
     cloneObjectAttributes: boolean;
     concurrency: number | (() => number) | null;
     ValidationError: typeof ValidationError;
@@ -3764,6 +3765,14 @@ declare namespace Objection {
     static relatedFindQueryMutates: boolean;
     static relatedInsertQueryMutates: boolean;
     static useLimitInFirst: boolean;
+    /**
+     * If `true`, eager loading respects the static `afterFind()` hook of this
+     * class: `withGraphJoined()` calls it for the related models of this
+     * class, and in both `withGraphJoined()` and `withGraphFetched()` the
+     * related models it returns, e.g. filtered ones, are what end up in the
+     * graph. Defaults to `false`; it will be `true` in 5.0.
+     */
+    static useAfterFindInGraphs: boolean;
     static cloneObjectAttributes: boolean;
     /**
      * How many queries graph operations and eager loading run at a time. The

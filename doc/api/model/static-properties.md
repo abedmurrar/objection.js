@@ -554,6 +554,18 @@ class Animal extends Model {
 
 If `true`, `limit(1)` is added to the query when [first()](/api/query-builder/other-methods.html#first) is called. Defaults to `false` for legacy reasons.
 
+## `static` useAfterFindInGraphs
+
+```js
+class Pet extends Model {
+  static useAfterFindInGraphs = true;
+}
+```
+
+If `true`, eager loading respects the static [afterFind()](/api/model/static-methods.html#static-afterfind) hook of this class: `withGraphJoined()` calls it for the related models of this class, and the related models it returns, e.g. filtered ones, are what `withGraphJoined()` and `withGraphFetched()` put in the graph. See [afterFind() with eager loading](/api/model/static-methods.html#with-eager-loading).
+
+Defaults to `false`, which keeps the behaviour of objection.js. It will default to `true` in 5.0. Set it on a base model class to enable it for all models.
+
 ## `static` relatedFindQueryMutates
 
 ```js
