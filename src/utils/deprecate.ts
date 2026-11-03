@@ -8,4 +8,9 @@ function deprecate(message: string): void {
   }
 }
 
-export { deprecate };
+// For tests, which check the messages.
+function resetDeprecations(): void {
+  LOGGED_DEPRECATIONS.clear();
+}
+
+export { deprecate, resetDeprecations };

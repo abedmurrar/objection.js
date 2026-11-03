@@ -1,6 +1,7 @@
 const expect = require('expect.js');
 const expectPartEql = require('./../../testUtils/testUtils').expectPartialEqual;
 const isPostgres = require('../../lib/utils/knexUtils').isPostgres;
+const { resetDeprecations } = require('../../lib/utils/deprecate');
 
 module.exports = (session) => {
   const Model1 = session.models.Model1;
@@ -137,6 +138,37 @@ module.exports = (session) => {
             expect(rows).to.have.length(1);
             expectPartEql(rows[0], { id: 3, model1Prop1: 'hello 3' });
           });
+      });
+
+      it('should warn about an order with a limit on MySQL, as knex leaves out the order', async function () {
+        // Only MySQL supports a limit in deletes.
+        if (!session.isMySql()) {
+          this.skip();
+        }
+
+        const warnings = [];
+        const originalWarn = console.warn;
+        console.warn = (message) => warnings.push(message);
+        resetDeprecations();
+
+        try {
+          await Model1.query().delete().where('id', '>', 1).orderBy('id').limit(1);
+          expect(warnings).to.have.length(1);
+          expect(warnings[0]).to.match(/^orderBy\(\) has no effect in delete queries with limit\(\) on MySQL/);
+
+          resetDeprecations();
+          const model1 = await Model1.query().findById(1);
+          await model1.$relatedQuery('model1Relation2').delete().orderBy('id_col').limit(1);
+          expect(warnings).to.have.length(2);
+
+          // A limit without an order doesn't warn.
+          resetDeprecations();
+          await Model1.query().delete().where('id', '>', 1).limit(1);
+          expect(warnings).to.have.length(2);
+        } finally {
+          console.warn = originalWarn;
+          resetDeprecations();
+        }
       });
 
       if (isPostgres(session.knex)) {

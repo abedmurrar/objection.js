@@ -1,5 +1,7 @@
 import { QueryBuilderOperation } from './QueryBuilderOperation';
 import { StaticHookArguments, hasStaticHook } from '../StaticHookArguments';
+import { isMySql } from '../../utils/knexUtils';
+import { deprecate } from '../../utils/deprecate';
 import type { KnexBuilder, QueryBuilder } from './types';
 
 class DeleteOperation extends QueryBuilderOperation {
@@ -10,6 +12,7 @@ class DeleteOperation extends QueryBuilderOperation {
 
   onBuildKnex(knexBuilder: KnexBuilder, builder: QueryBuilder): KnexBuilder {
     assertNoOffset(builder);
+    warnOrderedLimit(builder);
     return knexBuilder.delete();
   }
 
@@ -38,6 +41,18 @@ function assertZeroOffset(op: QueryBuilderOperation): void {
     throw new Error(
       "offset() can't be used with a delete query. knex leaves the offset out of deletes, so the query would delete the first rows, " +
         'or every matching row when there is no limit. Select the ids of the rows first, then delete them with whereIn().',
+    );
+  }
+}
+
+// knex leaves the order out of deletes on MySQL but keeps their limit, so
+// `delete().orderBy('id').limit(1)` deletes any one matching row.
+function warnOrderedLimit(builder: QueryBuilder): void {
+  if (isMySql(builder.unsafeKnex()) && builder.has('limit') && builder.has(/^orderBy/)) {
+    deprecate(
+      'orderBy() has no effect in delete queries with limit() on MySQL: knex leaves the order out, ' +
+        'so the limit deletes matching rows in any order. Select the ids of the rows first, then ' +
+        'delete them with whereIn(). This will throw an error in objection 5.0.',
     );
   }
 }
