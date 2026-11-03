@@ -194,8 +194,14 @@ function addToId(id: InsertedId, amount: number): InsertedId {
 }
 
 function getDefaultReturning(builder: QueryBuilder): string | string[] {
+  const conflictColumns = getConflictColumns(builder);
+
+  if (conflictColumns.length === 0) {
+    return builder.modelClass().getIdColumn();
+  }
+
   const idColumns = builder.modelClass().getIdColumnArray();
-  const columns = Array.from(new Set(idColumns.concat(getConflictColumns(builder))));
+  const columns = Array.from(new Set(idColumns.concat(conflictColumns)));
 
   return columns.length === 1 ? columns[0] : columns;
 }
