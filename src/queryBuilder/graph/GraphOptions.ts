@@ -65,7 +65,7 @@ class GraphOptions {
       !getCurrentNode(node, graphData) &&
       !!node.parentEdge &&
       !!node.parentEdge.relation &&
-      node.parentEdge.relation.hasRelateProp(node.obj) &&
+      hasRelateProp(node) &&
       graphData.nodeDbExistence.doesNodeExistInDb(node)
     );
   }
@@ -187,6 +187,20 @@ class GraphOptions {
         `expected ${optionName} option value "${option}" to be an instance of boolean or array of strings`,
       );
     }
+  }
+}
+
+// For `HasMany` and `HasOne` relations, the relate prop is the id of the
+// related model. Use the id state of the input graph, since the parent's
+// insert copies the foreign key into the related model, which can complete
+// a composite id that contains it and would turn an insert into a relate (#2544).
+function hasRelateProp(node: GraphNode): boolean {
+  const relation = node.parentEdge!.relation;
+
+  if (relation.isObjectionHasManyRelation) {
+    return node.hasId;
+  } else {
+    return relation.hasRelateProp(node.obj);
   }
 }
 
