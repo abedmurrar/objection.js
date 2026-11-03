@@ -75,6 +75,15 @@ module.exports = {
         .toSQL();
   },
 
+  'build: $relatedQuery delete': async (objection) => {
+    const { Person, Pet } = defineModels(objection);
+    bind(objection, { Person, Pet });
+    const person = Person.fromJson({ id: 1, firstName: 'A' });
+
+    return () =>
+      person.$relatedQuery('pets').delete().where('species', 'dog').toKnexQuery().toSQL();
+  },
+
   // Execution overhead of small queries.
 
   'execute: find 1 row': async (objection) => {
@@ -96,6 +105,13 @@ module.exports = {
     bind(objection, { Person });
 
     return () => Person.query().insert({ firstName: 'Jennifer', lastName: 'Aniston', age: 40 });
+  },
+
+  'execute: delete with where': async (objection) => {
+    const { Person } = defineModels(objection);
+    bind(objection, { Person });
+
+    return () => Person.query().delete().where('age', '<', 20);
   },
 
   // Per-row work.

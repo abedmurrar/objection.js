@@ -4,6 +4,17 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+### Bug fixes
+
+- Types:
+  - `Model.knex(knex)` returns nothing and `query.knex(knex)` returns the query builder. Both were typed as returning `Knex`.
+  - `Model.ValidationError` and `Model.NotFoundError` are declared.
+  - `QueryBuilderOperation`, `QueryBuilderBase`, `Relation` and `RelationExpression` can be imported in TypeScript, and `clear()` takes an operation class like `clear(QueryBuilderOperation)`.
+- The check for an offset on delete queries, added in 4.0.4, no longer has a measurable cost.
+- Docs:
+  - The raw value examples of `insert()`, `patch()` and `update()` used `'Jenni' || 'fer'`, which means `or` on MySQL. They now use `upper(?)`.
+  - `outerJoin()` and `outerJoinRelated()` build a bare `outer join`, which postgres, MySQL and SQLite reject. Their docs say so, and that MySQL has no full outer joins.
+
 ## 4.0.4 (2026-11-03)
 
 ### Bug fixes
