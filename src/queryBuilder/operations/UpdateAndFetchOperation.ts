@@ -8,6 +8,8 @@ class UpdateAndFetchOperation extends DelegateOperation {
   declare delegate: UpdateOperation;
   declare id: unknown;
   declare skipIdWhere: boolean;
+  // Shared with the clones that each execution runs.
+  declare state: { isMerged: boolean };
 
   constructor(name: string | null, opt: OperationOptions) {
     super(name, opt);
@@ -18,6 +20,7 @@ class UpdateAndFetchOperation extends DelegateOperation {
 
     this.id = null;
     this.skipIdWhere = false;
+    this.state = { isMerged: false };
   }
 
   get model(): Model {
@@ -27,6 +30,19 @@ class UpdateAndFetchOperation extends DelegateOperation {
   onAdd(builder: QueryBuilder, args: unknown[]): boolean {
     this.id = args[0];
     return this.delegate.onAdd(builder, args.slice(1));
+  }
+
+  onBefore1(builder: QueryBuilder, result: unknown): unknown {
+    // A second run would write back the row that the first one merged into
+    // the patch.
+    if (this.state.isMerged) {
+      throw new Error(
+        `Unable to execute ${this.name}() twice, as the fetched row was merged into ` +
+          'its patch. Create a new query for each run.',
+      );
+    }
+
+    return super.onBefore1(builder, result);
   }
 
   onBuild(builder: QueryBuilder): void {
@@ -56,6 +72,7 @@ class UpdateAndFetchOperation extends DelegateOperation {
 
     if (fetched) {
       this.model.$set(fetched);
+      this.state.isMerged = true;
     }
 
     await super.onAfter2(builder, numUpdated);
@@ -73,6 +90,7 @@ class UpdateAndFetchOperation extends DelegateOperation {
 
     clone.id = this.id;
     clone.skipIdWhere = this.skipIdWhere;
+    clone.state = this.state;
 
     return clone;
   }
