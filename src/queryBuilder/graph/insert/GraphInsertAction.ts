@@ -2,6 +2,7 @@ import { GraphAction } from '../GraphAction';
 import { groupBy, chunk, get, set } from '../../../utils/objectUtils';
 import { ModelGraphEdge } from '../../../model/graph/ModelGraphEdge';
 import * as promiseUtils from '../../../utils/promiseUtils';
+import { isMySql } from '../../../utils/knexUtils';
 import type { GraphData, GraphEdge, GraphNode } from '../GraphData';
 import type { QueryBuilder } from '../../QueryBuilder';
 import type { ManyToManyRelation } from '../../../relations/manyToMany/ManyToManyRelation';
@@ -9,6 +10,48 @@ import type { ModelClass } from '../../QueryBuilderOperationSupport';
 
 // The edges each node depends on.
 type Dependencies = Map<GraphNode, GraphEdge[]>;
+
+// A MySQL insert of several rows returns the id of the first row only, which
+// gives the ids of the others when none of the rows has one (see
+// `InsertOperation.prepareMySqlBatchInsert()`). So the rows with an id and the
+// ones without are inserted separately. The ids of rows with a composite id
+// can't be computed, so those without one are inserted one at a time.
+// The ids are checked right before the insert, since the inserts of the
+// nodes they depend on can set them.
+function splitBatch(
+  builder: QueryBuilder,
+  modelClass: ModelClass,
+  nodes: GraphNode[],
+): GraphNode[][] {
+  if (nodes.length === 1 || !isMySql(builder.unsafeKnex())) {
+    return [nodes];
+  }
+
+  const withId: GraphNode[] = [];
+  const withoutId: GraphNode[] = [];
+
+  for (const node of nodes) {
+    (node.obj.$hasId() ? withId : withoutId).push(node);
+  }
+
+  const batches: GraphNode[][] = [];
+
+  if (withId.length !== 0) {
+    batches.push(withId);
+  }
+
+  if (withoutId.length !== 0) {
+    if (Array.isArray(modelClass.getIdColumn())) {
+      for (const node of withoutId) {
+        batches.push([node]);
+      }
+    } else {
+      batches.push(withoutId);
+    }
+  }
+
+  return batches;
+}
 
 /**
  * Inserts a batch of nodes for a GraphInsert.
@@ -205,13 +248,15 @@ class GraphInsertAction extends GraphAction {
       node.userData.inserted = true;
     }
 
-    return this._runRelationBeforeInsertMethods(parentBuilder, nodes).then(() => {
-      return modelClass
-        .query()
-        .insert(nodes.map((node) => node.obj))
-        .childQueryOf(parentBuilder)
-        .copyFrom(parentBuilder, GraphAction.ReturningAllSelector)
-        .execute();
+    return this._runRelationBeforeInsertMethods(parentBuilder, nodes).then(async () => {
+      for (const batch of splitBatch(parentBuilder, modelClass, nodes)) {
+        await modelClass
+          .query()
+          .insert(batch.map((node) => node.obj))
+          .childQueryOf(parentBuilder)
+          .copyFrom(parentBuilder, GraphAction.ReturningAllSelector)
+          .execute();
+      }
     });
   }
 
