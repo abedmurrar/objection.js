@@ -19,3 +19,7 @@ npm-debug.log*
 
 # Local Claude Code state, including agent worktrees
 /.claude
+
+# Benchmark profiles and the ORM benchmark dependencies (npm --prefix bench/orms install)
+/bench/.profiles
+/bench/orms/node_modules
