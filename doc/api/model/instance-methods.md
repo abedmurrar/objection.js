@@ -869,6 +869,8 @@ person.$setRelated('children', children);
 console.log(person.children[0]);
 ```
 
+In TypeScript, the relation name must be a relation of the model, and the related models must be of the relation's model, like in [relatedQuery()](/api/model/static-methods.html#static-relatedquery). Rows from queries work too. For a name the types can't check, like one in a variable, give the related model type explicitly: `person.$setRelated<Pet>(relationName, pets)`. A [Relation](/api/types/#class-relation) instance and models whose relations the types don't know take any name. The same goes for `$appendRelated()`.
+
 ## $appendRelated()
 
 ```js
