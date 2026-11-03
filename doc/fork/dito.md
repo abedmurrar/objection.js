@@ -2,7 +2,7 @@
 
 [ditojs/objection](https://github.com/ditojs/objection) is the fork of objection.js by Jürg Lehni, one of its maintainers, and is published as the `objection` package on npm. Many of its fixes apply to this fork too, so they are ported here, adapted to this fork's code, with credit to their authors in each commit. MySQL and MariaDB fixes come first; fixes that only matter on other databases may not be ported.
 
-Each row links the original commits. The version is the first release of this package with the change.
+Each row links the original commits, which are by Jürg Lehni unless another author is named next to the commit. Each ported commit in this repository has a `Co-authored-by` line for its original author. The version is the first release of this package with the change.
 
 ## Bug fixes
 
