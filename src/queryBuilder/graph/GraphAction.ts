@@ -1,10 +1,13 @@
-import { isPostgres } from '../../utils/knexUtils';
+import { isPostgres, isMySql } from '../../utils/knexUtils';
 import type { GraphData, GraphNode } from './GraphData';
 import type { QueryBuilder } from '../QueryBuilder';
 import type { Operation } from '../QueryBuilderOperationSupport';
 import type { ObjectionToKnexConvertingOperation } from '../operations/ObjectionToKnexConvertingOperation';
 
 const POSTGRES_MAX_INSERT_BATCH_SIZE = 100;
+// MySQL inserts of several rows return the ids of all of them, see
+// `InsertOperation.prepareMySqlBatchInsert()`.
+const MYSQL_MAX_INSERT_BATCH_SIZE = 100;
 const MAX_CONCURRENCY = 100;
 
 class GraphAction {
@@ -50,7 +53,15 @@ class GraphAction {
   }
 
   _getBatchSize(builder: QueryBuilder): number {
-    return isPostgres(builder.unsafeKnex()) ? POSTGRES_MAX_INSERT_BATCH_SIZE : 1;
+    const knex = builder.unsafeKnex();
+
+    if (isPostgres(knex)) {
+      return POSTGRES_MAX_INSERT_BATCH_SIZE;
+    } else if (isMySql(knex)) {
+      return MYSQL_MAX_INSERT_BATCH_SIZE;
+    } else {
+      return 1;
+    }
   }
 
   _resolveReferences(node: GraphNode): void {
