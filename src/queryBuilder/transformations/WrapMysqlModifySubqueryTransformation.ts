@@ -1,5 +1,5 @@
 import { QueryTransformation } from './QueryTransformation';
-import { isMySql } from '../../utils/knexUtils';
+import { isMySql, isMariaDb, getMariaDbVersion } from '../../utils/knexUtils';
 import type { QueryBuilder } from '../QueryBuilder';
 import type { ObjectionToKnexConvertingOperation } from '../operations/ObjectionToKnexConvertingOperation';
 
@@ -16,7 +16,8 @@ import type { ObjectionToKnexConvertingOperation } from '../operations/Objection
  *   update foo set bar = 1 where id in (select * from (select id from foo))
  */
 class WrapMysqlModifySubqueryTransformation extends QueryTransformation {
-  // In a join callback `parentQuery` is a `JoinBuilder`, which the loop below walks past.
+  // In a where group or a join callback `parentQuery` is a partial builder,
+  // which the loop below walks past.
   onConvertQueryBuilderBase(query: QueryBuilder, parentQuery: QueryBuilder | null): QueryBuilder {
     const knex = parentQuery!.unsafeKnex();
 
@@ -31,9 +32,21 @@ class WrapMysqlModifySubqueryTransformation extends QueryTransformation {
       return query;
     }
 
-    // A subquery in a join callback belongs to the query of the join.
-    while (parentQuery && typeof parentQuery.isUpdate !== 'function') {
-      // The loop stops at the first parent query that is a `QueryBuilder`.
+    // MariaDB 10.3.2+ allows these subqueries. Wrapping them would break
+    // correlated subqueries, since MariaDB doesn't support outer references in
+    // derived tables (MySQL 8.0.14+ does).
+    if (allowsSameTableSubqueries(knex)) {
+      return query;
+    }
+
+    // Subqueries in where groups and join clauses are converted with a
+    // partial builder (or a `JoinBuilder`) as their parent. Walk up to the
+    // query that they belong to.
+    while (
+      parentQuery &&
+      (typeof parentQuery.isUpdate !== 'function' ||
+        (parentQuery.isPartial() && parentQuery.parentQuery()))
+    ) {
       parentQuery = parentQuery.parentQuery() as QueryBuilder | null;
     }
 
@@ -53,6 +66,17 @@ class WrapMysqlModifySubqueryTransformation extends QueryTransformation {
 
     return query.modelClass().query().from(query.as('mysql_subquery_fix'));
   }
+}
+
+function allowsSameTableSubqueries(knex: unknown): boolean {
+  if (!isMariaDb(knex)) {
+    return false;
+  }
+
+  const version = getMariaDbVersion(knex);
+
+  // A MariaDB without a known version is assumed to be a current one.
+  return !version || version[0] > 10 || (version[0] === 10 && version[1] >= 3);
 }
 
 function hasJoinsToTable(query: QueryBuilder, tableName: string): boolean {

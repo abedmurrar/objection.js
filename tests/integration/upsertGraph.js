@@ -84,6 +84,68 @@ module.exports = (session) => {
         return session.populate(population);
       });
 
+      it('should return models that write their unchanged props in later patches (#371)', async () => {
+        const result = await Model1.query(session.knex).upsertGraph(
+          { id: 2, model1Relation2: [{ idCol: 1, model2Prop1: 'changed' }] },
+          { fetchStrategy },
+        );
+
+        // The upsert leaves out the unchanged foreign key.
+        const [related] = result.model1Relation2;
+        related.model1Id = null;
+        await related.$query(session.knex).patch();
+
+        const [row] = await session.knex('model2').where('id_col', 1);
+        chai.expect(row).to.containSubset({ model1_id: null, model2_prop1: 'changed' });
+      });
+
+      it('should give back the unchanged props when a patch fails (#371)', async () => {
+        const upsert = Model1.fromJson({
+          id: 2,
+          model1Relation2: [
+            {
+              idCol: 1,
+              model2Prop1: 'changed',
+              model2Relation1: [
+                { id: 4, model1Prop1: 'changed' },
+                { id: 5, model1Prop1: 'changed' },
+              ],
+            },
+            {
+              idCol: 2,
+              model2Prop1: 'changed',
+              model2Relation1: [
+                { id: 6, model1Prop1: 'changed' },
+                { id: 7, model1Prop1: 'changed' },
+              ],
+            },
+          ],
+        });
+        let hasFailed = false;
+
+        // Fail the first patch, before all others have started.
+        await Model1.query(session.knex)
+          .upsertGraph(upsert, { fetchStrategy })
+          .context({
+            runBefore(result, builder) {
+              if (builder.isUpdate() && !hasFailed) {
+                hasFailed = true;
+                throw new Error('failed patch');
+              }
+              return result;
+            },
+          })
+          .catch(() => {});
+
+        const models = upsert.model1Relation2.flatMap((model) => [model, ...model.model2Relation1]);
+        expect(hasFailed).to.equal(true);
+        // Only the join table extras stay left out, as they aren't columns.
+        const extras = ['aliasedExtra'];
+        chai
+          .expect(models.map((model) => model.$omitFromDatabaseJson()))
+          .to.eql([undefined, extras, extras, undefined, extras, extras]);
+      });
+
       it('should do nothing if an empty array is given', () => {
         return Promise.all([
           Model1.query(session.knex).upsertGraph([]),
@@ -350,6 +412,56 @@ module.exports = (session) => {
           },
         );
       }
+
+      it('should not insert the descendants of models skipped by noInsert (#215)', async () => {
+        await Model1.query(session.knex).upsertGraph(
+          {
+            id: 1,
+
+            model1Relation1: {
+              // Not inserted because of `noInsert`, and neither are its descendants.
+              model1Prop1: 'skipped belongsToOne',
+              model1Relation2: [{ model2Prop1: 'hasMany of skipped' }],
+            },
+          },
+          { fetchStrategy, noInsert: ['model1Relation1'] },
+        );
+
+        const [model1Rows, model2Rows] = await Promise.all([
+          session.knex('Model1'),
+          session.knex('model2'),
+        ]);
+
+        chai.expect(model1Rows).to.have.length(7);
+        chai.expect(model2Rows).to.have.length(2);
+      });
+
+      it('should only insert the missing models with the options of insertGraph', async () => {
+        await Model1.query(session.knex).upsertGraph(
+          {
+            id: 2,
+            model1Prop1: 'updated root 2',
+            model1Relation2: [
+              { idCol: 1, model2Prop1: 'updated hasMany 1' },
+              { idCol: 10, model2Prop1: 'inserted hasMany 10' },
+              { model2Prop1: 'inserted hasMany' },
+            ],
+          },
+          { fetchStrategy, noUpdate: true, noDelete: true, noUnrelate: true, insertMissing: true },
+        );
+
+        const root = await Model1.query(session.knex)
+          .findById(2)
+          .withGraphFetched('model1Relation2');
+
+        expect(root.model1Prop1).to.equal('root 2');
+        expect(root.model1Relation2.map((it) => it.model2Prop1).sort()).to.eql([
+          'hasMany 1',
+          'hasMany 2',
+          'inserted hasMany',
+          'inserted hasMany 10',
+        ]);
+      });
 
       it('should respect noDelete, noInsert and noUpdate flags', () => {
         const upsert = {
@@ -1752,6 +1864,22 @@ module.exports = (session) => {
               },
             });
           });
+      });
+
+      it('should only write the foreign key when hasManyRelation and hasOneRelation models are related with noUpdate: true', async () => {
+        await Model1.query(session.knex).upsertGraph(
+          {
+            id: 1,
+            model1Relation1Inverse: { id: 4, model1Prop1: 'this should not be written to db' },
+            model1Relation2: [{ idCol: 1, model2Prop1: 'this should not be written to db' }],
+          },
+          { fetchStrategy, relate: true, noUpdate: true, noDelete: true },
+        );
+
+        const model1 = await Model1.query(session.knex).findById(4);
+        expect([model1.model1Id, model1.model1Prop1]).to.eql([1, 'manyToMany 1']);
+        const model2 = await Model2.query(session.knex).findById(1);
+        expect([model2.model1Id, model2.model2Prop1]).to.eql([1, 'hasMany 1']);
       });
 
       it('should not update other than the relation properties when belongsToOneRelation is unrelated but the parent has noUpdate: true', () => {
@@ -3926,6 +4054,26 @@ module.exports = (session) => {
               done();
             })
             .catch(done);
+        });
+
+        it('should not delete anything when the graph contains cyclic references', async () => {
+          const upsert = [
+            { id: 2, model1Relation2: [] },
+            { '#id': 'a', model1Prop1: '#ref{b.model1Prop1}' },
+            { '#id': 'b', model1Prop1: '#ref{a.model1Prop1}' },
+          ];
+
+          const before = await session.knex('model2').where('model1_id', 2);
+          expect(before.length).to.be.above(0);
+
+          const err = await Model1.query(session.knex)
+            .upsertGraph(upsert, { fetchStrategy, allowRefs: true })
+            .catch((err) => err);
+
+          expect(err.message).to.equal('the object graph contains cyclic references');
+          // Give queries that would run after the rejection the time to do so.
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          expect(await session.knex('model2').where('model1_id', 2)).to.have.length(before.length);
         });
 
         it('cycle detection should consider already inserted nodes', () => {

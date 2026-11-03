@@ -1,4 +1,5 @@
 import { asArray, flatten, isString } from '../utils/objectUtils';
+import { isQueryProp } from './modelQueryProps';
 import type { JsonSchema, ModelClass, ModelJson } from './Model';
 
 function parseJsonAttributes(json: ModelJson, modelClass: ModelClass): ModelJson {
@@ -30,11 +31,12 @@ function formatJsonAttributes(json: ModelJson, modelClass: ModelClass): ModelJso
 
   if (jsonAttr.length) {
     // All database clients want JSON columns as strings. Do the conversion here.
+    // Leave query properties set in hooks like `$beforeUpdate()` as they are.
     for (let i = 0, l = jsonAttr.length; i < l; ++i) {
       const attr = jsonAttr[i];
       const value = json[attr];
 
-      if (value != null) {
+      if (value != null && !isQueryProp(value)) {
         json[attr] = JSON.stringify(value);
       }
     }

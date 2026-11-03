@@ -197,6 +197,7 @@ export default defineConfig({
         knex: 'knex methods',
         typescript: 'TypeScript',
         performance: 'Performance',
+        dito: 'Ported from ditojs/objection',
       }),
     },
 

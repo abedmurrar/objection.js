@@ -52,13 +52,17 @@ class UpdateOperation extends QueryBuilderOperation {
 
   onBuildKnex(knexBuilder: KnexBuilder, builder: QueryBuilder): KnexBuilder {
     const json = this.model.$toDatabaseJson(builder);
-    const convertedJson = convertFieldExpressionsToRaw(builder, this.model, json);
+    const convertedJson = convertFieldExpressionsToRaw(builder, json);
 
     return knexBuilder.update(convertedJson);
   }
 
-  onAfter2(builder: QueryBuilder, numUpdated: unknown): unknown {
-    return callAfterUpdate(builder, this.model, this.modelOptions, numUpdated);
+  async onAfter2(builder: QueryBuilder, numUpdated: unknown): Promise<unknown> {
+    const result = await callAfterUpdate(builder, this.model, this.modelOptions, numUpdated);
+    // The patched model is what the write returns, e.g. to `upsertGraph()` and
+    // `patchAndFetch()`, or what it merges into the instance of `$query()`.
+    removeFieldExpressions(this.model);
+    return result;
   }
 
   toFindOperation(): QueryBuilderOperation | null {
@@ -137,9 +141,20 @@ async function callStaticAfterUpdate(builder: QueryBuilder, result: unknown): Pr
   }
 }
 
+// Field expressions only describe the writes into json columns, they aren't
+// properties of the models that the writes return. They are removed after the
+// query, not while building it: a query can be built more than once, e.g. by
+// `toKnexQuery()` or a clone, and a second build would lose them.
+function removeFieldExpressions(model: Model): void {
+  for (const key of Object.keys(model)) {
+    if (key.indexOf(':') > -1) {
+      delete model[key];
+    }
+  }
+}
+
 function convertFieldExpressionsToRaw(
   builder: QueryBuilder,
-  model: Model,
   json: Record<string, unknown>,
 ): Record<string, unknown> {
   const knex = builder.knex();
@@ -186,8 +201,6 @@ function convertFieldExpressionsToRaw(
           [target, val] as RawBinding[],
         );
       }
-
-      delete model[key];
     } else {
       convertedJson[key] = val;
     }

@@ -89,6 +89,8 @@ class Relation {
   declare joinTableRelatedProp: RelationProperty | null;
   declare joinTableBeforeInsert: RelationBeforeInsert | null;
   declare joinTableExtras: JoinTableExtra[];
+  // Only many-to-many relations have one. `clone()` copies it.
+  declare joinTableModify: RelationModifier | null | undefined;
 
   declare modify: RelationModifier | null | undefined;
   declare beforeInsert: RelationBeforeInsert;
@@ -183,6 +185,7 @@ class Relation {
     relation.joinTableRelatedProp = this.joinTableRelatedProp;
     relation.joinTableBeforeInsert = this.joinTableBeforeInsert;
     relation.joinTableExtras = this.joinTableExtras;
+    relation.joinTableModify = this.joinTableModify;
 
     return relation;
   }

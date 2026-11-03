@@ -41,6 +41,8 @@ class JoinResultParser {
       return flatRows;
     }
 
+    this._checkIdColumns(flatRows[0] as FlatRow);
+
     this.columnsByTableNode = this._createColumns(flatRows[0]);
     this.rootModelsById = new Map();
     this.rootModels = [];
@@ -50,6 +52,26 @@ class JoinResultParser {
     }
 
     return this.rootModels;
+  }
+
+  // The flat rows are grouped into models by their ids. Without them, the rows
+  // can't be told apart and would be merged into the wrong models (#2748).
+  _checkIdColumns(row: FlatRow): void {
+    for (const tableNode of this.tableTree.nodes) {
+      const idColumns = tableNode.modelClass.getIdColumnArray();
+      const hasIdColumns =
+        idColumns.length > 0 &&
+        idColumns.every((column) => Object.hasOwn(row, tableNode.getColumnAliasForColumn(column)));
+
+      if (!hasIdColumns) {
+        throw new Error(
+          `withGraphJoined: the id column(s) [${idColumns.join(', ')}] of model ${tableNode.modelClass.name} ` +
+            `are missing from the result, so the joined rows can't be grouped into models. ` +
+            `withGraphJoined requires all models in the relation expression to have a primary key ` +
+            `(idColumn) that exists in the table. Use withGraphFetched for models without one.`,
+        );
+      }
+    }
   }
 
   // `modelsById` holds the models of `tableNode` that were already created

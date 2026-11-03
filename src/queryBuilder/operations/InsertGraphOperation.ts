@@ -52,6 +52,7 @@ class InsertGraphOperation extends DelegateOperation {
         noUnrelate: true,
         insertMissing: true,
       }),
+      insertOnly: true,
     });
 
     // We resolve this query here and will not execute it. This is because the root

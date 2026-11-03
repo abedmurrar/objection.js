@@ -329,38 +329,72 @@ function objectHasDefaults(obj: Record<string, unknown>): boolean {
 }
 
 function jsonSchemaWithoutRequired(jsonSchema: JsonSchema): JsonSchema {
-  const subSchemaProps = ['anyOf', 'oneOf', 'allOf', 'not', 'then', 'else', 'properties'];
+  // Boolean schemas (`true` / `false`) have no `required` to strip.
+  if (!isObject(jsonSchema)) {
+    return jsonSchema;
+  }
+
+  // `not` is intentionally left untouched: stripping `required` inside it
+  // would turn it into a schema that rejects everything (e.g.
+  // `not: { required: ['a'] }` -> `not: {}`). Kept as is, it still holds for
+  // patches: any property present in the patch is also present in the
+  // resulting object.
+  const subSchemaProps = ['anyOf', 'oneOf', 'allOf', 'then', 'else', 'properties'];
+  // `definitions` was renamed to `$defs` in draft 2019-09. Support both.
+  const definitionProps = ['definitions', '$defs'];
   return Object.assign(
     omit(jsonSchema, ['required', ...subSchemaProps]),
     ...subSchemaProps.map((prop) => subSchemaWithoutRequired(jsonSchema, prop)),
-    jsonSchema && jsonSchema.definitions && Object.keys(jsonSchema.definitions).length > 0
-      ? {
-          definitions: Object.assign(
-            ...(Object.keys(jsonSchema.definitions).map((prop) => ({
-              [prop]: jsonSchemaWithoutRequired(jsonSchema.definitions[prop]),
-            })) as [JsonSchema, ...JsonSchema[]]),
-          ),
-        }
-      : {},
+    ...definitionProps.map((prop) => definitionsWithoutRequired(jsonSchema, prop)),
     jsonSchema.discriminator && jsonSchema.discriminator.propertyName
       ? { required: [jsonSchema.discriminator.propertyName] }
       : {},
   );
 }
 
-function subSchemaWithoutRequired(jsonSchema: JsonSchema, prop: string): JsonSchema {
-  if (jsonSchema[prop]) {
-    if (Array.isArray(jsonSchema[prop])) {
-      const schemaArray = jsonSchemaArrayWithoutRequired(jsonSchema[prop]);
+function definitionsWithoutRequired(jsonSchema: JsonSchema, prop: string): JsonSchema {
+  const definitions = jsonSchema[prop] as Record<string, JsonSchema> | undefined;
 
-      if (schemaArray.length !== 0) {
+  if (definitions && Object.keys(definitions).length > 0) {
+    return {
+      [prop]: Object.fromEntries(
+        Object.entries(definitions).map(([key, schema]) => [
+          key,
+          jsonSchemaWithoutRequired(schema),
+        ]),
+      ),
+    };
+  } else {
+    return {};
+  }
+}
+
+function subSchemaWithoutRequired(jsonSchema: JsonSchema, prop: string): JsonSchema {
+  if (jsonSchema[prop] !== undefined) {
+    if (Array.isArray(jsonSchema[prop])) {
+      const schemaArray = (jsonSchema[prop] as JsonSchema[]).map(jsonSchemaWithoutRequired);
+      const nonEmptySchemaArray = schemaArray.filter((schema) => !matchesAnything(schema));
+
+      // An `anyOf` or `oneOf` option that only consisted of `required` is
+      // empty once `required` is stripped, and an empty schema matches any
+      // patch, just like the stripped `required` keywords elsewhere and the
+      // `true` schema. Drop the whole keyword then: requiring the patch to
+      // match one of the remaining options would reject valid patches, and
+      // with `oneOf` keeping the empty option would fail every patch that also
+      // matches another option.
+      if (prop !== 'allOf' && nonEmptySchemaArray.length !== schemaArray.length) {
+        return {};
+      } else if (nonEmptySchemaArray.length !== 0) {
         return {
-          [prop]: schemaArray,
+          [prop]: nonEmptySchemaArray,
         };
       } else {
         return {};
       }
-    } else if (jsonSchema.type === 'object' && prop === 'properties') {
+    } else if (prop === 'properties') {
+      // `properties` is a map of property names to schemas, regardless of the
+      // schema's `type` (which may also be e.g. `['object', 'null']`, or be
+      // missing entirely).
       return {
         [prop]: Object.fromEntries(
           Object.entries(jsonSchema[prop] as Record<string, JsonSchema>).map(([key, schema]) => [
@@ -379,12 +413,8 @@ function subSchemaWithoutRequired(jsonSchema: JsonSchema, prop: string): JsonSch
   }
 }
 
-function jsonSchemaArrayWithoutRequired(jsonSchemaArray: JsonSchema[]): JsonSchema[] {
-  return jsonSchemaArray.map(jsonSchemaWithoutRequired).filter(isNotEmptyObject);
-}
-
-function isNotEmptyObject(obj: object): boolean {
-  return Object.keys(obj).length !== 0;
+function matchesAnything(schema: unknown): boolean {
+  return schema === true || (isObject(schema) && Object.keys(schema).length === 0);
 }
 
 export { AjvValidator };

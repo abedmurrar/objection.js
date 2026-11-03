@@ -24,12 +24,16 @@ const FetchStrategy = {
 
 class GraphOptions {
   declare options: GraphOptionsInput;
+  // Only `insertGraph()` sets it: it never fetches, updates or removes existing rows.
+  declare insertOnly: boolean;
 
-  constructor(options: GraphOptionsInput | GraphOptions) {
+  constructor(options: GraphOptionsInput | GraphOptions, insertOnly = false) {
     if (options instanceof GraphOptions) {
       this.options = options.options;
+      this.insertOnly = options.insertOnly;
     } else {
       this.options = options;
+      this.insertOnly = insertOnly;
     }
   }
 
@@ -45,13 +49,10 @@ class GraphOptions {
     }
   }
 
+  // An `upsertGraph()` with noUpdate, noDelete, noUnrelate and insertMissing
+  // is still an upsert: it must find the existing rows.
   isInsertOnly(): boolean {
-    // NO_RELATE is not in the list, since the `insert only` mode does
-    // relate things that can be related using inserts.
-    // TODO: Use a special key for this.
-    return [NO_DELETE, NO_UPDATE, NO_UNRELATE, INSERT_MISSING].every((opt) => {
-      return this.options[opt] === true;
-    });
+    return this.insertOnly;
   }
 
   // Like `shouldRelate` but ignores settings that explicitly disable relate operations.
@@ -65,7 +66,7 @@ class GraphOptions {
       !getCurrentNode(node, graphData) &&
       !!node.parentEdge &&
       !!node.parentEdge.relation &&
-      node.parentEdge.relation.hasRelateProp(node.obj) &&
+      hasRelateProp(node) &&
       graphData.nodeDbExistence.doesNodeExistInDb(node)
     );
   }
@@ -170,7 +171,7 @@ class GraphOptions {
       }
     }
 
-    return new GraphOptions(newOpt);
+    return new GraphOptions(newOpt, this.insertOnly);
   }
 
   _hasOption(node: GraphNode, optionName: string): boolean {
@@ -187,6 +188,20 @@ class GraphOptions {
         `expected ${optionName} option value "${option}" to be an instance of boolean or array of strings`,
       );
     }
+  }
+}
+
+// For `HasMany` and `HasOne` relations, the relate prop is the id of the
+// related model. Use the id state of the input graph, since the parent's
+// insert copies the foreign key into the related model, which can complete
+// a composite id that contains it and would turn an insert into a relate (#2544).
+function hasRelateProp(node: GraphNode): boolean {
+  const relation = node.parentEdge!.relation;
+
+  if (relation.isObjectionHasManyRelation) {
+    return node.hasId;
+  } else {
+    return relation.hasRelateProp(node.obj);
   }
 }
 

@@ -33,7 +33,7 @@ class MergeOperation extends QueryBuilderOperation {
 
     if (this.model) {
       const json = this.model.$toDatabaseJson(builder);
-      const convertedJson = convertFieldExpressionsToRaw(builder, this.model, json);
+      const convertedJson = convertFieldExpressionsToRaw(builder, json);
 
       return knexBuilder.merge(convertedJson);
     }

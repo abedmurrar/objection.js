@@ -22,21 +22,25 @@ class GraphUpsert {
   declare objects: GraphModel[];
   declare isArray: boolean;
   declare upsertOpt: GraphOptionsInput;
+  declare insertOnly: boolean;
 
   constructor({
     rootModelClass,
     objects,
     upsertOptions,
+    insertOnly = false,
   }: {
     rootModelClass: ModelClass;
     objects: unknown;
     upsertOptions: GraphOptionsInput;
+    insertOnly?: boolean;
   }) {
     checkCanBeConvertedToModels(rootModelClass, objects);
 
     this.objects = rootModelClass.ensureModelArray(objects, GraphUpsert.modelOptions);
     this.isArray = Array.isArray(objects);
     this.upsertOpt = upsertOptions;
+    this.insertOnly = insertOnly;
   }
 
   static get modelOptions(): { skipValidation: boolean } {
@@ -45,7 +49,7 @@ class GraphUpsert {
 
   run(builder: QueryBuilder): Promise<GraphModel | GraphModel[]> {
     const modelClass = builder.modelClass();
-    const graphOptions = new GraphOptions(this.upsertOpt);
+    const graphOptions = new GraphOptions(this.upsertOpt, this.insertOnly);
 
     const graph = ModelGraph.create(modelClass, this.objects) as Graph;
     assignDbRefsAsRelateProps(graph);
@@ -111,6 +115,7 @@ function fetchCurrentGraph(
 function pruneGraphs(): (graphData: GraphData) => GraphData {
   return (graphData) => {
     pruneRelatedBranches(graphData);
+    pruneSkippedBranches(graphData);
 
     if (!graphData.graphOptions.isInsertOnly()) {
       pruneDeletedBranches(graphData);
@@ -129,6 +134,31 @@ function pruneRelatedBranches(graphData: GraphData): void {
   });
 
   removeBranchesFromGraph(findRoots(relateNodes), graphData.graph);
+}
+
+// Nothing is written below nodes that `noInsert` skips, as their descendants
+// would be orphans (#215). Branches that references from outside point into
+// are kept, since the references need their models.
+function pruneSkippedBranches(graphData: GraphData): void {
+  const { graph, graphOptions } = graphData;
+
+  const skippedNodes = graph.nodes.filter((node) => {
+    return (
+      graphOptions.shouldInsertIgnoreDisable(node, graphData) &&
+      !graphOptions.shouldInsert(node, graphData) &&
+      !isReferencedFromOutside(node.descendantRelationNodes)
+    );
+  });
+
+  removeBranchesFromGraph(findRoots(skippedNodes), graph);
+}
+
+function isReferencedFromOutside(nodes: GraphNode[]): boolean {
+  const nodeSet = new Set(nodes);
+
+  return nodes.some((node) =>
+    node.refEdges.some((edge) => edge.isRelatedNode(node) && !nodeSet.has(edge.ownerNode)),
+  );
 }
 
 function pruneDeletedBranches(graphData: GraphData): void {
@@ -303,12 +333,16 @@ function executeOperations(builder: QueryBuilder): (graphData: GraphData) => Pro
       ? [GraphInsert]
       : [GraphDelete, GraphInsert, GraphPatch, GraphRecursiveUpsert];
 
-    return operations.reduce<Promise<unknown>>((promise, Operation) => {
-      const operation = new Operation(graphData);
-      const actions = operation.createActions();
+    // Create all actions before chaining the first ones, which would run even
+    // if creating the actions of a later operation throws, e.g. for a cycle.
+    const operationActions = operations.map((Operation) =>
+      new Operation(graphData).createActions(),
+    );
 
-      return promise.then(() => executeActions(builder, actions));
-    }, Promise.resolve());
+    return operationActions.reduce<Promise<unknown>>(
+      (promise, actions) => promise.then(() => executeActions(builder, actions)),
+      Promise.resolve(),
+    );
   };
 }
 

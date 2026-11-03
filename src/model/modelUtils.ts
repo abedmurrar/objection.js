@@ -42,4 +42,20 @@ function keyByProps<M extends Model>(
   return map;
 }
 
-export { hiddenProps, staticHiddenProps, defineNonEnumerableProperty, keyByProps };
+// Give `model` back the props that it left out of its database JSON, as
+// returned by `$omitFromDatabaseJson()` before more were left out.
+function restoreOmitFromDatabaseJson(model: object, props: string[] | undefined): void {
+  if (props) {
+    defineNonEnumerableProperty(model, '$$omitFromDatabaseJson', props);
+  } else {
+    delete (model as { $$omitFromDatabaseJson?: string[] }).$$omitFromDatabaseJson;
+  }
+}
+
+export {
+  hiddenProps,
+  staticHiddenProps,
+  defineNonEnumerableProperty,
+  keyByProps,
+  restoreOmitFromDatabaseJson,
+};

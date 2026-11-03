@@ -1,4 +1,5 @@
 import { getModel } from '../../../model/getModel';
+import { restoreOmitFromDatabaseJson } from '../../../model/modelUtils';
 import { GraphAction } from '../GraphAction';
 import { isInternalProp } from '../../../utils/internalPropUtils';
 import { difference, isObject, jsonEquals } from '../../../utils/objectUtils';
@@ -15,10 +16,24 @@ class GraphPatchAction extends GraphAction {
     this.nodes = nodes;
   }
 
-  run(builder: QueryBuilder): PromiseLike<unknown> {
-    return promiseUtils.map(this.nodes, (node: GraphNode) => this._runForNode(builder, node), {
-      concurrency: this._getConcurrency(builder, this.nodes),
-    });
+  async run(builder: QueryBuilder): Promise<unknown> {
+    // The patches leave out the props that don't change, but the models that
+    // the graph returns get them back once the patches are written (#371).
+    const omittedProps = new Map(
+      this.nodes.map((node) => [node, node.obj.$omitFromDatabaseJson()] as const),
+    );
+
+    try {
+      return await promiseUtils.map(
+        this.nodes,
+        (node: GraphNode) => this._runForNode(builder, node),
+        { concurrency: this._getConcurrency(builder, this.nodes) },
+      );
+    } finally {
+      for (const [node, props] of omittedProps) {
+        restoreOmitFromDatabaseJson(node.obj, props);
+      }
+    }
   }
 
   _runForNode(builder: QueryBuilder, node: GraphNode): Promise<unknown> | null {
@@ -33,6 +48,14 @@ class GraphPatchAction extends GraphAction {
     // properties. That's why we handle them here.
     const changePropsBecauseOfBelongsToOneDelete = this._handleBelongsToOneDeletes(node);
 
+    // HasManyRelation and HasOneRelation relates write the related object's
+    // foreign keys, also with `noUpdate`.
+    const changedPropsBecauseOfRelate =
+      this.graphOptions.shouldRelate(node, this.graphData) &&
+      node.parentEdge!.relation.isObjectionHasManyRelation
+        ? node.parentEdge!.relation.relatedProp.props
+        : [];
+
     const handleUpdate = (): boolean => {
       const { changedProps, unchangedProps } = this._findChanges(node);
       const allProps = [...changedProps, ...unchangedProps];
@@ -40,7 +63,11 @@ class GraphPatchAction extends GraphAction {
       const propsToUpdate = difference(
         shouldPatch || shouldUpdate
           ? changedProps
-          : [...changedPropsBecauseOfBelongsToOneInsert, ...changePropsBecauseOfBelongsToOneDelete],
+          : [
+              ...changedPropsBecauseOfBelongsToOneInsert,
+              ...changePropsBecauseOfBelongsToOneDelete,
+              ...changedPropsBecauseOfRelate,
+            ],
 
         // Remove id properties from the props to update. With upsertGraph
         // it never makes sense to change the id.

@@ -23,6 +23,7 @@ interface GraphNode {
   modelClass: ModelClass;
   obj: GraphModel;
   edges: GraphEdge[];
+  refEdges: GraphEdge[];
   userData: Record<string, unknown>;
   hasId: boolean;
   uid: unknown;
@@ -52,6 +53,7 @@ interface GraphEdge {
   refRelatedDataPath: PropertyKey[] | null;
   getOtherNode(node: GraphNode): GraphNode;
   isOwnerNode(node: GraphNode): boolean;
+  isRelatedNode(node: GraphNode): boolean;
 }
 
 interface Graph {

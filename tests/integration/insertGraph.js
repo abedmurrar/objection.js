@@ -333,6 +333,44 @@ module.exports = (session) => {
         }, 'model1Relation1.model1Relation3[1].model2Prop1'),
       );
 
+      it('should roll back after the inserts that already started when a model fails validation', async () => {
+        let numStarted = 0;
+        let numInserted = 0;
+
+        class ValidatedModel1 extends Model1 {
+          static jsonSchema = {
+            type: 'object',
+            properties: {
+              model1Prop1: { type: 'string' },
+            },
+          };
+
+          // Keep the valid inserts running when the invalid model fails:
+          async $beforeInsert() {
+            numStarted++;
+            await new Promise((resolve) => setTimeout(resolve, 10));
+          }
+
+          $afterInsert() {
+            numInserted++;
+          }
+        }
+
+        const graph = [
+          ...Array.from({ length: 7 }, (_, i) => ({ model1Prop1: `${i}` })),
+          { model1Prop1: 666 },
+        ];
+
+        const err = await transaction(ValidatedModel1, (ValidatedModel1) =>
+          ValidatedModel1.query().insertGraph(graph),
+        ).catch((err) => err);
+
+        expect(err).to.be.a(ValidationError);
+        // Inserts that run after the rollback can commit their rows on SQLite:
+        expect(numInserted).to.equal(numStarted);
+        expect(await session.knex('Model1')).to.have.length(1);
+      });
+
       it('should validate models upon insertion: references in integer columns should be accepted', () => {
         return transaction(Model1, Model2, (Model1, Model2) => {
           // We can modify Model1 and Model2 here since it is a subclass of the actual
@@ -419,6 +457,89 @@ module.exports = (session) => {
               ],
             });
           });
+      });
+
+      it('should not insert the descendants of models skipped by noInsert (#215)', async () => {
+        await Model1.query().insertGraph(
+          {
+            model1Prop1: 'root',
+
+            model1Relation2: [
+              {
+                // Not inserted because of `noInsert`, and neither are its descendants.
+                model2Prop1: 'skipped hasMany',
+
+                model2Relation1: [
+                  {
+                    model1Prop1: 'manyToMany of skipped',
+                    model1Relation1: { model1Prop1: 'belongsToOne of skipped' },
+                  },
+                ],
+              },
+            ],
+          },
+          { noInsert: ['model1Relation2'] },
+        );
+
+        const [model1Rows, model2Rows] = await Promise.all([
+          session.knex('Model1').orderBy('id'),
+          session.knex('model2'),
+        ]);
+
+        chai.expect(model1Rows.map((row) => row.model1Prop1)).to.eql(['20', 'root']);
+        chai.expect(model2Rows.map((row) => row.id_col)).to.eql([1]);
+      });
+
+      it('should insert the models below models skipped by noInsert that #ref points to (#215)', async () => {
+        const model = await Model1.query().insertGraph(
+          {
+            model1Prop1: 'root',
+
+            model1Relation1: {
+              // Not inserted because of `noInsert`.
+              model1Prop1: 'skipped belongsToOne',
+              model1Relation2: [{ '#id': 'referenced', model2Prop1: 'referenced' }],
+
+              model1Relation1: {
+                // Not inserted because of `noInsert`, and neither are its descendants.
+                model1Prop1: 'nested skipped belongsToOne',
+                model1Relation2: [{ model2Prop1: 'hasMany of nested skipped' }],
+              },
+            },
+
+            model1Relation3: [{ '#ref': 'referenced' }],
+          },
+          { allowRefs: true, noInsert: ['model1Relation1', 'model1Relation1.model1Relation1'] },
+        );
+
+        const result = await Model1.query().findById(model.id).withGraphFetched('model1Relation3');
+
+        expect(result.model1Id).to.equal(null);
+        expect(result.model1Relation3.map((it) => it.model2Prop1)).to.eql(['referenced']);
+        expect(
+          await session.knex('model2').where('model2_prop1', 'hasMany of nested skipped'),
+        ).to.eql([]);
+      });
+
+      it('should insert the models below models skipped by noInsert that #ref{} points to (#215)', async () => {
+        const model = await Model1.query().insertGraph(
+          {
+            model1Prop1: 'root',
+            model1Prop2: '#ref{referenced.idCol}',
+
+            model1Relation1: {
+              // Not inserted because of `noInsert`.
+              model1Prop1: 'skipped belongsToOne',
+              model1Relation2: [{ '#id': 'referenced', model2Prop1: 'referenced' }],
+            },
+          },
+          { allowRefs: true, noInsert: ['model1Relation1'] },
+        );
+
+        const [row] = await session.knex('model2').where('model2_prop1', 'referenced');
+
+        expect(row.id_col).to.be.a('number');
+        expect(model.model1Prop2).to.equal(row.id_col);
       });
 
       it('trying to relate a HasManyRelation should throw', (done) => {
@@ -686,6 +807,27 @@ module.exports = (session) => {
     });
 
     describe('.$relatedQuery().insertGraph()', () => {
+      describe('belongs to one relation', () => {
+        let parent;
+
+        beforeEach(async () => {
+          await session.populate(population);
+          parent = await Model1.query().findById(1);
+        });
+
+        it('should insert a model with relations and relate it (#216)', async () => {
+          const inserted = await parent
+            .$relatedQuery('model1Relation1')
+            .insertGraph(insertion, { allowRefs: true });
+
+          expect(parent.model1Id).to.equal(inserted.id);
+          await check(inserted, true);
+
+          const row = await session.knex('Model1').where('id', 1).first();
+          expect(row.model1Id).to.equal(inserted.id);
+        });
+      });
+
       describe('has many relation', () => {
         let parent;
 

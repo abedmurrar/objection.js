@@ -460,6 +460,13 @@ describe('ManyToManyRelation', () => {
     expect(relationFilter.joinTableModify).to.be.a(Function);
   });
 
+  it('should keep the join.through modifier in clones, which bindKnex() uses', () => {
+    const modifier = (builder) => builder.where('someColumn', 'foo');
+    createJoinThroughModifiedRelation(modifier);
+
+    expect(relation.clone().joinTableModify).to.equal(relation.joinTableModify);
+  });
+
   describe('find', () => {
     it('should generate a find query', () => {
       const owner = OwnerModel.fromJson({ oid: 666 });
