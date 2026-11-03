@@ -1,7 +1,19 @@
 import { Person } from './fixtures/person';
 import type { Animal } from './fixtures/animal';
 import type { ModelClass } from '../../';
-import { Model, QueryBuilder, knexIdentifierMapping, type Transaction } from '../../';
+import {
+  Model,
+  type NotFoundError,
+  QueryBuilder,
+  QueryBuilderBase,
+  QueryBuilderOperation,
+  Relation,
+  RelationExpression,
+  type ValidationError,
+  knexIdentifierMapping,
+  type Transaction,
+} from '../../';
+import type { Knex } from 'knex';
 import { expectType } from './_utils/expect';
 
 (async () => {
@@ -51,3 +63,29 @@ import { expectType } from './_utils/expect';
 
   const parsed: object = QueryBuilder.parseRelationExpression('[pets, children]');
 })();
+
+// knex() getters and setters, the error classes on Model and the runtime-only
+// classes.
+(async (knex: Knex) => {
+  expectType<Knex>()(Person.knex());
+  expectType<void>()(Person.knex(knex));
+
+  const query = Person.query().where('firstName', 'Jennifer');
+  expectType<typeof query>()(query.knex(knex));
+  expectType<Knex>()(Person.query().knex());
+
+  expectType<typeof NotFoundError>()(Person.NotFoundError);
+  expectType<typeof ValidationError>()(Model.ValidationError);
+  const notFound = new Person.NotFoundError({ modelClass: Person });
+  const isValidation: boolean = notFound instanceof Model.ValidationError;
+
+  Person.query().clear(QueryBuilderOperation).clear('where').clear(/order/);
+
+  const expr = RelationExpression.create('[pets, children]');
+  const exprString: string | null = expr.toString();
+  const isSub: boolean = expr.isSubExpression('pets');
+
+  const relation = Person.getRelation('pets');
+  const isRelation: boolean = relation instanceof Relation;
+  const isBase: boolean = (query as unknown) instanceof QueryBuilderBase;
+})(Person.knex());

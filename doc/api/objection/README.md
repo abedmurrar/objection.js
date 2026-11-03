@@ -33,7 +33,7 @@ const { QueryBuilder } = require('objection');
 const { QueryBuilderBase } = require('objection');
 ```
 
-The base class of [QueryBuilder](/api/query-builder/). It isn't in the TypeScript types.
+The base class of [QueryBuilder](/api/query-builder/).
 
 ## QueryBuilderOperation
 
@@ -41,7 +41,7 @@ The base class of [QueryBuilder](/api/query-builder/). It isn't in the TypeScrip
 const { QueryBuilderOperation } = require('objection');
 ```
 
-The base class of the operations a query is made of. Every operation matches it, so `query.clear(QueryBuilderOperation)` removes all operations of the query. It isn't in the TypeScript types.
+The base class of the operations a query is made of. Every operation matches it, so `query.clear(QueryBuilderOperation)` removes all operations of the query.
 
 ## Relation
 
@@ -56,7 +56,7 @@ const {
 } = require('objection');
 ```
 
-The [relation](/api/types/#class-relation) classes. They are the same classes as `Model.BelongsToOneRelation`, `Model.HasOneRelation` and so on, which are used as the `relation` of a [RelationMapping](/api/types/#type-relationmapping). `Relation` is the base class of the others. In TypeScript, `Relation` is only an interface, so the `Relation` class itself can't be imported.
+The [relation](/api/types/#class-relation) classes. They are the same classes as `Model.BelongsToOneRelation`, `Model.HasOneRelation` and so on, which are used as the `relation` of a [RelationMapping](/api/types/#type-relationmapping). `Relation` is the base class of the others.
 
 ## RelationExpression
 
@@ -64,7 +64,7 @@ The [relation](/api/types/#class-relation) classes. They are the same classes as
 const { RelationExpression } = require('objection');
 ```
 
-The class of parsed [relation expressions](/api/types/#type-relationexpression). `RelationExpression.create(expr)` parses a string or an object expression. The query builder methods take strings and objects, so you don't need it to pass expressions to them. In TypeScript, `RelationExpression` is only a type, so the class can't be imported.
+The class of parsed [relation expressions](/api/types/#type-relationexpression). `RelationExpression.create(expr)` parses a string or an object expression. The query builder methods take strings and objects, so you don't need it to pass expressions to them.
 
 ## defineRelations
 

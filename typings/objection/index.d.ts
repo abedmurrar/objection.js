@@ -35,6 +35,11 @@ declare namespace Objection {
   const HasManyRelation: RelationType<'many'>;
   const ManyToManyRelation: RelationType<'many'>;
   const HasOneThroughRelation: RelationType<'one'>;
+  /**
+   * The base class of the relation classes.
+   */
+  const Relation: RelationType;
+  const RelationExpression: RelationExpressionClass;
 
   const snakeCaseMappers: SnakeCaseMappersFactory;
   const knexSnakeCaseMappers: KnexSnakeCaseMappersFactory;
@@ -1166,6 +1171,19 @@ declare namespace Objection {
   }
 
   type RelationExpression<M extends Model> = string | object;
+
+  /**
+   * A parsed relation expression, from `RelationExpression.create()`.
+   */
+  interface ParsedRelationExpression {
+    isSubExpression(expr: RelationExpression<any>): boolean;
+    toString(): string | null;
+    toPojo(): object;
+  }
+
+  interface RelationExpressionClass {
+    create(expr?: RelationExpression<any>): ParsedRelationExpression;
+  }
 
   /**
    * `E` if it's a valid relation expression for model `M`, otherwise a message
@@ -2318,8 +2336,22 @@ declare namespace Objection {
   }
 
   interface ClearMethod<QB extends AnyQueryBuilder> {
-    (selector: string | RegExp): QB;
+    (selector: string | RegExp | typeof QueryBuilderOperation): QB;
   }
+
+  /**
+   * The base class of the operations a query is made of.
+   * `query.clear(QueryBuilderOperation)` removes every operation.
+   */
+  export class QueryBuilderOperation {
+    name: string | null;
+    opt: object;
+  }
+
+  /**
+   * The base class of `QueryBuilder`.
+   */
+  export class QueryBuilderBase {}
 
   interface ColumnInfoMethod<QB extends AnyQueryBuilder> {
     (): Promise<Knex.ColumnInfo>;
@@ -3029,7 +3061,8 @@ declare namespace Objection {
     columnInfo: ColumnInfoMethod<this>;
 
     toKnexQuery<T extends {} = ModelObject<M>>(): Knex.QueryBuilder<T, T[]>;
-    knex(knex?: Knex): Knex;
+    knex(): Knex;
+    knex(knex: Knex | null | undefined): this;
     clone(): this;
 
     page(page: number, pageSize: number): this['~page'];
@@ -3590,6 +3623,8 @@ declare namespace Objection {
     useLimitInFirst: boolean;
     cloneObjectAttributes: boolean;
     concurrency: number | (() => number) | null;
+    ValidationError: typeof ValidationError;
+    NotFoundError: typeof NotFoundError;
     modifiers: Modifiers;
     columnNameMappers: ColumnNameMappers;
 
@@ -3632,7 +3667,8 @@ declare namespace Objection {
     tableMetadata(opt?: TableMetadataOptions): TableMetadata;
     fetchTableMetadata(opt?: FetchTableMetadataOptions): Promise<TableMetadata>;
 
-    knex(knex?: Knex): Knex;
+    knex(): Knex;
+    knex(knex: Knex): void;
     knexQuery(): Knex.QueryBuilder;
     startTransaction(knexOrTransaction?: TransactionOrKnex): Promise<Transaction>;
 
@@ -3711,6 +3747,8 @@ declare namespace Objection {
      * which run one at a time.
      */
     static concurrency: number | (() => number) | null;
+    static ValidationError: typeof ValidationError;
+    static NotFoundError: typeof NotFoundError;
     static modifiers: Modifiers;
     static columnNameMappers: ColumnNameMappers;
 
@@ -3784,7 +3822,8 @@ declare namespace Objection {
     static tableMetadata(opt?: TableMetadataOptions): TableMetadata;
     static fetchTableMetadata(opt?: FetchTableMetadataOptions): Promise<TableMetadata>;
 
-    static knex(knex?: Knex): Knex;
+    static knex(): Knex;
+    static knex(knex: Knex): void;
     static knexQuery(): Knex.QueryBuilder;
     static startTransaction(knexOrTransaction?: TransactionOrKnex): Promise<Transaction>;
 

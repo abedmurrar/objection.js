@@ -73,7 +73,7 @@ const { raw } = require('objection');
 
 await Person.query().insert({
   age: Person.query().avg('age'),
-  firstName: raw("'Jenni' || 'fer'")
+  firstName: raw('upper(?)', ['jennifer'])
 });
 ```
 
@@ -213,7 +213,7 @@ await Person.query().patch({
   age: Person.query().avg('age'),
   // You can use knex.raw instead of `raw()` if
   // you prefer.
-  firstName: raw("'Jenni' || 'fer'"),
+  firstName: raw('upper(?)', ['jennifer']),
   oldLastName: ref('lastName'),
   // This updates a value nested deep inside a
   // json column `detailsJsonColumn`.
@@ -323,7 +323,7 @@ You can also give raw expressions, subqueries and `ref()` as values like this:
 const { raw, ref } = require('objection');
 
 await Person.query().update({
-  firstName: raw("'Jenni' || 'fer'"),
+  firstName: raw('upper(?)', ['jennifer']),
   lastName: 'Lawrence',
   age: Person.query().avg('age'),
   oldLastName: ref('lastName') // same as knex.raw('??', ['lastName'])

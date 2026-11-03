@@ -100,6 +100,8 @@ Alias for [joinRelated](/api/query-builder/join-methods.html#joinrelated).
 
 Outer join version of the [joinRelated](/api/query-builder/join-methods.html#joinrelated) method.
 
+It builds a bare `outer join`, which postgres, MySQL and SQLite reject. Use [leftOuterJoinRelated](/api/query-builder/join-methods.html#leftouterjoinrelated), or [fullOuterJoinRelated](/api/query-builder/join-methods.html#fullouterjoinrelated) on postgres and SQLite.
+
 ## leftJoinRelated()
 
 Left join version of the [joinRelated](/api/query-builder/join-methods.html#joinrelated) method.
@@ -118,7 +120,7 @@ Right outer join version of the [joinRelated](/api/query-builder/join-methods.ht
 
 ## fullOuterJoinRelated()
 
-Full outer join version of the [joinRelated](/api/query-builder/join-methods.html#joinrelated) method.
+Full outer join version of the [joinRelated](/api/query-builder/join-methods.html#joinrelated) method. MySQL doesn't support full outer joins.
 
 ## join()
 
@@ -224,9 +226,9 @@ Takes the same arguments as [join](/api/query-builder/join-methods.html#join).
 
 ## outerJoin()
 
-See [knex documentation](https://knexjs.org/guide/query-builder.html#fullouterjoin)
-
 Takes the same arguments as [join](/api/query-builder/join-methods.html#join).
+
+knex builds a bare `outer join`, which postgres, MySQL and SQLite reject. Use [leftOuterJoin](/api/query-builder/join-methods.html#leftouterjoin), or [fullOuterJoin](/api/query-builder/join-methods.html#fullouterjoin) on postgres and SQLite.
 
 ##### Return value
 
@@ -238,7 +240,7 @@ Takes the same arguments as [join](/api/query-builder/join-methods.html#join).
 
 See [knex documentation](https://knexjs.org/guide/query-builder.html#fullouterjoin)
 
-Takes the same arguments as [join](/api/query-builder/join-methods.html#join).
+Takes the same arguments as [join](/api/query-builder/join-methods.html#join). MySQL doesn't support full outer joins.
 
 ##### Return value
 
