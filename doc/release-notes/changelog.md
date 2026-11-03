@@ -4,6 +4,8 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+## 4.1.3 (2026-11-03)
+
 ### Performance
 
 - Queries create far fewer promises. The hooks of a query run one after another, and only wait when a hook returns a promise, instead of about 40 promises per query. A `findById()` runs 27% fewer CPU instructions in objection, a `delete()` 14%, a single-row `insert()` or find 11%. The hooks run in the same order and see the same results.
