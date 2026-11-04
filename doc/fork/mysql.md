@@ -171,6 +171,28 @@ people.map((it) => it.id); // the ids of both rows, like [1, 2]
 - **MySQL** only returns the id of the first row. InnoDB gives the rows of one multi-row insert consecutive ids, `@@auto_increment_increment` apart, so objection computes the rest. It reads `@@auto_increment_increment` once per knex config.
 - On MySQL, set the id on all rows or on none. A batch where only some rows have an id is rejected before anything is inserted: `batch insert on MySQL can't return ids when only some rows have an id. Set the id on all rows or none.`
 - On MySQL, ids aren't set with `onConflict()`, because rows can be skipped or updated.
+- Since 4.1.2, `insertGraph()` and `upsertGraph()` use batch inserts too: they insert the new rows of a table together, up to 100 at a time. Rows with an id and rows without one go in separate inserts.
+
+## Many-to-many writes
+
+`unrelate()` and patches with join table extras only modify the join rows that match the filters (since 4.1.4). The join rows are filtered by a subquery for each join row, which MySQL and MariaDB run in the same single statement as postgres:
+
+```js
+await course.$relatedQuery('students').unrelate().where('enrollments.status', 'dropped');
+```
+
+```sql
+delete from `enrollments` where `enrollments`.`courseId` in (7) and exists (
+  select 1 from `students` where `students`.`id` = `enrollments`.`studentId`
+  and `enrollments`.`status` = 'dropped')
+```
+
+MySQL doesn't allow a statement to read the table it modifies in a subquery, so two cases take a second query that fetches the ids of the matching join rows first:
+
+- Filters that may read the join table themselves: joins, `joinRelated()`, subqueries and raw SQL.
+- A trigger on the join table that changes a table the subquery reads, which MySQL rejects with error 1442. The statement runs again with the ids, and the join table is remembered, so the next statements fetch the ids first. A failed statement doesn't roll back a MySQL transaction.
+
+The ids can't tell apart join rows that differ only in their other columns, so in these two cases such duplicates are modified together.
 
 ## Upserts
 

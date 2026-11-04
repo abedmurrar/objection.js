@@ -15,10 +15,10 @@ npm install @abedmurrar/objection knex
 ## Why this one
 
 - **Types that know what you loaded.** Relations are inferred from `relationMappings`, query results only contain the relations the query fetched, and relation expressions, modifier names and `Model.ref()` columns are checked at compile time. See [TypeScript](https://abedmurrar.github.io/objection.js/fork/typescript).
-- **Fast.** objection's own work for a query takes 13% to 19% less time than in objection.js 3.1.5, `toJSON()` 44% less, validation 55% less, and a validated insert in a new transaction 91% less, with the same SQL and results. See [Performance](https://abedmurrar.github.io/objection.js/fork/performance).
+- **Fast.** objection's own work for a query takes 13% to 19% less time than in objection.js 3.1.5, and since 4.1.3 another 10% to 27% fewer CPU instructions; `toJSON()` takes 44% less, validation 55% less, and a validated insert in a new transaction 91% less, with the same SQL and results. On a real MySQL, among the ORMs we measured (objection, sequelize, typeorm, mikro-orm, drizzle-orm) it was clearly the fastest at reading 1000 rows, deleting and eager loading, and on par with objection.js 3.1.5 at simple finds. See [Performance](https://abedmurrar.github.io/objection.js/fork/performance).
 - **MySQL and MariaDB as first-class databases**, not only postgres: JSON field expressions, the `whereJson*` methods, batch inserts and an `fn.*` helper for every MySQL 8.4 function. MariaDB 10.6 and 11.4 are tested in CI. See [MySQL and MariaDB](https://abedmurrar.github.io/objection.js/fork/mysql).
 - **Expressions without raw SQL**, like `Pet.ref('age').gte(3)`, `fn.count().filter(...)`, `fn.case()` and window functions. See [Expressions](https://abedmurrar.github.io/objection.js/fork/expressions).
-- **Safer.** JSON field keys are escaped (in objection.js 3.1.5 they allowed SQL injection), an `orWhere()` can no longer match the rows of other relation owners, and `for()` is no longer silently ignored. See [Breaking changes](https://abedmurrar.github.io/objection.js/fork/breaking-changes).
+- **Safer.** JSON field keys are escaped (in objection.js 3.1.5 they allowed SQL injection), an `orWhere()` can no longer match the rows of other relation owners, `for()` is no longer silently ignored, many-to-many `unrelate()` and patches only touch the join rows that match their filters, and with [`useAfterFindInGraphs`](https://abedmurrar.github.io/objection.js/api/model/static-properties#static-useafterfindingraphs) the `afterFind()` filters of related models apply to eager loading too. See [Breaking changes](https://abedmurrar.github.io/objection.js/fork/breaking-changes).
 - **Modern.** Node.js 24+, ES modules and CommonJS from one package, knex 3.3, the knex methods objection didn't have, no lodash and no bluebird, and `npm audit` reports nothing. The source is written in strict TypeScript and compiled with TypeScript 7.
 
 ## A quick look
@@ -103,5 +103,7 @@ Like objection.js, this is less a classic ORM than **a relational query builder*
 ## Credits
 
 This project is built on objection.js by Sami Koskimäki and its many contributors, maintained at Vincit. Its design, its API, most of its code and much of the documentation come from there. Thank you.
+
+Many fixes are ported from [ditojs/objection](https://github.com/ditojs/objection) by Jürg Lehni and its contributors, with credit in each commit. [Ported from ditojs/objection](https://abedmurrar.github.io/objection.js/fork/dito) lists them.
 
 Released under the MIT license, like objection.js.

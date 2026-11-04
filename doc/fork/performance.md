@@ -14,6 +14,8 @@ The fork does less work per query than objection.js 3.1.5. The generated SQL and
 | Static hooks only when they exist      | Every query used to create the arguments of the static hooks (`beforeFind`, `afterInsert`, ...) and call them, even when the model doesn't define them.                                                                                                                           |
 | Operation walks without allocations    | A query walks its list of operations about twenty times while it is built and executed. The walks no longer allocate functions, and checking whether a query is a find takes one walk instead of five.                                                                            |
 | Faster keys for ids                    | Relations and graphs are matched by keys made from ids. Numbers and strings, which almost all ids are, are now converted first.                                                                                                                                                   |
+| Hooks run without promises (4.1.3)     | Every phase of a query (`onBefore1` ... `onAfter3`, `runBefore()`, `runAfter()`) used to chain promises and await each hook, about 40 promises per query, even with no hooks. The hooks now run one after another and only wait when a hook returns a promise.                  |
+| Graph inserts in one query per table on MySQL (4.1.2) | `insertGraph()` and `upsertGraph()` inserted one row per query on MySQL. They now insert the rows of a table together, as on postgres: a person with 2 pets with 2 toys each takes 3 inserts instead of 7.                                                                         |
 
 ## Benchmarks
 
@@ -43,6 +45,38 @@ Models whose JSON attributes hold only plain objects, arrays and dates are clone
 
 These measure objection's own work, against a mocked database. With a real database, the database's time comes on top: reading 1000 rows from SQLite, for example, is mostly SQLite's time and the `JSON.parse()` of the JSON columns, and is about 6% faster. The full results, including the end-to-end runs on SQLite, are in [bench/README.md](https://github.com/abedmurrar/objection.js/blob/main/bench/README.md).
 
+### Since 4.1
+
+Measured as the CPU instructions per operation (`bench/count.js`), which unlike times barely depend on what else runs on the machine:
+
+| The change of 4.1.3, against 4.1.1 | Change     |
+| ---------------------------------- | ---------: |
+| `findById()`                    | **−27.2%** |
+| `delete()` with a where clause  | **−14.2%** |
+| A find returning 1 row          | **−11.5%** |
+| `insert()` of 1 row             | **−10.5%** |
+| `findById()` on SQLite          |  **−7.4%** |
+
+The scenarios that are dominated by rows, graphs and validation are unchanged by it. On a real MySQL, the batched graph inserts of 4.1.2 made a nested `insertGraph()` (a person with 2 pets with 2 toys each, in a transaction) go from 29% slower than objection.js 3.1.5 to 16% faster: it runs 5 queries instead of 9.
+
+## Compared with other ORMs
+
+`bench/orms` runs the same scenarios on a real MySQL 8.4 through the mysql2 driver with this fork, objection 3.1.5 and 4.4.2, raw knex, kysely, drizzle-orm, sequelize, typeorm and mikro-orm, each with its own API. These are the results of 4.1.1, before the speed-ups above, on Linux with Node.js 24.17 and MySQL 8.4 in Docker, median time per operation:
+
+| Scenario                        | This fork | objection 3.1.5 | objection 4.4.2 | Fastest other ORM     | knex (no ORM) |
+| ------------------------------- | --------: | --------------: | --------------: | --------------------- | ------------: |
+| Find by id                      |  257.6 µs |        260.0 µs |        285.2 µs | typeorm, 281.7 µs     |      194.6 µs |
+| Find 100 rows¹                  |  411.6 µs |        433.9 µs |        531.7 µs | drizzle-orm, 451.6 µs |      291.3 µs |
+| Find 1000 rows¹                 |   1.40 ms |         1.95 ms |         2.26 ms | drizzle-orm, 2.41 ms  |      914.1 µs |
+| Delete by id                    |  243.9 µs |        307.5 µs |        297.6 µs | mikro-orm, 303.4 µs   |      178.9 µs |
+| Eager loading, separate queries |   5.39 ms |         7.52 ms |         7.89 ms | drizzle-orm, 6.97 ms  |       4.84 ms |
+| Eager loading, one query        |   5.44 ms |         6.81 ms |         7.93 ms | typeorm, 7.62 ms      |       3.04 ms |
+| Batch insert of 100 rows        |   8.92 ms |    not on MySQL |    not on MySQL | sequelize, 7.37 ms    |       6.32 ms |
+
+¹ Measured again for this fork, both objection versions and knex on a quiet machine; the others are from the first run.
+
+Among the ORMs, the fork was clearly the fastest at finding 1000 rows, deleting and eager loading, and even with objection.js 3.1.5 at finding by id and finding 100 rows: there, the differences are within what changes between runs. kysely, a query builder, is faster than knex itself on the simplest queries: the fork builds on knex, so knex's own work per query is part of every query. Writes of single rows, updates and transactions take mostly MySQL's commit to disk, about 4 ms here, and the ORMs were close to each other there. Times on a database depend on the machine and on what else runs on it; run the benchmark on your own setup before relying on these numbers.
+
 ## The TypeScript build
 
 The source is TypeScript, compiled to CommonJS by `tsc`. The compiled code does the same work as the JavaScript it replaced, and it's as fast. Against the last JavaScript build, 7 rounds of every benchmark scenario, the largest differences were within noise:
@@ -59,7 +93,7 @@ The source is TypeScript, compiled to CommonJS by `tsc`. The compiled code does 
 
 ## Eager loading on MySQL
 
-4.0.0-alpha.0 ran every query of `withGraphFetched()` and `fetchGraph()` one at a time on MySQL, along with the graph writes, which deadlocked when they ran concurrently. Reads don't deadlock, so eager loading runs its queries 4 at a time again, as in objection.js 3.1.5. Graph writes still run one at a time on MySQL. With 1 ms per query, `withGraphFetched('[pets.toys, movies]')` takes 23.5% less time than in 4.0.0-alpha.0.
+4.0.0-alpha.0 ran every query of `withGraphFetched()` and `fetchGraph()` one at a time on MySQL, along with the graph writes, which deadlocked when they ran concurrently. Reads don't deadlock, so eager loading runs its queries 4 at a time again, as in objection.js 3.1.5. Graph writes still run one at a time on MySQL, but since 4.1.2 they insert the rows of a table in one query. With 1 ms per query, `withGraphFetched('[pets.toys, movies]')` takes 23.5% less time than in 4.0.0-alpha.0.
 
 The number of queries doesn't change: eager loading runs one query per relation in the expression for all the models, not one per model.
 
@@ -70,4 +104,8 @@ npm run bench                                   # all scenarios
 npm run bench -- --filter graph                 # scenarios whose name matches
 npm run bench:compare -- --baseline ../other    # compare two checkouts
 node bench/sql-check.js --baseline ../other     # check that the SQL and results are the same
+node bench/count.js --baseline ../other         # CPU instructions, for busy machines
+npm run bench:orms                              # against other ORMs on MySQL
 ```
+
+[bench/README.md](https://github.com/abedmurrar/objection.js/blob/main/bench/README.md) explains how to set them up.
