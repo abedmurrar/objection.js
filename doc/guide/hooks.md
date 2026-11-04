@@ -138,6 +138,10 @@ Static hooks are executed in different stages of each query type (find, update, 
 - [beforeFind](/api/model/static-methods.html#static-beforefind)
 - [afterFind](/api/model/static-methods.html#static-afterfind)
 
+::: tip Eager loading
+By default, the static `afterFind()` of a related model class doesn't decide what eager loading puts in the graph: `withGraphFetched()` assigns the related models before the hook runs, and `withGraphJoined()` doesn't call it. If the hook filters out models that the user may not see, set [useAfterFindInGraphs](/api/model/static-properties.html#static-useafterfindingraphs) on the class, so that both apply it. See [afterFind() with eager loading](/api/model/static-methods.html#with-eager-loading).
+:::
+
 The static hooks are passed one argument of type [StaticHookArguments](/api/types/#type-statichookarguments). The most interesting of all properties of that object is the `asFindQuery` parameter that allows you to fetch the items that were/would be affected by the query. For example the following example would fetch the identifiers of all people that would get deleted by the query being executed:
 
 ```js
