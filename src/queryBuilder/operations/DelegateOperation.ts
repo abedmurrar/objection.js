@@ -125,7 +125,7 @@ class DelegateOperation extends QueryBuilderOperation {
 
   hasToFindOperation(): boolean {
     return (
-      this.hasToFindOperation !== DelegateOperation.prototype.hasToFindOperation ||
+      this.toFindOperation !== DelegateOperation.prototype.toFindOperation ||
       this.delegate.hasToFindOperation()
     );
   }

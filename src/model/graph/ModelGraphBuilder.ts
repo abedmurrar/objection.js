@@ -241,12 +241,12 @@ function visitStringsInObject(
   }
 }
 
+// `matchAll()` works on a copy of the regex. `exec()` on the shared global
+// `propRefRegex` kept its `lastIndex` when a callback threw, and the next
+// string was searched from there, which skipped its references.
 function forEachMatch(regex: RegExp, str: string, cb: (match: RegExpExecArray) => void): void {
-  let matchResult = regex.exec(str);
-
-  while (matchResult) {
-    cb(matchResult);
-    matchResult = regex.exec(str);
+  for (const match of str.matchAll(regex)) {
+    cb(match);
   }
 }
 
