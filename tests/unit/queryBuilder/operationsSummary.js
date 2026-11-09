@@ -147,6 +147,110 @@ describe('operations summary', () => {
     );
   });
 
+  it('should group where clauses only when there are two where scopes', async () => {
+    const byId = Person.query(mockKnex).deleteById(1);
+    const sql = byId.toKnexQuery().toString();
+
+    // `findById` adds a `whereComposite` child when it is built. It is inside
+    // `findById`, so it doesn't count as a second where operation.
+    expect(byId.needsWhereGrouping()).to.be(false);
+    expect(sql).to.equal('delete from "person" where "person"."id" = 1');
+
+    const withOr = Person.query(mockKnex).deleteById(1).where('a', 1).orWhere('b', 2);
+    expect(withOr.toKnexQuery().toString()).to.equal(
+      'delete from "person" where "person"."id" = 1 and ("a" = 1 or "b" = 2)',
+    );
+
+    const person = Person.fromJson({ id: 1 });
+    expect(
+      person.$query(mockKnex).delete().where('a', 1).orWhere('b', 2).toKnexQuery().toString(),
+    ).to.equal('delete from "person" where "person"."id" = 1 and ("a" = 1 or "b" = 2)');
+  });
+
+  describe('delete hooks', () => {
+    it('should return synchronously without static hooks', async () => {
+      const { DeleteOperation } = require('../../../lib/queryBuilder/operations/DeleteOperation');
+      const op = new DeleteOperation('delete');
+      const builder = Person.query(mockKnex);
+
+      expect(op.onBefore2(builder, 'before')).to.equal('before');
+      expect(op.onAfter2(builder, 'after')).to.equal('after');
+    });
+
+    it('should still run static hooks, and use the result of afterDelete', async () => {
+      const calls = [];
+
+      class Hooked extends Person {
+        static async beforeDelete() {
+          await null;
+          calls.push('beforeDelete');
+        }
+
+        static afterDelete({ result }) {
+          calls.push(`afterDelete ${result}`);
+          return 'from afterDelete';
+        }
+      }
+
+      const result = await Hooked.query(mockKnex).deleteById(1);
+
+      expect(calls).to.eql(['beforeDelete', 'afterDelete ']);
+      expect(executed).to.eql(['delete from "person" where "person"."id" = 1']);
+      expect(result).to.equal('from afterDelete');
+    });
+
+    it('should keep the result when afterDelete returns nothing', async () => {
+      class Hooked extends Person {
+        static afterDelete() {}
+      }
+
+      expect(await Hooked.query(mockKnex).deleteById(1)).to.be(undefined);
+    });
+
+    it('should reject, not throw, when a static hook throws', async () => {
+      class Hooked extends Person {
+        static beforeDelete() {
+          throw new Error('no deleting');
+        }
+      }
+
+      const promise = Hooked.query(mockKnex).deleteById(1).execute();
+      let error = null;
+
+      try {
+        await promise;
+      } catch (err) {
+        error = err;
+      }
+
+      expect(error.message).to.equal('no deleting');
+      expect(executed).to.eql([]);
+    });
+
+    it('should still check deleteById(undefined) and offset()', async () => {
+      let error = null;
+
+      try {
+        await Person.query(mockKnex).deleteById(undefined);
+      } catch (err) {
+        error = err;
+      }
+
+      expect(error.message).to.equal('undefined was passed to deleteById');
+      expect(await Person.query(mockKnex).skipUndefined().deleteById(undefined)).to.be(undefined);
+
+      error = null;
+
+      try {
+        await Person.query(mockKnex).delete().offset(5);
+      } catch (err) {
+        error = err;
+      }
+
+      expect(error.message).to.match(/^offset\(\) can't be used with a delete query/);
+    });
+  });
+
   it('should use the hooks that an operation answers itself', async () => {
     const calls = [];
 

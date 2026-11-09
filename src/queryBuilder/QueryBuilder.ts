@@ -1,4 +1,4 @@
-import { withWhereScope, effectiveWhereScope } from './whereScopes';
+import { withWhereScope, effectiveWhereScope, hasWhereAncestor } from './whereScopes';
 import { wrapError } from 'db-errors';
 
 import { raw } from './RawBuilder';
@@ -74,6 +74,9 @@ interface QueryOperationsSummary extends OperationsSummary {
   hasSelectOperation: boolean;
   // Whether a where operation has a where scope, see `whereScopes.ts`.
   hasScopedWhereOperation: boolean;
+  // The number of where operations that aren't inside another where
+  // operation. The where scopes are those of these operations.
+  whereOperationCount: number;
 }
 
 // Whether the next builder created is a clone, see `clone()`.
@@ -377,9 +380,11 @@ class QueryBuilder extends QueryBuilderBase {
     return this.operationsSummary().hasSelectOperation;
   }
 
-  // Where clauses are only grouped when some have a where scope.
+  // Where clauses are only grouped when some have a where scope, and it takes
+  // two where operations to have two scopes.
   needsWhereGrouping(): boolean {
-    return this.operationsSummary().hasScopedWhereOperation;
+    const summary = this.operationsSummary();
+    return summary.hasScopedWhereOperation && summary.whereOperationCount > 1;
   }
 
   hasWithGraph(): boolean {
@@ -402,6 +407,7 @@ class QueryBuilder extends QueryBuilderBase {
       lastFromOperation: null,
       hasSelectOperation: false,
       hasScopedWhereOperation: false,
+      whereOperationCount: 0,
     };
   }
 
@@ -445,8 +451,14 @@ class QueryBuilder extends QueryBuilderBase {
       summary.hasSelectOperation = true;
     }
 
-    if ((kind & KIND_WHERE) !== 0 && effectiveWhereScope(op) !== null) {
-      summary.hasScopedWhereOperation = true;
+    if ((kind & KIND_WHERE) !== 0) {
+      if (!hasWhereAncestor(op)) {
+        summary.whereOperationCount += 1;
+      }
+
+      if (effectiveWhereScope(op) !== null) {
+        summary.hasScopedWhereOperation = true;
+      }
     }
 
     return true;
