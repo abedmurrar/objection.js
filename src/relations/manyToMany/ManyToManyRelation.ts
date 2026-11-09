@@ -265,10 +265,6 @@ class ManyToManyRelation extends Relation {
     });
   }
 
-  createJoinModels(ownerId: unknown[], related: RelationModel[]): Record<string, unknown>[] {
-    return related.map((related) => this.createJoinModel(ownerId, related));
-  }
-
   // `rel` is a related model, or an id object (see ManyToManyRelateOperation).
   createJoinModel(ownerId: unknown[], rel: Record<string, any>): Record<string, unknown> {
     const joinModel: Record<string, unknown> = {};

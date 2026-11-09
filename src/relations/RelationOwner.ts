@@ -1,4 +1,4 @@
-import { isObject, asArray, asSingle, uniqBy } from '../utils/objectUtils';
+import { isObject, asArray, uniqBy } from '../utils/objectUtils';
 import { normalizeIds } from '../utils/normalizeIds';
 import type { Relation, RelationModel, RelationQueryBuilder } from './Relation';
 import type { ReferenceBuilder, RelationProperty } from './RelationProperty';
@@ -51,10 +51,6 @@ class RelationOwner {
     return asArray(this.owner as RelationModel | RelationModel[]);
   }
 
-  get model(): RelationModel {
-    return asSingle(this.owner as RelationModel | RelationModel[]);
-  }
-
   get reference(): ReferenceBuilder[] {
     return this.owner as ReferenceBuilder[];
   }
@@ -103,11 +99,8 @@ class RelationOwner {
     }
   }
 
-  getSplitProps(
-    builder: RelationQueryBuilder,
-    relation: Relation,
-    ownerProp: RelationProperty = relation.ownerProp,
-  ) {
+  getSplitProps(builder: RelationQueryBuilder, relation: Relation) {
+    const { ownerProp } = relation;
     const values = this.getProps(relation, relation.ownerProp);
 
     if (isQueryBuilder(values)) {

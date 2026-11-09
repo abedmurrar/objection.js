@@ -1,6 +1,5 @@
 const { setTimeout: sleep } = require('node:timers/promises');
 const expect = require('expect.js');
-const classUtils = require('../../lib/utils/classUtils');
 
 const {
   snakeCase,

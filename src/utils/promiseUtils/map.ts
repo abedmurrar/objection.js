@@ -82,7 +82,7 @@ function mapMany<T, R>(
   });
 }
 
-function executeNext<T, R>(ctx: MapContext<T, R>): null | undefined {
+function executeNext<T, R>(ctx: MapContext<T, R>): void {
   try {
     if (ctx.failed) {
       return;
@@ -101,20 +101,17 @@ function executeNext<T, R>(ctx: MapContext<T, R>): null | undefined {
     } else {
       process.nextTick(() => afterExecute(ctx, maybePromise as R, index));
     }
-
-    return null;
   } catch (err) {
     onError(ctx, err);
-    return undefined;
   }
 }
 
-function afterExecute<T, R>(ctx: MapContext<T, R>, result: R, index: number): null {
+function afterExecute<T, R>(ctx: MapContext<T, R>, result: R, index: number): void {
   ctx.numFinished++;
 
   if (ctx.failed) {
     rejectWhenFinished(ctx);
-    return null;
+    return;
   }
 
   ctx.results[index] = result;
@@ -126,8 +123,6 @@ function afterExecute<T, R>(ctx: MapContext<T, R>, result: R, index: number): nu
   if (ctx.index < ctx.items.length) {
     executeNext(ctx);
   }
-
-  return null;
 }
 
 function onError<T, R>(ctx: MapContext<T, R>, err: unknown): void {

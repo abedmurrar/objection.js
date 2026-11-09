@@ -5,12 +5,15 @@ import type { RelationOwner } from '../../RelationOwner';
 import type { ManyToManyRelation } from '../ManyToManyRelation';
 
 class ManyToManyUpdateOperationBase extends UpdateOperation {
+  // Defined by `ManyToManyModifyMixin`, which every concrete class uses.
+  declare applyModifyFilterForRelatedTable: (builder: RelationQueryBuilder) => RelationQueryBuilder;
+  declare applyModifyFilterForJoinTable: (builder: RelationQueryBuilder) => RelationQueryBuilder;
+
   declare relation: ManyToManyRelation;
   declare owner: RelationOwner;
 
   declare hasExtraProps: boolean;
   declare joinTablePatch: Record<string, unknown>;
-  declare joinTablePatchFilterQuery: RelationQueryBuilder | null;
   declare skipRelationFilter: boolean;
 
   constructor(name: string, opt: RelationOperationOptions<ManyToManyRelation>) {
@@ -21,7 +24,6 @@ class ManyToManyUpdateOperationBase extends UpdateOperation {
 
     this.hasExtraProps = false;
     this.joinTablePatch = {};
-    this.joinTablePatchFilterQuery = null;
     this.skipRelationFilter = false;
   }
 
@@ -103,22 +105,11 @@ class ManyToManyUpdateOperationBase extends UpdateOperation {
       );
   }
 
-  /* istanbul ignore next */
-  applyModifyFilterForRelatedTable(builder: RelationQueryBuilder): RelationQueryBuilder {
-    throw new Error('not implemented');
-  }
-
-  /* istanbul ignore next */
-  applyModifyFilterForJoinTable(builder: RelationQueryBuilder): RelationQueryBuilder {
-    throw new Error('not implemented');
-  }
-
   clone(): this {
     const clone = super.clone();
 
     clone.hasExtraProps = this.hasExtraProps;
     clone.joinTablePatch = this.joinTablePatch;
-    clone.joinTablePatchFilterQuery = this.joinTablePatchFilterQuery;
     clone.skipRelationFilter = this.skipRelationFilter;
 
     return clone;

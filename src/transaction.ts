@@ -1,4 +1,3 @@
-import * as promiseUtils from './utils/promiseUtils';
 import { isFunction } from './utils/objectUtils';
 import type { Knex } from 'knex';
 import type { ModelClass } from './model/Model';
@@ -49,7 +48,9 @@ function transaction(...transactionArgs: unknown[]): Promise<unknown> {
       }
     }
 
-    return knex.transaction((trx) => {
+    // An async callback makes a throwing callback roll back the transaction
+    // like a rejecting one: knex only commits or rolls back on a promise.
+    return knex.transaction(async (trx) => {
       const args = new Array(modelClasses.length + 1);
 
       for (let i = 0; i < modelClasses.length; ++i) {
@@ -58,9 +59,7 @@ function transaction(...transactionArgs: unknown[]): Promise<unknown> {
 
       args[args.length - 1] = trx;
 
-      return promiseUtils.try(() => {
-        return callback.apply(trx, args);
-      }) as Promise<unknown>;
+      return callback.apply(trx, args);
     });
   }
 }
