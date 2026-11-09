@@ -4,6 +4,8 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+## 4.2.3 (2026-11-09)
+
 ### Performance
 
 - `upsertGraph()` unrelates many-to-many rows in one statement that deletes their join rows by the ids of both sides, `delete from owner_item where ownerId in (?) and itemId in (?, ?)`. MySQL and MariaDB first fetched the ids of the join rows in a separate query, and the other databases filtered the join rows with a subquery of the related table. `upsertGraph()` has just fetched these rows through the relation, as it has the rows it deletes since 4.2.2. Measured on MySQL 8.4, an `upsertGraph()` that unrelates one item takes 4.6 ms instead of 5.1 ms (median). Relations with their own `modify` or `filter`, or that don't join the id columns of the related table, keep the subquery. On MySQL, a single statement with the subquery wasn't an option: it locks the related rows, and in the stress test of 4.2.2 with a cascading foreign key, 30 of 1,200 concurrent `upsertGraph()` calls deadlocked with it, and none with the ids.
