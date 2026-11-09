@@ -17,10 +17,13 @@ function validate(
   }
 
   if (validatingModelInstance) {
-    // Strip away relations and other internal stuff.
-    // TODO 1: This should use `json.$toJson()` since we always validate the input representation!
-    // TODO 2: This should also keep the relations in the object because some validators may
-    //         depend on the relations.
+    // Strip away relations and other internal stuff. The model holds the
+    // internal form, which is also what `$setJson` validates: it calls
+    // `$parseJson` before `$validate`. `$toJson()` would give the external
+    // form, without hidden properties and with virtual attributes.
+    //
+    // Unlike `$setJson`, this leaves out the relations, so validators that
+    // read them see them in `insert()` but not in graph inserts and patches.
     json = clone(json as Model, true, true);
     // We can mutate `json` now that we took a copy of it.
     options = Object.assign({}, options, { mutable: true });
