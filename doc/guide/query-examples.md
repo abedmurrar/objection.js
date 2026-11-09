@@ -936,7 +936,7 @@ Arbitrary relation graphs can be inserted using the [insertGraph](/api/query-bui
 
 See the [allowGraph](/api/query-builder/eager-methods.html#allowgraph) method if you need to limit which relations can be inserted using [insertGraph](/api/query-builder/mutate-methods.html#insertgraph) method to avoid security issues.
 
-If you are using Postgres the inserts are done in batches for maximum performance. On other databases the rows are inserted one at a time.
+On postgres and MySQL, the new rows of a table are inserted together, up to 100 in one query. On SQLite the rows are inserted one at a time. Up to 4 queries run at the same time, see [concurrency](/api/model/static-properties.html#static-concurrency).
 
 [insertGraph](/api/query-builder/mutate-methods.html#insertgraph) operation is **not** atomic by default! You need to start a transaction and pass it to the query using any of the supported ways. See the section about [transactions](/guide/transactions.html) for more information.
 
