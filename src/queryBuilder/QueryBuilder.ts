@@ -1,4 +1,4 @@
-import { withWhereScope } from './whereScopes';
+import { withWhereScope, effectiveWhereScope } from './whereScopes';
 import { wrapError } from 'db-errors';
 
 import { raw } from './RawBuilder';
@@ -69,6 +69,11 @@ interface QueryOperationsSummary extends OperationsSummary {
   hasInsertOperation: boolean;
   hasFindOperation: boolean;
   eagerOperation: EagerOperation | null;
+  // The last operation that sets the table, see `buildKnexQuery()`.
+  lastFromOperation: Operation | null;
+  hasSelectOperation: boolean;
+  // Whether a where operation has a where scope, see `whereScopes.ts`.
+  hasScopedWhereOperation: boolean;
 }
 
 // Whether the next builder created is a clone, see `clone()`.
@@ -369,7 +374,12 @@ class QueryBuilder extends QueryBuilderBase {
   }
 
   hasSelects(): boolean {
-    return this.has(QueryBuilderBase.SelectSelector);
+    return this.operationsSummary().hasSelectOperation;
+  }
+
+  // Where clauses are only grouped when some have a where scope.
+  needsWhereGrouping(): boolean {
+    return this.operationsSummary().hasScopedWhereOperation;
   }
 
   hasWithGraph(): boolean {
@@ -389,12 +399,15 @@ class QueryBuilder extends QueryBuilderBase {
       hasInsertOperation: false,
       hasFindOperation: false,
       eagerOperation: null,
+      lastFromOperation: null,
+      hasSelectOperation: false,
+      hasScopedWhereOperation: false,
     };
   }
 
   // One walk answers what a query asks about its operations while it is
   // built and executed.
-  summarizeOperation(summary: QueryOperationsSummary, op: Operation): boolean {
+  summarizeOperation(summary: QueryOperationsSummary, op: Operation, isAdded: boolean): boolean {
     const kind = operationKind(op);
     summary.hooks |= op.hookMask();
 
@@ -410,13 +423,30 @@ class QueryBuilder extends QueryBuilderBase {
       summary.hasFindOperation = true;
     }
 
+    // The first eager operation and the last from operation count, so with
+    // more than one, it matters where an added one is.
     if ((kind & KIND_EAGER) !== 0) {
-      if (summary.eagerOperation !== null) {
-        // Which one comes first depends on where the new one was added.
+      if (summary.eagerOperation === null) {
+        summary.eagerOperation = op as EagerOperation;
+      } else if (isAdded) {
+        return false;
+      }
+    }
+
+    if ((kind & KIND_FROM) !== 0) {
+      if (isAdded && summary.lastFromOperation !== null) {
         return false;
       }
 
-      summary.eagerOperation = op as EagerOperation;
+      summary.lastFromOperation = op;
+    }
+
+    if ((kind & KIND_SELECT) !== 0) {
+      summary.hasSelectOperation = true;
+    }
+
+    if ((kind & KIND_WHERE) !== 0 && effectiveWhereScope(op) !== null) {
+      summary.hasScopedWhereOperation = true;
     }
 
     return true;
@@ -576,20 +606,50 @@ class QueryBuilder extends QueryBuilderBase {
     const builder = this.clone();
 
     try {
-      // The hooks run synchronously one after another, and a phase only waits
-      // when a hook returns a promise. Most queries have no async hook, so this
-      // saves a promise and a microtask per hook and phase.
-      const runBefore = beforeExecute(builder);
+      // The phases run one after another in this function, and a phase only
+      // waits when a hook returns a promise. Most queries have no async hook,
+      // so this saves a promise and a microtask per hook and phase, and the
+      // functions that would chain the phases.
+
+      // This needs to be checked before any hooks are called.
+      checkForUsage(builder);
+      addImplicitOperations(builder);
+
+      // The `runBefore` hooks are read before the hooks run.
+      const userRunBefore = builder.context().runBefore;
+      const internalRunBefore = builder.internalContext().runBefore;
+
       // As before, no hook runs inside the caller's call to `execute()`.
       await undefined;
 
-      let result = runBefore();
+      let result: unknown = runOperationHooks(builder, 'onBefore1', undefined);
+      if (isPromise(result)) result = await result;
+      result = runOperationHooks(builder, 'onBefore2', result);
+      if (isPromise(result)) result = await result;
+      result = runHooks(builder, userRunBefore, result);
+      if (isPromise(result)) result = await result;
+      result = runHooks(builder, internalRunBefore, result);
+      if (isPromise(result)) result = await result;
+      result = runOperationHooks(builder, 'onBefore3', result);
       if (isPromise(result)) result = await result;
 
       result = doExecute(builder);
       if (isPromise(result)) result = await result;
 
-      result = afterExecute(builder, result);
+      result = runOperationHooks(builder, 'onAfter1', result);
+      if (isPromise(result)) result = await result;
+      result = runOperationHooks(builder, 'onAfter2', result);
+      if (isPromise(result)) result = await result;
+
+      // The `runAfter` hooks are read after `onAfter2`.
+      const userRunAfter = builder.context().runAfter;
+      const internalRunAfter = builder.internalContext().runAfter;
+
+      result = runHooks(builder, userRunAfter, result);
+      if (isPromise(result)) result = await result;
+      result = runHooks(builder, internalRunAfter, result);
+      if (isPromise(result)) result = await result;
+      result = runOperationHooks(builder, 'onAfter3', result);
       if (isPromise(result)) result = await result;
 
       return result;
@@ -1128,6 +1188,9 @@ const KIND_WRITE = 1;
 const KIND_INSERT = 2;
 const KIND_FIND = 4;
 const KIND_EAGER = 8;
+const KIND_FROM = 16;
+const KIND_SELECT = 32;
+const KIND_WHERE = 64;
 const baseIs = QueryBuilderOperation.prototype.is;
 
 // The kinds of an operation that the summary of a query needs, worked out
@@ -1147,14 +1210,16 @@ function operationKind(op: Operation): number {
           : 0) |
         (op instanceof InsertOperation ? KIND_INSERT : 0) |
         (op instanceof FindOperation ? KIND_FIND : 0) |
-        (op instanceof EagerOperation ? KIND_EAGER : 0);
+        (op instanceof EagerOperation ? KIND_EAGER : 0) |
+        nameKind(op);
     } else {
       // A class like `DelegateOperation` answers `is()` itself.
       kind =
         (isWriteOperation(op) ? KIND_WRITE : 0) |
         (op.is(InsertOperation) ? KIND_INSERT : 0) |
         (op.is(FindOperation) ? KIND_FIND : 0) |
-        (op.is(EagerOperation) ? KIND_EAGER : 0);
+        (op.is(EagerOperation) ? KIND_EAGER : 0) |
+        nameKind(op);
     }
 
     op._kindMask = kind;
@@ -1162,6 +1227,29 @@ function operationKind(op: Operation): number {
 
   return kind;
 }
+
+// The kinds that the selectors of `buildKnexQuery()`, `hasSelects()` and the
+// where grouping find by the name of an operation.
+// The names are those of the query builder methods, so they are few.
+function nameKind(op: Operation): number {
+  let kind = nameKinds.get(op.name);
+
+  if (kind === undefined) {
+    // A null name is tested as 'null', as `test()` converts it to a string.
+    const name = op.name as string;
+
+    kind =
+      (QueryBuilderBase.FromSelector.test(name) ? KIND_FROM : 0) |
+      (QueryBuilderBase.SelectSelector.test(name) ? KIND_SELECT : 0) |
+      (QueryBuilderBase.WhereSelector.test(name) ? KIND_WHERE : 0);
+
+    nameKinds.set(op.name, kind);
+  }
+
+  return kind;
+}
+
+const nameKinds = new Map<string | null, number>();
 
 function isWriteOperation(op: Operation): boolean {
   return (
@@ -1297,30 +1385,6 @@ function checkForUsage(builder: QueryBuilder): void {
   }
 }
 
-// Checks the query and adds the implicit operations, synchronously. Returns a
-// function that runs the before hooks, which returns a promise only when a hook
-// does. The `runBefore` hooks are read here, as when they were chained here.
-function beforeExecute(builder: QueryBuilder): () => unknown {
-  // This needs to be checked before any hooks are called.
-  checkForUsage(builder);
-
-  builder = addImplicitOperations(builder);
-
-  const userRunBefore = builder.context().runBefore;
-  const internalRunBefore = builder.internalContext().runBefore;
-
-  return () =>
-    then(runOperationHooks(builder, 'onBefore1', undefined), (result) =>
-      then(runOperationHooks(builder, 'onBefore2', result), (result) =>
-        then(runHooks(builder, userRunBefore, result), (result) =>
-          then(runHooks(builder, internalRunBefore, result), (result) =>
-            runOperationHooks(builder, 'onBefore3', result),
-          ),
-        ),
-      ),
-    );
-}
-
 function doExecute(builder: QueryBuilder): unknown {
   builder = callOnBuildHooks(builder);
   const queryExecutorOperation = findQueryExecutorOperation(builder);
@@ -1335,34 +1399,18 @@ function doExecute(builder: QueryBuilder): unknown {
   } else if (queryExecutorOperation !== null) {
     return queryExecutorOperation.queryExecutor(builder);
   } else {
-    // The knex query builder is a thenable: resolving it runs the query.
-    return Promise.resolve(buildKnexQuery(builder)).then((result) =>
-      then(runOperationHooks(builder, 'onRawResult', result), (result) =>
-        createModels(result, builder),
-      ),
-    );
+    return runKnexQuery(builder);
   }
 }
 
-function afterExecute(builder: QueryBuilder, result: unknown): unknown {
-  return then(runOperationHooks(builder, 'onAfter1', result), (result) =>
-    then(runOperationHooks(builder, 'onAfter2', result), (result) => {
-      const userRunAfter = builder.context().runAfter;
-      const internalRunAfter = builder.internalContext().runAfter;
+async function runKnexQuery(builder: QueryBuilder): Promise<unknown> {
+  // The knex query builder is a thenable: awaiting it runs the query.
+  let result: unknown = await buildKnexQuery(builder);
 
-      return then(runHooks(builder, userRunAfter, result), (result) =>
-        then(runHooks(builder, internalRunAfter, result), (result) =>
-          runOperationHooks(builder, 'onAfter3', result),
-        ),
-      );
-    }),
-  );
-}
+  result = runOperationHooks(builder, 'onRawResult', result);
+  if (isPromise(result)) result = await result;
 
-// Calls `cb` with `value`, or with what it resolves to when it's a promise
-// (or another thenable, like a query builder).
-function then(value: unknown, cb: (value: unknown) => unknown): unknown {
-  return isPromise(value) ? Promise.resolve(value).then(cb) : cb(value);
+  return createModels(result, builder);
 }
 
 class ReturnImmediatelyException {
@@ -1537,7 +1585,7 @@ function buildKnexQuery(
 ): KnexLike {
   knexBuilder = builder.executeOnBuildKnex(knexBuilder);
 
-  const fromOperation = builder.findLastOperation(QueryBuilderBase.FromSelector);
+  const fromOperation = builder.operationsSummary().lastFromOperation;
 
   if (!builder.isPartial()) {
     // Set the table only if it hasn't been explicitly set yet.

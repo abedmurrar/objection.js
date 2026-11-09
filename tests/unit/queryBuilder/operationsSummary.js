@@ -117,6 +117,36 @@ describe('operations summary', () => {
     expect(query.toKnexQuery().toString()).to.equal(executed[0]);
   });
 
+  // The last operation that sets the table decides the default select.
+  it('should build the table and select of the last of several from operations', () => {
+    const sql = (query) => query.toKnexQuery().toString();
+
+    expect(sql(Person.query(mockKnex).into('other').table('person'))).to.equal(
+      'select "person".* from "person"',
+    );
+    expect(sql(Person.query(mockKnex).table('person').into('other'))).to.equal(
+      'select * from "other"',
+    );
+    expect(sql(Person.query(mockKnex).where('a', 1).table('person').from('x'))).to.equal(
+      'select "x".* from "x" where "a" = 1',
+    );
+
+    // A query whose summary is current when the second one is added.
+    const query = Person.query(mockKnex).into('other');
+    query.isFind();
+    query.table('person');
+    expect(sql(query)).to.equal('select "person".* from "person"');
+  });
+
+  it('should group where clauses only when they have a where scope', async () => {
+    const person = Person.fromJson({ id: 1 });
+
+    expect(Person.query(mockKnex).where('a', 1).orWhere('b', 2).needsWhereGrouping()).to.be(false);
+    expect(person.$query(mockKnex).where('a', 1).orWhere('b', 2).toKnexQuery().toString()).to.equal(
+      'select "person".* from "person" where "person"."id" = 1 and ("a" = 1 or "b" = 2)',
+    );
+  });
+
   it('should use the hooks that an operation answers itself', async () => {
     const calls = [];
 

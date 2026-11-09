@@ -502,7 +502,7 @@ class QueryBuilderOperationSupport {
     const summary = this.createOperationsSummary();
 
     this.forEachOperation(true, (op) => {
-      this.summarizeOperation(summary, op);
+      this.summarizeOperation(summary, op, false);
     });
 
     this._operationsSummary = summary;
@@ -513,10 +513,16 @@ class QueryBuilderOperationSupport {
     return { version: this._operationsVersion, hooks: 0 };
   }
 
-  // Takes one operation in, without its child operations. Returns false if the
-  // summary has to be made again by a walk instead, when the operation was
-  // added to a current one.
-  summarizeOperation(summary: OperationsSummary, op: Operation): boolean {
+  // Whether the where clauses may have to be grouped by their where scopes.
+  needsWhereGrouping(): boolean {
+    return true;
+  }
+
+  // Takes one operation in, without its child operations. A walk takes them in
+  // in order. `isAdded` is for an operation added to a current summary, which
+  // may come before others in the order: returns false if the summary has to
+  // be made again by a walk instead.
+  summarizeOperation(summary: OperationsSummary, op: Operation, isAdded: boolean): boolean {
     summary.hooks |= op.hookMask();
     return true;
   }
@@ -635,7 +641,7 @@ class QueryBuilderOperationSupport {
 
       this._operationsVersion++;
 
-      if (isCurrent && this.summarizeOperation(summary, operation)) {
+      if (isCurrent && this.summarizeOperation(summary, operation, true)) {
         summary.version = this._operationsVersion;
       }
     }
@@ -714,7 +720,7 @@ class QueryBuilderOperationSupport {
   }
 
   executeOnBuildKnex(knexBuilder: KnexLike): KnexLike {
-    const whereGrouping = createWhereGrouping(this);
+    const whereGrouping = this.needsWhereGrouping() ? createWhereGrouping(this) : null;
 
     this.forEachOperation(true, (op) => {
       if (whereGrouping !== null && whereGrouping.isGrouped(op)) {
