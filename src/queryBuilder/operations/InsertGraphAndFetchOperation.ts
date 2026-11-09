@@ -22,23 +22,32 @@ class InsertGraphAndFetchOperation extends DelegateOperation {
     return this.delegate.isArray;
   }
 
-  async onAfter2(builder: QueryBuilder): Promise<unknown> {
-    if (this.models.length === 0) {
-      return this.isArray ? [] : null;
-    }
-
-    const eager = RelationExpression.fromModelGraph(this.models);
-    const modelClass = this.models[0].constructor;
-    const ids = this.models.map((model) => model.$id());
-
-    const models = await modelClass
-      .query()
-      .childQueryOf(builder)
-      .findByIds(ids)
-      .withGraphFetched(eager);
-
-    return this.isArray ? models : models[0] || null;
+  onAfter2(builder: QueryBuilder): Promise<unknown> {
+    return fetchGraph(builder, this.models, this.isArray);
   }
 }
 
-export { InsertGraphAndFetchOperation };
+// Fetches the models that a graph write wrote, with the relations of the graph.
+async function fetchGraph(
+  builder: QueryBuilder,
+  models: Model[],
+  isArray: boolean,
+): Promise<unknown> {
+  if (models.length === 0) {
+    return isArray ? [] : null;
+  }
+
+  const eager = RelationExpression.fromModelGraph(models);
+  const modelClass = models[0].constructor;
+  const ids = models.map((model) => model.$id());
+
+  const fetched = await modelClass
+    .query()
+    .childQueryOf(builder)
+    .findByIds(ids)
+    .withGraphFetched(eager);
+
+  return isArray ? fetched : fetched[0] || null;
+}
+
+export { InsertGraphAndFetchOperation, fetchGraph };

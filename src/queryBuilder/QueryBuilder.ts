@@ -516,7 +516,6 @@ class QueryBuilder extends QueryBuilderBase {
 
     builder._allowedGraphExpression = this._allowedGraphExpression;
     builder._findOperationOptions = this._findOperationOptions;
-    builder._relatedQueryFor = this._relatedQueryFor;
 
     return builder;
   }
@@ -1040,75 +1039,35 @@ class QueryBuilder extends QueryBuilderBase {
   }
 
   joinRelated(expression: unknown, options?: object): this {
-    ensureJoinRelatedOperation(this, 'innerJoin').addCall({
-      expression,
-      options,
-    });
-
-    return this;
+    return addJoinRelated(this, 'innerJoin', expression, options);
   }
 
   innerJoinRelated(expression: unknown, options?: object): this {
-    ensureJoinRelatedOperation(this, 'innerJoin').addCall({
-      expression,
-      options,
-    });
-
-    return this;
+    return addJoinRelated(this, 'innerJoin', expression, options);
   }
 
   outerJoinRelated(expression: unknown, options?: object): this {
-    ensureJoinRelatedOperation(this, 'outerJoin').addCall({
-      expression,
-      options,
-    });
-
-    return this;
+    return addJoinRelated(this, 'outerJoin', expression, options);
   }
 
   fullOuterJoinRelated(expression: unknown, options?: object): this {
-    ensureJoinRelatedOperation(this, 'fullOuterJoin').addCall({
-      expression,
-      options,
-    });
-
-    return this;
+    return addJoinRelated(this, 'fullOuterJoin', expression, options);
   }
 
   leftJoinRelated(expression: unknown, options?: object): this {
-    ensureJoinRelatedOperation(this, 'leftJoin').addCall({
-      expression,
-      options,
-    });
-
-    return this;
+    return addJoinRelated(this, 'leftJoin', expression, options);
   }
 
   leftOuterJoinRelated(expression: unknown, options?: object): this {
-    ensureJoinRelatedOperation(this, 'leftOuterJoin').addCall({
-      expression,
-      options,
-    });
-
-    return this;
+    return addJoinRelated(this, 'leftOuterJoin', expression, options);
   }
 
   rightJoinRelated(expression: unknown, options?: object): this {
-    ensureJoinRelatedOperation(this, 'rightJoin').addCall({
-      expression,
-      options,
-    });
-
-    return this;
+    return addJoinRelated(this, 'rightJoin', expression, options);
   }
 
   rightOuterJoinRelated(expression: unknown, options?: object): this {
-    ensureJoinRelatedOperation(this, 'rightOuterJoin').addCall({
-      expression,
-      options,
-    });
-
-    return this;
+    return addJoinRelated(this, 'rightOuterJoin', expression, options);
   }
 
   deleteById(id: unknown): this {
@@ -1512,6 +1471,16 @@ function runOperationHooksFrom(
   }
 
   return result;
+}
+
+function addJoinRelated<T extends QueryBuilder>(
+  builder: T,
+  joinOperation: string,
+  expression: unknown,
+  options: object | undefined,
+): T {
+  ensureJoinRelatedOperation(builder, joinOperation).addCall({ expression, options });
+  return builder;
 }
 
 function ensureJoinRelatedOperation(

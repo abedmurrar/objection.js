@@ -29,17 +29,19 @@ class JoinEagerOperation extends EagerOperation {
   }
 
   onBefore3(builder: QueryBuilder): unknown {
-    return this.joiner!.setExpression(this.buildFinalExpression())
-      .setModifiers(this.buildFinalModifiers(builder))
-      .setOptions(this.graphOptions)
-      .fetchColumnInfo(builder);
+    return this.configureJoiner(builder).fetchColumnInfo(builder);
   }
 
+  // Also configures the joiner, because a query can be built without being
+  // executed, e.g. by `toKnexQuery()`.
   onBuild(builder: QueryBuilder): void {
-    this.joiner!.setExpression(this.buildFinalExpression())
+    this.configureJoiner(builder).build(builder);
+  }
+
+  configureJoiner(builder: QueryBuilder) {
+    return this.joiner!.setExpression(this.buildFinalExpression())
       .setModifiers(this.buildFinalModifiers(builder))
-      .setOptions(this.graphOptions)
-      .build(builder);
+      .setOptions(this.graphOptions);
   }
 
   onRawResult(builder: QueryBuilder, rows: unknown): unknown {

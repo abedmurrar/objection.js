@@ -4,7 +4,8 @@ import { isKnexRaw, isKnexQueryBuilder } from '../../utils/knexUtils';
 import { toPgJsonPathLiteral, getJsonDialect } from '../../utils/postgresJsonPath';
 import { toMySqlJsonPath, toJsonSql } from '../../utils/mysqlJsonPath';
 import { QueryBuilderOperation } from './QueryBuilderOperation';
-import { StaticHookArguments, hasStaticHook } from '../StaticHookArguments';
+import { callStaticBeforeHook, callStaticAfterHook } from '../StaticHookArguments';
+import { after, afterReturn } from '../../utils/promiseUtils';
 import type {
   KnexBuilder,
   Model,
@@ -40,9 +41,12 @@ class UpdateOperation extends QueryBuilderOperation {
     return true;
   }
 
-  async onBefore2(builder: QueryBuilder, result: unknown): Promise<unknown> {
-    await callBeforeUpdate(builder, this.model, this.modelOptions);
-    return result;
+  // Only returns a promise when a hook does.
+  onBefore2(builder: QueryBuilder, result: unknown): unknown {
+    const maybePromise = this.model.$beforeUpdate(this.modelOptions, builder.context());
+    const beforeHooks = after(maybePromise, () => callStaticBeforeHook(builder, 'beforeUpdate'));
+
+    return afterReturn(beforeHooks, result);
   }
 
   onBefore3(builder: QueryBuilder): void {
@@ -69,12 +73,19 @@ class UpdateOperation extends QueryBuilderOperation {
     return builder.isExplicitlyResolvedOrRejected() && !this.hasNothingToUpdate;
   }
 
-  async onAfter2(builder: QueryBuilder, numUpdated: unknown): Promise<unknown> {
-    const result = await callAfterUpdate(builder, this.model, this.modelOptions, numUpdated);
+  // Only returns a promise when a hook does.
+  onAfter2(builder: QueryBuilder, numUpdated: unknown): unknown {
+    const maybePromise = this.model.$afterUpdate(this.modelOptions, builder.context());
+    const result = after(maybePromise, () =>
+      callStaticAfterHook(builder, 'afterUpdate', numUpdated),
+    );
+
     // The patched model is what the write returns, e.g. to `upsertGraph()` and
     // `patchAndFetch()`, or what it merges into the instance of `$query()`.
-    removeFieldExpressions(this.model);
-    return result;
+    return after(result, (result: unknown) => {
+      removeFieldExpressions(this.model);
+      return result;
+    });
   }
 
   toFindOperation(): QueryBuilderOperation | null {
@@ -93,65 +104,6 @@ class UpdateOperation extends QueryBuilderOperation {
 interface JsonAccess {
   readonly type: 'array' | 'object';
   readonly ref: string | number;
-}
-
-async function callBeforeUpdate(
-  builder: QueryBuilder,
-  model: Model,
-  modelOptions: ModelOptions,
-): Promise<unknown> {
-  await callInstanceBeforeUpdate(builder, model, modelOptions);
-  return callStaticBeforeUpdate(builder);
-}
-
-function callInstanceBeforeUpdate(
-  builder: QueryBuilder,
-  model: Model,
-  modelOptions: ModelOptions,
-): unknown {
-  return model.$beforeUpdate(modelOptions, builder.context());
-}
-
-function callStaticBeforeUpdate(builder: QueryBuilder): unknown {
-  if (!hasStaticHook(builder.modelClass(), 'beforeUpdate')) {
-    return undefined;
-  }
-
-  const args = StaticHookArguments.create({ builder });
-  return builder.modelClass().beforeUpdate(args);
-}
-
-async function callAfterUpdate(
-  builder: QueryBuilder,
-  model: Model,
-  modelOptions: ModelOptions,
-  result: unknown,
-): Promise<unknown> {
-  await callInstanceAfterUpdate(builder, model, modelOptions);
-  return callStaticAfterUpdate(builder, result);
-}
-
-function callInstanceAfterUpdate(
-  builder: QueryBuilder,
-  model: Model,
-  modelOptions: ModelOptions,
-): unknown {
-  return model.$afterUpdate(modelOptions, builder.context());
-}
-
-async function callStaticAfterUpdate(builder: QueryBuilder, result: unknown): Promise<unknown> {
-  if (!hasStaticHook(builder.modelClass(), 'afterUpdate')) {
-    return result;
-  }
-
-  const args = StaticHookArguments.create({ builder, result });
-  const maybeResult = await builder.modelClass().afterUpdate(args);
-
-  if (maybeResult === undefined) {
-    return result;
-  } else {
-    return maybeResult;
-  }
 }
 
 // Field expressions only describe the writes into json columns, they aren't

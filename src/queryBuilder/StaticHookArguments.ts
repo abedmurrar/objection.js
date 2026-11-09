@@ -1,4 +1,5 @@
 import { asArray } from '../utils/objectUtils';
+import { after } from '../utils/promiseUtils';
 import type { QueryBuilder } from './QueryBuilder';
 import type { ModelClass, Operation } from './QueryBuilderOperationSupport';
 import type { QueryBuilderUserContext } from './QueryBuilderUserContext';
@@ -15,6 +16,44 @@ function markDefaultStaticHook(hook: object): void {
 
 function hasStaticHook(modelClass: ModelClass, hookName: string): boolean {
   return !defaultStaticHooks.has(modelClass[hookName]);
+}
+
+type StaticHook = (this: ModelClass, args: StaticHookArguments) => unknown;
+
+// Calls a static "before" hook (`beforeFind`, `beforeInsert`, ...) of the
+// query's model class, if the class overrides it. Returns what the hook
+// returns: a promise to wait for, or anything else, which is ignored.
+function callStaticBeforeHook(builder: QueryBuilder, hookName: string): unknown {
+  const modelClass = builder.modelClass();
+
+  if (!hasStaticHook(modelClass, hookName)) {
+    return undefined;
+  }
+
+  return (modelClass[hookName] as StaticHook).call(
+    modelClass,
+    StaticHookArguments.create({ builder }),
+  );
+}
+
+// Calls a static "after" hook (`afterFind`, `afterInsert`, ...) of the query's
+// model class, if the class overrides it. Returns the result, or what the hook
+// returns instead of `undefined`, and only a promise when the hook returns one.
+function callStaticAfterHook(builder: QueryBuilder, hookName: string, result: unknown): unknown {
+  const modelClass = builder.modelClass();
+
+  if (!hasStaticHook(modelClass, hookName)) {
+    return result;
+  }
+
+  const maybePromise = (modelClass[hookName] as StaticHook).call(
+    modelClass,
+    StaticHookArguments.create({ builder, result }),
+  );
+
+  return after(maybePromise, (maybeResult: unknown) =>
+    maybeResult === undefined ? result : maybeResult,
+  );
 }
 
 interface StaticHookArgumentsOptions {
@@ -58,43 +97,19 @@ class StaticHookArguments {
   }
 
   get relation(): unknown {
-    const op = this[BUILDER_SYMBOL].findOperation(hasRelation);
-
-    if (op) {
-      return getRelation(op);
-    } else {
-      return undefined;
-    }
+    return findInOperations(this[BUILDER_SYMBOL], getRelation);
   }
 
   get modelOptions(): unknown {
-    const op = this[BUILDER_SYMBOL].findOperation(hasModelOptions);
-
-    if (op) {
-      return getModelOptions(op);
-    } else {
-      return undefined;
-    }
+    return findInOperations(this[BUILDER_SYMBOL], getModelOptions);
   }
 
   get items(): unknown[] {
-    const op = this[BUILDER_SYMBOL].findOperation(hasItems);
-
-    if (op) {
-      return asArray(getItems(op));
-    } else {
-      return [];
-    }
+    return asArray(findInOperations(this[BUILDER_SYMBOL], getItems) || []);
   }
 
   get inputItems(): unknown[] {
-    const op = this[BUILDER_SYMBOL].findOperation(hasInputItems);
-
-    if (op) {
-      return asArray(getInputItems(op));
-    } else {
-      return [];
-    }
+    return asArray(findInOperations(this[BUILDER_SYMBOL], getInputItems) || []);
   }
 
   get cancelQuery(): (cancelValue?: unknown) => void {
@@ -186,36 +201,39 @@ interface ItemOperation extends Operation {
   model?: unknown;
 }
 
-function getRelation(op: ItemOperation): unknown {
-  return op.relation;
+// The value of the first operation that has one (a truthy one), or undefined.
+function findInOperations(builder: QueryBuilder, get: (op: ItemOperation) => unknown): unknown {
+  let value: unknown;
+
+  builder.findOperation((op: ItemOperation) => {
+    value = get(op);
+    return !!value;
+  });
+
+  return value || undefined;
 }
 
-function hasRelation(op: ItemOperation): boolean {
-  return !!getRelation(op);
+function getRelation(op: ItemOperation): unknown {
+  return op.relation;
 }
 
 function getModelOptions(op: ItemOperation): unknown {
   return op.modelOptions;
 }
 
-function hasModelOptions(op: ItemOperation): boolean {
-  return !!getModelOptions(op);
-}
-
 function getItems(op: ItemOperation): unknown {
   return op.instance || (op.owner && op.owner.isModels && op.owner.modelArray);
-}
-
-function hasItems(op: ItemOperation): boolean {
-  return !!getItems(op);
 }
 
 function getInputItems(op: ItemOperation): unknown {
   return op.models || op.model;
 }
 
-function hasInputItems(op: ItemOperation): boolean {
-  return !!getInputItems(op);
-}
-
-export { StaticHookArguments, JoinedStaticHookArguments, markDefaultStaticHook, hasStaticHook };
+export {
+  StaticHookArguments,
+  JoinedStaticHookArguments,
+  markDefaultStaticHook,
+  hasStaticHook,
+  callStaticBeforeHook,
+  callStaticAfterHook,
+};

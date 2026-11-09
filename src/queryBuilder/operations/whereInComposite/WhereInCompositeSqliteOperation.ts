@@ -33,12 +33,6 @@ class WhereInCompositeSqliteOperation extends ObjectionToKnexConvertingOperation
       }
     }
   }
-
-  clone(): this {
-    const clone = super.clone();
-    clone.prefix = this.prefix;
-    return clone;
-  }
 }
 
 function buildWhereArgs(columns: unknown, values: unknown): WhereArgs {
