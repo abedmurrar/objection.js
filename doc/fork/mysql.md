@@ -189,10 +189,18 @@ delete from `enrollments` where `enrollments`.`courseId` in (7) and exists (
 
 MySQL doesn't allow a statement to read the table it modifies in a subquery, so two cases take a second query that fetches the ids of the matching join rows first:
 
-- Filters that may read the join table themselves: joins, `joinRelated()`, subqueries and raw SQL.
+- Filters that may read the join table themselves: joins, `joinRelated()`, subqueries and raw SQL. `findById()` and `findByIds()` count as such filters too.
 - A trigger on the join table that changes a table the subquery reads, which MySQL rejects with error 1442. The statement runs again with the ids, and the join table is remembered, so the next statements fetch the ids first. A failed statement doesn't roll back a MySQL transaction.
 
 The ids can't tell apart join rows that differ only in their other columns, so in these two cases such duplicates are modified together.
+
+`upsertGraph()` has just fetched the rows it unrelates through the relation, so since 4.2.3 it deletes their join rows by the ids of both sides in one statement, without the subquery, on every database:
+
+```sql
+delete from `enrollments` where `enrollments`.`courseId` in (7) and `enrollments`.`studentId` in (3, 4)
+```
+
+Before, MySQL and MariaDB took the second query here too. The subquery isn't only slower: it locks the related rows, and deadlocked with concurrent deletes of them that cascade to the join table. This applies when the relation has no `modify` or `filter` of its own and joins the id columns of the related table. Other relations keep the subquery.
 
 ## Upserts
 

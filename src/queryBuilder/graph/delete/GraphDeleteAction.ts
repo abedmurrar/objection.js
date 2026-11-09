@@ -49,11 +49,13 @@ class GraphDeleteAction extends GraphAction {
           .$relatedQuery(relation.name)
           .childQueryOf(parentBuilder, { fork: true });
 
-        if (!shouldUnrelate && relation.isObjectionManyToManyRelation) {
+        if (relation.isObjectionManyToManyRelation) {
           // The current graph was fetched through the relations, so the
-          // deleted rows are known to be related to their parents, and are
-          // deleted by their ids only. A subquery that joins the join table
-          // deadlocks with concurrent writes of the join table on MySQL.
+          // deleted and unrelated rows are known to be related to their
+          // parents. Deletes delete them by their ids only, and unrelates
+          // delete the join rows by the ids of both sides. A subquery that
+          // joins the join table, or reads the related table, deadlocks with
+          // concurrent writes on MySQL.
           builder.internalOptions({ skipRelationFilter: true });
         }
 

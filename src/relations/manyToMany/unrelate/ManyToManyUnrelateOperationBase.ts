@@ -7,6 +7,14 @@ import type { ManyToManyRelation } from '../ManyToManyRelation';
 class ManyToManyUnrelateOperationBase extends UnrelateOperation {
   declare relation: ManyToManyRelation;
   declare owner: RelationOwner;
+  declare skipRelationFilter: boolean;
+
+  // The rows that `upsertGraph()` unrelates are known to be related to the
+  // owner, see `ManyToManyModifyMixin.relatedIdsOfFilters()`.
+  onAdd(builder: RelationQueryBuilder, args: unknown[]): boolean {
+    this.skipRelationFilter = builder.internalOptions().skipRelationFilter;
+    return super.onAdd(builder, args);
+  }
 
   get modifiesJoinTable(): boolean {
     return true;

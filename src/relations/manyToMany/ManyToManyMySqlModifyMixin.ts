@@ -1,5 +1,4 @@
-import { ManyToManyModifyMixin } from './ManyToManyModifyMixin';
-import { isPlainObject } from '../../utils/objectUtils';
+import { ManyToManyModifyMixin, isSimpleFilterArg } from './ManyToManyModifyMixin';
 import type { ManyToManyModifyOperationClass } from './ManyToManyModifyMixin';
 import type { RelationQueryBuilder } from '../Relation';
 import type { ObjectionToKnexConvertingOperation } from '../../queryBuilder/operations/ObjectionToKnexConvertingOperation';
@@ -22,6 +21,10 @@ import type { ObjectionToKnexConvertingOperation } from '../../queryBuilder/oper
 const ManyToManyMySqlModifyMixin = <T extends ManyToManyModifyOperationClass>(Operation: T) => {
   return class extends ManyToManyModifyMixin(Operation) {
     applyModifyFilterForJoinTable(builder: RelationQueryBuilder): RelationQueryBuilder {
+      if (this.joinRowRelatedIds !== null) {
+        return this.applyRelatedIdFilterForJoinTable(builder);
+      }
+
       const { joinTableOwnerProp } = this.relation;
       const readsJoinTable = this.joinRowFilterReadsJoinTable(builder);
       const original = builder;
@@ -139,37 +142,6 @@ function rememberTriggerConflict(builder: RelationQueryBuilder, joinTable: strin
 function isTriggerConflictError(err: unknown): boolean {
   const nativeError = (err as { nativeError?: { errno?: number } } | null)?.nativeError;
   return nativeError?.errno === 1442;
-}
-
-// A value, a column reference, or an array or object of those: arguments that
-// can't contain a subquery or raw SQL.
-function isSimpleFilterArg(arg: unknown): boolean {
-  if (arg === null || arg === undefined) {
-    return true;
-  }
-
-  switch (typeof arg) {
-    case 'string':
-    case 'number':
-    case 'boolean':
-    case 'bigint':
-      return true;
-    case 'object':
-      if (arg instanceof Date || Buffer.isBuffer(arg)) {
-        return true;
-      } else if ((arg as { isObjectionReferenceBuilder?: boolean }).isObjectionReferenceBuilder) {
-        return true;
-      } else if (Array.isArray(arg)) {
-        return arg.every(isSimpleFilterArg);
-      } else if (isPlainObject(arg)) {
-        return Object.values(arg).every(isSimpleFilterArg);
-      } else {
-        return false;
-      }
-    default:
-      // Functions (where groups and subquery callbacks) and symbols.
-      return false;
-  }
 }
 
 export { ManyToManyMySqlModifyMixin };

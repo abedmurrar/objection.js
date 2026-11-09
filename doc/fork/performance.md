@@ -16,6 +16,7 @@ The fork does less work per query than objection.js 3.1.5. The generated SQL and
 | Faster keys for ids                    | Relations and graphs are matched by keys made from ids. Numbers and strings, which almost all ids are, are now converted first.                                                                                                                                                   |
 | Hooks run without promises (4.1.3)     | Every phase of a query (`onBefore1` ... `onAfter3`, `runBefore()`, `runAfter()`) used to chain promises and await each hook, about 40 promises per query, even with no hooks. The hooks now run one after another and only wait when a hook returns a promise.                  |
 | Graph inserts in one query per table on MySQL (4.1.2) | `insertGraph()` and `upsertGraph()` inserted one row per query on MySQL. They now insert the rows of a table together, as on postgres: a person with 2 pets with 2 toys each takes 3 inserts instead of 7.                                                                         |
+| Graph unrelates in one statement (4.2.3) | `upsertGraph()` deletes the join rows of the many-to-many rows it unrelates by the ids of both sides in one statement. MySQL fetched their ids in a separate query first: an `upsertGraph()` that unrelates one item takes 4.6 ms instead of 5.1 ms on MySQL 8.4. See [Many-to-many writes](./mysql.md#many-to-many-writes). |
 
 ## Benchmarks
 
