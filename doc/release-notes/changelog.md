@@ -4,6 +4,8 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+## 4.2.7 (2026-11-09)
+
 ### Performance
 
 - Deletes no longer wait for promises when the model has no static `beforeDelete()` or `afterDelete()` hook: these two hooks of every delete were `async` functions, so each delete waited on two promises that had nothing to do. A query with only one where operation, like `deleteById()` or `findById()`, also no longer looks for where clauses to group, since it takes two to have two scopes. Instruction counts of the mock benchmarks: `deleteById()` −16.2%, a delete with a where −12.0%; no other scenario changed by more than run-to-run variation. On a real MySQL 8.4, `deleteById()` of a missing row took 206.0 µs instead of 216.4 µs (median of 5 alternating rounds). The SQL is the same, and hooks that exist still run, with their errors rejecting the query as before.
