@@ -4,6 +4,8 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+## 4.2.8 (2026-11-09)
+
 ### Fixes
 
 - After an `insertGraph()` or `upsertGraph()` failed on a `#ref{}` it couldn't resolve, the next graph could keep one of its `#ref{}` references as literal text instead of replacing it. The references are searched with the shared global regex `Model.propRefRegex`, and the failed search left it in the middle of a string, so the next search started there. Each string is now searched with `matchAll()`, which uses a copy of the regex.
