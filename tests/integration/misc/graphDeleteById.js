@@ -2,8 +2,9 @@ const expect = require('expect.js');
 const { Model } = require('../../../');
 
 // upsertGraph() deletes the many-to-many rows that it fetched through their
-// relation by their ids only. A subquery that joins the join table deadlocked
-// with concurrent writes of the join table on MySQL and MariaDB.
+// relation by their ids only, and unrelates them by the ids of both sides. A
+// subquery that joins the join table, or reads the related table, deadlocked
+// with concurrent writes on MySQL and MariaDB.
 module.exports = (session) => {
   describe('upsertGraph deletes many-to-many rows by id', () => {
     const knex = session.knex;
@@ -80,6 +81,16 @@ module.exports = (session) => {
               to: 'gdItem.id',
             },
           },
+          namedTags: {
+            relation: Model.ManyToManyRelation,
+            modelClass: Item,
+            modify: (builder) => builder.where('gdItem.name', 'like', 'tag%'),
+            join: {
+              from: 'gdPerson.id',
+              through: { from: 'gdPersonTag.personId', to: 'gdPersonTag.itemId' },
+              to: 'gdItem.id',
+            },
+          },
         };
       };
     });
@@ -129,16 +140,13 @@ module.exports = (session) => {
       expect(itemDeletes).to.have.length(1);
       expect(itemDeletes[0]).not.to.contain('gdPersonItem');
 
-      // The unrelate of the other relation still filters the join rows by
-      // their related rows: in the delete, or on MySQL in the query that
-      // fetches the ids of the join rows first.
+      // The unrelate of the other relation deletes the join rows by the ids
+      // of the person and the item, in one statement.
       const unrelates = sql.filter((it) => /^delete from .gdPersonTag. /.test(it));
       expect(unrelates).to.have.length(1);
-
-      const joinRowFilter = session.isMySql()
-        ? sql.find((it) => /^select .* from .gdPersonTag. where /.test(it))
-        : unrelates[0];
-      expect(joinRowFilter).to.match(/exists \(select 1 from .gdItem. where .gdItem.\..id. = /);
+      expect(unrelates[0]).not.to.contain('gdItem');
+      expect(unrelates[0]).to.match(/.personId. in \(.+\) and .gdPersonTag.\..itemId. in \(/);
+      expect(sql.filter((it) => /^select .* from .gdPersonTag. where /.test(it))).to.have.length(0);
 
       const items = await knex('gdItem').orderBy('id').pluck('id');
       expect(items).to.eql([11, 13, 21, 22]);
@@ -165,6 +173,38 @@ module.exports = (session) => {
       expect(count).to.equal(0);
       expect(await knex('gdItem').where('id', 13).first()).to.be.ok();
       expect(sql.filter((it) => /^delete from .gdItem. /.test(it))[0]).to.contain('gdPersonItem');
+    });
+
+    it('should keep the relation filter of unrelates outside upsertGraph', async () => {
+      const person = await Person.query(knex).findById(1);
+
+      // Item 13 is related to person 2, not to person 1.
+      const count = await person.$relatedQuery('items', knex).unrelate().findByIds([11, 13]);
+
+      expect(count).to.equal(1);
+      const rows = await knex('gdPersonItem').orderBy('itemId').select('personId', 'itemId');
+      expect(rows).to.eql([
+        { personId: 1, itemId: 12 },
+        { personId: 2, itemId: 13 },
+      ]);
+    });
+
+    it('should keep the filter of a relation that has one in upsertGraph unrelates', async () => {
+      await Person.query(knex).upsertGraph(
+        { id: 1, namedTags: [{ id: 21 }] },
+        { unrelate: ['namedTags'] },
+      );
+
+      const unrelates = sql.filter((it) => /^delete from .gdPersonTag. /.test(it));
+      expect(unrelates).to.have.length(1);
+
+      const joinRowFilter = session.isMySql()
+        ? sql.find((it) => /^select .* from .gdPersonTag. where /.test(it))
+        : unrelates[0];
+      expect(joinRowFilter).to.match(/exists \(select 1 from .gdItem. where .gdItem.\..id. = /);
+
+      const rows = await knex('gdPersonTag').where('personId', 1).pluck('itemId');
+      expect(rows).to.eql([21]);
     });
   });
 };

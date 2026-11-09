@@ -1,4 +1,6 @@
 import { withWhereScope } from '../../queryBuilder/whereScopes';
+import { FindByIdsOperation } from '../../queryBuilder/operations/FindByIdsOperation';
+import { isPlainObject } from '../../utils/objectUtils';
 import { ManyToManyFindOperation } from './find/ManyToManyFindOperation';
 import type { RelationOperationOptions, RelationQueryBuilder } from '../Relation';
 import type { RelationOwner } from '../RelationOwner';
@@ -38,6 +40,7 @@ const ManyToManyModifyMixin = <T extends ManyToManyModifyOperationClass>(Operati
     declare modifyFilterSubquery: RelationQueryBuilder | null;
     declare joinRowFilterSubquery: RelationQueryBuilder | null;
     declare skipRelationFilter: boolean;
+    declare joinRowRelatedIds: unknown[] | null;
 
     // The arguments of the operation class this mixin is applied to.
     constructor(...args: any[]) {
@@ -45,6 +48,7 @@ const ManyToManyModifyMixin = <T extends ManyToManyModifyOperationClass>(Operati
       this.modifyFilterSubquery = null;
       this.joinRowFilterSubquery = null;
       this.skipRelationFilter = false;
+      this.joinRowRelatedIds = null;
     }
 
     // Unrelate doesn't execute the main query, and updates of rows that are
@@ -57,7 +61,17 @@ const ManyToManyModifyMixin = <T extends ManyToManyModifyOperationClass>(Operati
     // At this point `builder` should only have the user's own wheres and joins. There can
     // be other operations (like orderBy) too, but those are meaningless with modify operations.
     onBuild(builder: RelationQueryBuilder) {
-      if (this.modifiesJoinTable && !this.skipRelationFilter) {
+      if (this.modifiesJoinTableOnly && this.skipRelationFilter) {
+        this.joinRowRelatedIds = this.relatedIdsOfFilters(builder);
+      }
+
+      // Patches that skip the relation filter filter the join rows by ids
+      // themselves.
+      if (
+        this.modifiesJoinTable &&
+        this.joinRowRelatedIds === null &&
+        (!this.skipRelationFilter || this.modifiesJoinTableOnly)
+      ) {
         this.joinRowFilterSubquery = this.createJoinRowFilterSubquery(builder);
       }
 
@@ -110,12 +124,79 @@ const ManyToManyModifyMixin = <T extends ManyToManyModifyOperationClass>(Operati
     // Only modifies the join rows of the owner whose related row matches the
     // filters (#1853).
     applyModifyFilterForJoinTable(builder: RelationQueryBuilder): RelationQueryBuilder {
+      if (this.joinRowRelatedIds !== null) {
+        return this.applyRelatedIdFilterForJoinTable(builder);
+      }
+
       const joinTableOwnerRefs = this.relation.joinTableOwnerProp.refs(builder);
       const ownerValues = this.owner.getProps(this.relation);
 
       return builder
         .whereInComposite(joinTableOwnerRefs, ownerValues)
         .whereExists(this.joinRowFilterSubquery!);
+    }
+
+    // The join rows of the owner and the related ids.
+    applyRelatedIdFilterForJoinTable(builder: RelationQueryBuilder): RelationQueryBuilder {
+      return builder
+        .whereInComposite(
+          this.relation.joinTableOwnerProp.refs(builder),
+          this.owner.getProps(this.relation),
+        )
+        .whereInComposite(
+          this.relation.joinTableRelatedProp!.refs(builder),
+          this.joinRowRelatedIds,
+        );
+    }
+
+    // The ids of an unrelate of rows that are known to be related, like the
+    // unrelates of `upsertGraph()`, when they are its only filter. The join
+    // rows are then filtered by these ids, without a subquery of the related
+    // table: on MySQL the subquery locks the related rows, and deadlocks with
+    // concurrent deletes of them that cascade to the join table. Null if the
+    // relation has its own filter, doesn't join the ids of the related table,
+    // or the query has other filters.
+    relatedIdsOfFilters(builder: RelationQueryBuilder): unknown[] | null {
+      const { relation } = this;
+      const builderClass = builder.constructor;
+      const idColumns = relation.relatedModelClass.getIdColumnArray();
+      const relatedColumns = relation.relatedProp.cols;
+
+      if (
+        relation.modify ||
+        idColumns.length !== relatedColumns.length ||
+        idColumns.some((column, i) => column !== relatedColumns[i]) ||
+        builder.has(builderClass.JoinSelector)
+      ) {
+        return null;
+      }
+
+      let findByIds: FindByIdsOperation | null = null;
+      let otherFilters = false;
+
+      builder.forEachOperation(builderClass.WhereSelector, (op: unknown): boolean | void => {
+        if (op instanceof FindByIdsOperation && findByIds === null) {
+          findByIds = op;
+        } else if (
+          !((op as { parentOperation: unknown }).parentOperation instanceof FindByIdsOperation)
+        ) {
+          otherFilters = true;
+          return false;
+        }
+      });
+
+      const ids = (findByIds as FindByIdsOperation | null)?.ids;
+
+      if (
+        otherFilters ||
+        !Array.isArray(ids) ||
+        ids.length === 0 ||
+        !ids.every(isSimpleFilterArg)
+      ) {
+        return null;
+      }
+
+      return ids;
     }
 
     // Selects the related row of a join row if it matches the filters. The
@@ -167,6 +248,7 @@ const ManyToManyModifyMixin = <T extends ManyToManyModifyOperationClass>(Operati
       clone.modifyFilterSubquery = this.modifyFilterSubquery;
       clone.joinRowFilterSubquery = this.joinRowFilterSubquery;
       clone.skipRelationFilter = this.skipRelationFilter;
+      clone.joinRowRelatedIds = this.joinRowRelatedIds;
       return clone;
     }
   };
@@ -183,4 +265,35 @@ class ManyToManyModifyFindOperation extends ManyToManyFindOperation {
   }
 }
 
-export { ManyToManyModifyMixin };
+// A value, a column reference, or an array or object of those: arguments that
+// can't contain a subquery or raw SQL.
+function isSimpleFilterArg(arg: unknown): boolean {
+  if (arg === null || arg === undefined) {
+    return true;
+  }
+
+  switch (typeof arg) {
+    case 'string':
+    case 'number':
+    case 'boolean':
+    case 'bigint':
+      return true;
+    case 'object':
+      if (arg instanceof Date || Buffer.isBuffer(arg)) {
+        return true;
+      } else if ((arg as { isObjectionReferenceBuilder?: boolean }).isObjectionReferenceBuilder) {
+        return true;
+      } else if (Array.isArray(arg)) {
+        return arg.every(isSimpleFilterArg);
+      } else if (isPlainObject(arg)) {
+        return Object.values(arg).every(isSimpleFilterArg);
+      } else {
+        return false;
+      }
+    default:
+      // Functions (where groups and subquery callbacks) and symbols.
+      return false;
+  }
+}
+
+export { ManyToManyModifyMixin, isSimpleFilterArg };
