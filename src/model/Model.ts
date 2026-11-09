@@ -4,7 +4,6 @@ import { validate } from './modelValidate';
 import { isMsSql } from '../utils/knexUtils';
 import { visitModels } from './modelVisitor';
 import { hasId, getSetId } from './modelId';
-import { map as promiseMap } from '../utils/promiseUtils';
 import { toJson, toDatabaseJson } from './modelToJson';
 import { values, propKey, hasProps } from './modelValues';
 import { defineNonEnumerableProperty } from './modelUtils';
@@ -855,9 +854,9 @@ class Model {
       }
     });
 
-    return promiseMap(promises, (it: unknown) => it, {
-      concurrency: this.getConcurrency(this.knex()),
-    });
+    // The traversers have all been called above, so a concurrency limit here
+    // would limit nothing.
+    return Promise.all(promises);
   }
 }
 
