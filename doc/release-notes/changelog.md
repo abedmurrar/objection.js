@@ -4,6 +4,10 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+### Performance
+
+- `insertGraph()` and `upsertGraph()` are as fast as in 4.2.7 again. The fix for skipped `#ref{}` references in 4.2.8 searched every string of every graph with `matchAll()`, which copies the regex and creates an iterator for each string: in the mock benchmarks, `insertGraph()` of 50 persons with pets took 7% to 8% more instructions and 15% to 28% more time, and `upsertGraph()` 3% to 5% more instructions. The search uses `exec()` again, and resets the shared regex before and after it, also when a reference can't be resolved, so the 4.2.8 fix still holds.
+
 ## 4.2.8 (2026-11-09)
 
 ### Fixes

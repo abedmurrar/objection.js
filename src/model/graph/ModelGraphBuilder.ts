@@ -241,12 +241,23 @@ function visitStringsInObject(
   }
 }
 
-// `matchAll()` works on a copy of the regex. `exec()` on the shared global
-// `propRefRegex` kept its `lastIndex` when a callback threw, and the next
-// string was searched from there, which skipped its references.
+// `propRefRegex` is a shared global regex, so its `lastIndex` is reset
+// before and after the search, also when a callback throws. Otherwise the
+// next string is searched from where this one stopped, which skips its
+// references. Every string of every graph is searched, so this doesn't use
+// `matchAll()`: it copies the regex and creates an iterator for each string.
 function forEachMatch(regex: RegExp, str: string, cb: (match: RegExpExecArray) => void): void {
-  for (const match of str.matchAll(regex)) {
-    cb(match);
+  regex.lastIndex = 0;
+
+  try {
+    let match = regex.exec(str);
+
+    while (match !== null) {
+      cb(match);
+      match = regex.exec(str);
+    }
+  } finally {
+    regex.lastIndex = 0;
   }
 }
 
