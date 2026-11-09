@@ -4,6 +4,8 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+## 4.2.6 (2026-11-09)
+
 ### Performance
 
 - A query no longer walks its operations to find the table it reads from, whether it has a select, and whether its where clauses need to be grouped: the summary of its operations from 4.2.5 holds these too. The kinds of an operation that come from its name are looked up once per name. `execute()` runs the phases of a query one after another instead of chaining them with about 12 functions per query. Instruction counts of the mock benchmarks against 4.2.5: an insert of 1 row −9.8%, a delete with a where −7.7%, building a query with where, orderBy and limit −5.8%, `upsertGraph()` of 20 persons with pets −4.0%, a find −2.6%. On a real MySQL 8.4, finds and deletes took 2% to 4% less time, about as much as the times vary between runs. The SQL is the same.
