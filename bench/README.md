@@ -39,7 +39,7 @@ node bench/count.js --baseline ../other                  # CPU instructions per 
 
 ## Against other ORMs on MySQL
 
-`bench/orms` runs the same 11 scenarios on this checkout, objection 4.4.2 and 3.1.5, raw knex, kysely, drizzle-orm, sequelize, typeorm and mikro-orm, on a real MySQL through the mysql2 driver: finds by id, of 100 and of 1000 rows, inserts of 1 and 100 rows, updates, deletes, eager loading with separate queries and with one query, a transaction and a nested insert. Each contender uses its own idiomatic API on the same tables.
+`bench/orms` runs the same 13 scenarios on this checkout, objection 4.4.2 and 3.1.5, raw knex, kysely, drizzle-orm, sequelize, typeorm and mikro-orm, on a real MySQL through the mysql2 driver: finds by id, of 100 and of 1000 rows, inserts of 1 and 100 rows, updates, deletes, eager loading with separate queries and with one query, a transaction, a nested insert, and an `upsertGraph()` with and without a transaction, which only the objection versions run. The latest results are in [Performance](../doc/fork/performance.md#compared-with-other-orms). Each contender uses its own idiomatic API on the same tables.
 
 `fork-native-pool` is this checkout on mysql2's own pool, through knex's `connectionPool` option, instead of knex's pool. It isn't run by default: add it with `--contenders`. See [mysql2's own connection pool](../doc/fork/mysql.md#mysql2-s-own-connection-pool).
 
