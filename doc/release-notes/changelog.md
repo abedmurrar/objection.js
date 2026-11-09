@@ -10,7 +10,7 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ### Internal
 
-- Removed duplicated code from the query builder, about 240 lines: one base class for the five operations that hold a callback (`runBefore()`, `runAfter()`, `onBuild()`, `onBuildKnex()`, `onError()`), one `fetchGraph()` for `insertGraphAndFetch()` and `upsertGraphAndFetch()`, one-line `*JoinRelated()` methods, one definition of the where selector, and fewer helper functions in the static hook arguments. Behaviour, SQL and the public API are the same.
+- Removed duplicated code from the query builder, about 210 lines: one base class for the five operations that hold a callback (`runBefore()`, `runAfter()`, `onBuild()`, `onBuildKnex()`, `onError()`), one `fetchGraph()` for `insertGraphAndFetch()` and `upsertGraphAndFetch()`, one-line `*JoinRelated()` methods, one definition of the where selector, and fewer helper functions in the static hook arguments. Behaviour, SQL and the public API are the same.
 
 ## 4.2.10 (2026-11-09)
 
