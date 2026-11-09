@@ -64,21 +64,25 @@ The scenarios that are dominated by rows, graphs and validation are unchanged by
 
 ## Compared with other ORMs
 
-`bench/orms` runs the same scenarios on a real MySQL 8.4 through the mysql2 driver with this fork, objection 3.1.5 and 4.4.2, raw knex, kysely, drizzle-orm, sequelize, typeorm and mikro-orm, each with its own API. These are the results of 4.1.1, before the speed-ups above, on Linux with Node.js 24.17 and MySQL 8.4 in Docker, median time per operation:
+`bench/orms` runs the same scenarios on a real MySQL 8.4 through the mysql2 driver with this fork, objection 3.1.5 and 4.4.2, raw knex, kysely, drizzle-orm, sequelize, typeorm and mikro-orm, each with its own API. These are the results of 4.2.5, on Linux with Node.js 24.17 and MySQL 8.4 in Docker, median time per operation of 3 rounds, all from one run on a quiet machine:
 
-| Scenario                        | This fork | objection 3.1.5 | objection 4.4.2 | Fastest other ORM     | knex (no ORM) |
-| ------------------------------- | --------: | --------------: | --------------: | --------------------- | ------------: |
-| Find by id                      |  257.6 µs |        260.0 µs |        285.2 µs | typeorm, 281.7 µs     |      194.6 µs |
-| Find 100 rows¹                  |  411.6 µs |        433.9 µs |        531.7 µs | drizzle-orm, 451.6 µs |      291.3 µs |
-| Find 1000 rows¹                 |   1.40 ms |         1.95 ms |         2.26 ms | drizzle-orm, 2.41 ms  |      914.1 µs |
-| Delete by id                    |  243.9 µs |        307.5 µs |        297.6 µs | mikro-orm, 303.4 µs   |      178.9 µs |
-| Eager loading, separate queries |   5.39 ms |         7.52 ms |         7.89 ms | drizzle-orm, 6.97 ms  |       4.84 ms |
-| Eager loading, one query        |   5.44 ms |         6.81 ms |         7.93 ms | typeorm, 7.62 ms      |       3.04 ms |
-| Batch insert of 100 rows        |   8.92 ms |    not on MySQL |    not on MySQL | sequelize, 7.37 ms    |       6.32 ms |
+| Scenario                        | This fork | objection 3.1.5 | objection 4.4.2 | Fastest other ORM     | knex (no ORM) | kysely   |
+| ------------------------------- | --------: | --------------: | --------------: | --------------------- | ------------: | -------: |
+| Find by id                      |  178.2 µs |        204.9 µs |        226.8 µs | typeorm, 190.8 µs     |      144.2 µs | 111.3 µs |
+| Find 100 rows                   |  252.2 µs |        262.6 µs |        334.0 µs | typeorm, 325.4 µs     |      206.1 µs | 188.6 µs |
+| Find 1000 rows                  |  714.1 µs |        772.3 µs |         1.09 ms | drizzle-orm, 1.16 ms  |      528.2 µs | 499.2 µs |
+| Delete by id                    |  169.2 µs |        172.7 µs |        199.6 µs | drizzle-orm, 127.3 µs |      103.1 µs |  97.1 µs |
+| Eager loading, separate queries |   2.66 ms |         2.73 ms |         3.35 ms | drizzle-orm, 3.23 ms  |       1.98 ms |  1.97 ms |
+| Eager loading, one query        |   2.27 ms |         2.59 ms |         3.23 ms | typeorm, 2.85 ms      |       1.61 ms | 100.2 ms |
+| Batch insert of 100 rows        |   4.16 ms |    not on MySQL |    not on MySQL | mikro-orm, 4.14 ms    |       3.89 ms |  3.96 ms |
+| Nested insert                   |   4.64 ms |         5.00 ms |         5.48 ms | drizzle-orm, 4.25 ms  |       4.17 ms |  4.09 ms |
+| `upsertGraph()` in a transaction |   6.22 ms |         6.45 ms |         7.33 ms | none has one          |               |          |
 
-¹ Measured again for this fork, both objection versions and knex on a quiet machine; the others are from the first run.
+The nested insert is a person with 2 pets with 2 toys each, in a transaction. kysely's eager loading in one query builds the graph from JSON aggregates, which is slow on MySQL.
 
-Among the ORMs, the fork was clearly the fastest at finding 1000 rows, deleting and eager loading, and even with objection.js 3.1.5 at finding by id and finding 100 rows: there, the differences are within what changes between runs. kysely, a query builder, is faster than knex itself on the simplest queries: the fork builds on knex, so knex's own work per query is part of every query. kysely also uses mysql2's connection pool, but that explains only a small part of the difference: with mysql2's pool, the fork found rows by id 2% to 17% faster, against kysely's 34% lead over knex. See [mysql2's own connection pool](./mysql.md#mysql2-s-own-connection-pool). Writes of single rows, updates and transactions take mostly MySQL's commit to disk, about 4 ms here, and the ORMs were close to each other there. Times on a database depend on the machine and on what else runs on it; run the benchmark on your own setup before relying on these numbers.
+Among the ORMs, the fork was the fastest at finding rows and at eager loading. drizzle-orm, typeorm and sequelize deleted a row by id faster, and drizzle-orm and mikro-orm were faster at the nested insert; mikro-orm's batch insert was even. Inserts and updates of single rows and transactions take mostly MySQL's commit to disk, about 3 to 4 ms here, and all contenders were within 9% of each other there.
+
+knex and kysely, which are query builders and don't create models, are faster than every ORM at the small queries. The fork builds on knex, so knex's own work per query is part of every query: a find by id took 34 µs more than knex and 67 µs more than kysely. kysely also uses mysql2's connection pool, but that explains only a small part of its lead over knex (23% at a find by id in this run): with mysql2's pool, the fork found rows by id 2% to 17% faster. See [mysql2's own connection pool](./mysql.md#mysql2-s-own-connection-pool). Times on a database depend on the machine and on what else runs on it; run the benchmark on your own setup before relying on these numbers.
 
 ## The TypeScript build
 
