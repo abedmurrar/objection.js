@@ -5,6 +5,7 @@
 
 const path = require('node:path');
 const knexFactory = require('knex');
+const mysql2 = require('mysql2');
 const { connection, personRow, nestedPerson, hundredRows, idCycler } = require('../common');
 
 async function load(variant, lib) {
@@ -17,9 +18,9 @@ async function load(variant, lib) {
   return mod.default && mod.default.Model ? mod.default : mod;
 }
 
-async function create({ variant, lib }) {
+async function create({ variant, lib, nativePool }) {
   const { Model } = await load(variant, lib);
-  const knex = knexFactory({ client: 'mysql2', connection, pool: { min: 1, max: 4 } });
+  const { knex, close } = createKnex(nativePool);
 
   class Toy extends Model {
     static tableName = 'toy';
@@ -83,7 +84,23 @@ async function create({ variant, lib }) {
     scenarios['batch insert 100 rows'] = undefined;
   }
 
-  return { scenarios, close: () => knex.destroy() };
+  return { scenarios, close };
+}
+
+// knex's own pool (tarn), or with `nativePool` mysql2's pool through knex's
+// `connectionPool` option, the way kysely uses it. Both hold up to 4
+// connections.
+function createKnex(nativePool) {
+  if (!nativePool) {
+    const knex = knexFactory({ client: 'mysql2', connection, pool: { min: 1, max: 4 } });
+    return { knex, close: () => knex.destroy() };
+  }
+
+  const pool = mysql2.createPool({ ...connection, connectionLimit: 4 });
+  const knex = knexFactory({ client: 'mysql2', version: '8.4', connectionPool: pool });
+
+  // knex doesn't end a pool it was given.
+  return { knex, close: () => knex.destroy().then(() => pool.end()) };
 }
 
 module.exports = { create };

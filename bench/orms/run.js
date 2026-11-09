@@ -21,7 +21,9 @@ const { CONTENDERS } = require('./contenders');
 const opt = parseArgs(process.argv.slice(2), {
   lib: path.join(__dirname, '..', '..'),
   filter: '',
-  contenders: Object.keys(CONTENDERS).join(','),
+  contenders: Object.keys(CONTENDERS)
+    .filter((name) => !CONTENDERS[name].optIn)
+    .join(','),
   rounds: 3,
   samples: 7,
   sampleMs: 250,

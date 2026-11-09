@@ -7,6 +7,13 @@ const CONTENDERS = {
     options: { variant: 'fork' },
     label: '@abedmurrar/objection (this checkout)',
   },
+  'fork-native-pool': {
+    file: 'objection.js',
+    options: { variant: 'fork', nativePool: true },
+    label: "@abedmurrar/objection on mysql2's own pool",
+    // Only run when named with --contenders.
+    optIn: true,
+  },
   'objection-4.4.2': {
     file: 'objection.js',
     options: { variant: 'objection-4.4.2' },

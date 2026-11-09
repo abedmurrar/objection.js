@@ -308,6 +308,36 @@ Helpers for functions that only exist on MySQL throw when used with another data
 
 In TypeScript, the helpers check the number of arguments and type the result as `FunctionBuilder<T>`. The expression methods use that type to check values: `fn.timestampDiff('day', a, b).gt('30')` is an error. See [TypeScript](./typescript.md#typed-fn-and-ref).
 
+## mysql2's own connection pool
+
+Since knex 3.3.0, knex can run its queries on a pool that you create with mysql2, instead of its own pool, through the `connectionPool` option. kysely uses mysql2's pool this way. We measured it with objection, and **don't recommend it yet**: it saves little time, and it breaks `withGraphJoined()`.
+
+```js
+const mysql2 = require('mysql2');
+
+const pool = mysql2.createPool({ host, user, password, database, connectionLimit: 10 });
+const knex = require('knex')({ client: 'mysql2', version: '8.4', connectionPool: pool });
+
+// knex.destroy() doesn't end the pool.
+await knex.destroy();
+await pool.end();
+```
+
+What we measured with `bench/orms` (the `fork-native-pool` contender, 4 connections, MySQL 8.4 in Docker, 3 runs):
+
+- Finds of one row by id were 2% to 17% faster.
+- Finds of 100 rows were 3% to 5% faster.
+- Everything else, from finds of 1000 rows to eager loading, writes and transactions, changed by less than the runs differed from each other.
+
+What breaks or changes, checked with knex 3.3.0 and mysql2 3.24:
+
+- **`withGraphJoined()` throws.** knex reads the database name from `connection`, which you can't pass with `connectionPool`. Without it, knex's `columnInfo()` returns no columns, and `withGraphJoined()` can't select the columns of the joined tables: `the id column(s) [id] of model Pet are missing from the result`.
+- **`.timeout(ms, { cancel: true })` doesn't cancel.** It fails with `cancelling of query failed`, and the query keeps running on the server. Timeouts without `cancel` still reject.
+- **Acquire timeouts are ignored.** knex's `acquireConnectionTimeout` and `pool` options don't apply. When all connections are busy, a query waits until one is free. Set mysql2's `queueLimit` and `connectTimeout` instead.
+- **`knex.destroy()` doesn't end the pool.** End it yourself with `pool.end()`.
+- **`connection` and `connectionPool` can't be used together.** knex throws: `'connectionPool' and 'connection' are mutually exclusive`.
+- **knex 3.3.0 or newer is required.**
+
 ## MariaDB
 
 The MySQL features work on MariaDB too. They are tested on MariaDB 10.6 and 11.4.
