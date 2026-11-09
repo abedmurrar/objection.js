@@ -4,6 +4,8 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+## 4.2.10 (2026-11-09)
+
 ### Internal
 
 - Removed code that couldn't run or that nothing read, about 170 lines: base query builder methods that `QueryBuilder` replaces, unused relation and graph helpers, the "not implemented" placeholders of the many-to-many operations, the `$$relationArray` of bound model classes, `utils/classUtils.ts` and `promiseUtils.try`. Binding a model class to a knex instance, which every transaction does, takes 6.5% fewer instructions. Behaviour, SQL and the public API are the same.
