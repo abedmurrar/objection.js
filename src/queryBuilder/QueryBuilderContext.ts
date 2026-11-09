@@ -21,9 +21,10 @@ class QueryBuilderContext extends QueryBuilderContextBase {
   clone(): this {
     const ctx = super.clone();
 
-    ctx.runBefore = this.runBefore.slice();
-    ctx.runAfter = this.runAfter.slice();
-    ctx.onBuild = this.onBuild.slice();
+    // The constructor gave the copy empty arrays.
+    if (this.runBefore.length !== 0) ctx.runBefore = this.runBefore.slice();
+    if (this.runAfter.length !== 0) ctx.runAfter = this.runAfter.slice();
+    if (this.onBuild.length !== 0) ctx.onBuild = this.onBuild.slice();
 
     return ctx;
   }

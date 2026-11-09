@@ -49,7 +49,9 @@ import { KnexOperation } from './operations/KnexOperation';
 import { createModelsFromDatabaseRows } from '../model/modelDatabaseRows';
 import type { KnexLike, ModelClass, Operation } from './QueryBuilderOperationSupport';
 import type { FindOptions } from './operations/types';
-import type { HookName } from './operations/QueryBuilderOperation';
+import { HookBits, QueryBuilderOperation } from './operations/QueryBuilderOperation';
+import type { HookName, PhaseHookName } from './operations/QueryBuilderOperation';
+import type { OperationsSummary } from './QueryBuilderOperationSupport';
 import type { InstanceUpdateOperation } from './operations/InstanceUpdateOperation';
 import type { RelationOperationOptions } from '../relations/Relation';
 
@@ -60,6 +62,23 @@ type Modifier<B> = ((builder: B, ...args: any[]) => unknown) | string | object |
 
 // Creates the operation that a write method (or a find query) adds.
 type OperationFactory = (builder: QueryBuilder) => Operation;
+
+// The summary of a query's operations, see `summarizeOperations()`.
+interface QueryOperationsSummary extends OperationsSummary {
+  hasWriteOperation: boolean;
+  hasInsertOperation: boolean;
+  hasFindOperation: boolean;
+  eagerOperation: EagerOperation | null;
+}
+
+// Whether the next builder created is a clone, see `clone()`.
+let skipNextContext = false;
+
+function takeSkipNextContext(): boolean {
+  const skip = skipNextContext;
+  skipNextContext = false;
+  return skip;
+}
 
 class QueryBuilder extends QueryBuilderBase {
   // Types `this.constructor` (and `builder.constructor.forClass()` in the operations).
@@ -87,7 +106,7 @@ class QueryBuilder extends QueryBuilderBase {
   declare _deleteOperationFactory: OperationFactory;
 
   static init(self: QueryBuilder, modelClass: ModelClass): void {
-    super.init(self, modelClass);
+    super.init(self, modelClass, takeSkipNextContext());
 
     self._resultModelClass = null;
     self._explicitRejectValue = null;
@@ -311,8 +330,8 @@ class QueryBuilder extends QueryBuilderBase {
       this.isRelate === QueryBuilder.prototype.isRelate &&
       this.isUnrelate === QueryBuilder.prototype.isUnrelate
     ) {
-      // The same as below in one walk of the operations instead of five.
-      return !this.has(isWriteOperation);
+      // The same as below without a walk of the operations.
+      return !this.operationsSummary().hasWriteOperation;
     }
 
     return !(
@@ -325,7 +344,7 @@ class QueryBuilder extends QueryBuilderBase {
   }
 
   isInsert(): boolean {
-    return this.has(InsertOperation);
+    return this.operationsSummary().hasInsertOperation;
   }
 
   isUpdate(): boolean {
@@ -354,8 +373,53 @@ class QueryBuilder extends QueryBuilderBase {
   }
 
   hasWithGraph(): boolean {
-    const eagerOp = this.findOperation(EagerOperation);
-    return !!eagerOp && !eagerOp.expression.isEmpty;
+    const eagerOp = this.operationsSummary().eagerOperation;
+    return eagerOp !== null && !eagerOp.expression.isEmpty;
+  }
+
+  operationsSummary(): QueryOperationsSummary {
+    return super.operationsSummary() as QueryOperationsSummary;
+  }
+
+  createOperationsSummary(): QueryOperationsSummary {
+    return {
+      version: this._operationsVersion,
+      hooks: 0,
+      hasWriteOperation: false,
+      hasInsertOperation: false,
+      hasFindOperation: false,
+      eagerOperation: null,
+    };
+  }
+
+  // One walk answers what a query asks about its operations while it is
+  // built and executed.
+  summarizeOperation(summary: QueryOperationsSummary, op: Operation): boolean {
+    const kind = operationKind(op);
+    summary.hooks |= op.hookMask();
+
+    if ((kind & KIND_WRITE) !== 0) {
+      summary.hasWriteOperation = true;
+    }
+
+    if ((kind & KIND_INSERT) !== 0) {
+      summary.hasInsertOperation = true;
+    }
+
+    if ((kind & KIND_FIND) !== 0) {
+      summary.hasFindOperation = true;
+    }
+
+    if ((kind & KIND_EAGER) !== 0) {
+      if (summary.eagerOperation !== null) {
+        // Which one comes first depends on where the new one was added.
+        return false;
+      }
+
+      summary.eagerOperation = op as EagerOperation;
+    }
+
+    return true;
   }
 
   isSelectAll(): boolean {
@@ -393,6 +457,9 @@ class QueryBuilder extends QueryBuilderBase {
   }
 
   clone(): this {
+    // `baseCloneInto()` replaces the context that a new builder would get.
+    // Only for this class: a subclass's constructor may use its context.
+    skipNextContext = this.constructor === QueryBuilder;
     const builder = this.emptyInstance();
 
     // Call the super class's clone implementation.
@@ -402,7 +469,8 @@ class QueryBuilder extends QueryBuilderBase {
 
     builder._explicitRejectValue = this._explicitRejectValue;
     builder._explicitResolveValue = this._explicitResolveValue;
-    builder._modifiers = { ...this._modifiers };
+    // Shared: `modifiers()` replaces the object instead of changing it.
+    builder._modifiers = this._modifiers;
 
     builder._allowedGraphExpression = this._allowedGraphExpression;
     builder._findOperationOptions = this._findOperationOptions;
@@ -1056,6 +1124,45 @@ Object.defineProperties(QueryBuilder.prototype, {
   },
 });
 
+const KIND_WRITE = 1;
+const KIND_INSERT = 2;
+const KIND_FIND = 4;
+const KIND_EAGER = 8;
+const baseIs = QueryBuilderOperation.prototype.is;
+
+// The kinds of an operation that the summary of a query needs, worked out
+// once for an operation and its clones.
+function operationKind(op: Operation): number {
+  let kind = op._kindMask;
+
+  if (kind === -1) {
+    if (op.is === baseIs) {
+      kind =
+        (op instanceof InsertOperation ||
+        op instanceof UpdateOperation ||
+        op instanceof DeleteOperation ||
+        op instanceof RelateOperation ||
+        op instanceof UnrelateOperation
+          ? KIND_WRITE
+          : 0) |
+        (op instanceof InsertOperation ? KIND_INSERT : 0) |
+        (op instanceof FindOperation ? KIND_FIND : 0) |
+        (op instanceof EagerOperation ? KIND_EAGER : 0);
+    } else {
+      // A class like `DelegateOperation` answers `is()` itself.
+      kind =
+        (isWriteOperation(op) ? KIND_WRITE : 0) |
+        (op.is(InsertOperation) ? KIND_INSERT : 0) |
+        (op.is(FindOperation) ? KIND_FIND : 0) |
+        (op.is(EagerOperation) ? KIND_EAGER : 0);
+    }
+
+    op._kindMask = kind;
+  }
+
+  return kind;
+}
+
 function isWriteOperation(op: Operation): boolean {
   return (
     op.is(InsertOperation) ||
@@ -1177,7 +1284,11 @@ function checkEager(builder: QueryBuilder): void {
 }
 
 function findQueryExecutorOperation(builder: QueryBuilder): Operation | null {
-  return builder.findOperation((op: Operation) => op.hasQueryExecutor());
+  if ((builder.operationsSummary().hooks & HookBits.queryExecutor) === 0) {
+    return null;
+  }
+
+  return builder.findOperation((op: Operation) => (op.hookMask() & HookBits.queryExecutor) !== 0);
 }
 
 function checkForUsage(builder: QueryBuilder): void {
@@ -1290,11 +1401,21 @@ function handleExecuteError(builder: QueryBuilder, err: unknown): Promise<unknow
 // Calls the `hookName` hook of every operation that has one, in order, each
 // with the result of the previous one. The operations are collected when the
 // phase starts, so ones that hooks add only take part in later phases.
-function runOperationHooks(builder: QueryBuilder, hookName: HookName, result: unknown): unknown {
+function runOperationHooks(
+  builder: QueryBuilder,
+  hookName: PhaseHookName,
+  result: unknown,
+): unknown {
+  const bit = HookBits[hookName];
+
+  if ((builder.operationsSummary().hooks & bit) === 0) {
+    return result;
+  }
+
   let operations: Operation[] | null = null;
 
   builder.forEachOperation(true, (op) => {
-    if (op.hasHook(hookName)) {
+    if ((op.hookMask() & bit) !== 0) {
       if (operations === null) {
         operations = [op];
       } else {
@@ -1380,14 +1501,14 @@ function addImplicitOperations(builder: QueryBuilder): QueryBuilder {
 }
 
 function addFindOperation(builder: QueryBuilder): void {
-  if (!builder.has(FindOperation)) {
+  if (!builder.operationsSummary().hasFindOperation) {
     const operation = builder._findOperationFactory(builder);
     builder.addOperationToFront(operation, []);
   }
 }
 
 function moveEagerOperationToEnd(builder: QueryBuilder): void {
-  const eagerOp = builder.findOperation(EagerOperation);
+  const eagerOp = builder.operationsSummary().eagerOperation;
 
   builder.clear(EagerOperation);
   builder.addOperation(eagerOp!);

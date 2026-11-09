@@ -33,6 +33,23 @@ const hookNameToHasMethodName = {
 // correspond to a single query builder method call. For example SelectOperation could be added when
 // a `select` method is called.
 //
+// A bit for each hook that a query runs in phases, see `hookMask()`.
+const HookBits = {
+  onBefore1: 1,
+  onBefore2: 2,
+  onBefore3: 4,
+  onBuild: 8,
+  onBuildKnex: 16,
+  onRawResult: 32,
+  queryExecutor: 64,
+  onAfter1: 128,
+  onAfter2: 256,
+  onAfter3: 512,
+  onError: 1024,
+} as const;
+
+export type PhaseHookName = keyof typeof HookBits;
+
 // QueryBuilderOperation is just a bunch of query execution lifecycle hooks that subclasses
 // can (but don't have to) implement.
 //
@@ -48,10 +65,19 @@ class QueryBuilderOperation {
   declare parentOperation: QueryBuilderOperation | null;
   declare childOperations: QueryBuilderOperation[];
   declare whereScope: unknown;
+  declare _hookMask: number;
+  declare _kindMask: number;
 
   constructor(name: string | null = null, opt: OperationOptions = {}) {
     this.name = name;
     this.opt = opt;
+
+    // The hooks this operation has, see `hookMask()`.
+    this._hookMask = -1;
+
+    // The kinds of operation this is, cached by the query builder. A clone
+    // has the same class, so it keeps them.
+    this._kindMask = -1;
 
     // From which hook was this operation added as a child
     // operation.
@@ -73,6 +99,20 @@ class QueryBuilderOperation {
 
   hasHook(hookName: HookName): boolean {
     return this[hookNameToHasMethodName[hookName]]();
+  }
+
+  // The `HookBits` of the hooks this operation has. Worked out on the first
+  // call: an operation's hooks are set when it is created or cloned, before it
+  // takes part in a query.
+  hookMask(): number {
+    let mask = this._hookMask;
+
+    if (mask === -1) {
+      mask = computeHookMask(this);
+      this._hookMask = mask;
+    }
+
+    return mask;
   }
 
   // This is called immediately when a query builder method is called.
@@ -247,16 +287,20 @@ class QueryBuilderOperation {
       ) => this
     )(this.name, this.opt);
 
+    clone._kindMask = this._kindMask;
     clone.adderHookName = this.adderHookName;
     clone.parentOperation = this.parentOperation;
     clone.whereScope = this.whereScope;
 
-    clone.childOperations = this.childOperations.map((childOp) => {
-      const childOpClone = childOp.clone();
+    // The constructor gave the clone an empty array.
+    if (this.childOperations.length !== 0) {
+      clone.childOperations = this.childOperations.map((childOp) => {
+        const childOpClone = childOp.clone();
 
-      childOpClone.parentOperation = clone;
-      return childOpClone;
-    });
+        childOpClone.parentOperation = clone;
+        return childOpClone;
+      });
+    }
 
     return clone;
   }
@@ -327,4 +371,51 @@ Object.defineProperties(QueryBuilderOperation, {
   },
 });
 
+const PHASE_HOOK_NAMES = Object.keys(HookBits) as PhaseHookName[];
+const BASE = QueryBuilderOperation.prototype;
+
+// The hooks are compared with the base class directly, unless the operation's
+// class decides itself whether it has a hook, like `DelegateOperation`.
+function computeHookMask(op: QueryBuilderOperation): number {
+  if (
+    op.hasOnBefore1 !== BASE.hasOnBefore1 ||
+    op.hasOnBefore2 !== BASE.hasOnBefore2 ||
+    op.hasOnBefore3 !== BASE.hasOnBefore3 ||
+    op.hasOnBuild !== BASE.hasOnBuild ||
+    op.hasOnBuildKnex !== BASE.hasOnBuildKnex ||
+    op.hasOnRawResult !== BASE.hasOnRawResult ||
+    op.hasQueryExecutor !== BASE.hasQueryExecutor ||
+    op.hasOnAfter1 !== BASE.hasOnAfter1 ||
+    op.hasOnAfter2 !== BASE.hasOnAfter2 ||
+    op.hasOnAfter3 !== BASE.hasOnAfter3 ||
+    op.hasOnError !== BASE.hasOnError ||
+    op.hasHook !== BASE.hasHook
+  ) {
+    let mask = 0;
+
+    for (const hookName of PHASE_HOOK_NAMES) {
+      if (op.hasHook(hookName)) {
+        mask |= HookBits[hookName];
+      }
+    }
+
+    return mask;
+  }
+
+  return (
+    (op.onBefore1 !== BASE.onBefore1 ? HookBits.onBefore1 : 0) |
+    (op.onBefore2 !== BASE.onBefore2 ? HookBits.onBefore2 : 0) |
+    (op.onBefore3 !== BASE.onBefore3 ? HookBits.onBefore3 : 0) |
+    (op.onBuild !== BASE.onBuild ? HookBits.onBuild : 0) |
+    (op.onBuildKnex !== BASE.onBuildKnex ? HookBits.onBuildKnex : 0) |
+    (op.onRawResult !== BASE.onRawResult ? HookBits.onRawResult : 0) |
+    (op.queryExecutor !== BASE.queryExecutor ? HookBits.queryExecutor : 0) |
+    (op.onAfter1 !== BASE.onAfter1 ? HookBits.onAfter1 : 0) |
+    (op.onAfter2 !== BASE.onAfter2 ? HookBits.onAfter2 : 0) |
+    (op.onAfter3 !== BASE.onAfter3 ? HookBits.onAfter3 : 0) |
+    (op.onError !== BASE.onError ? HookBits.onError : 0)
+  );
+}
+
+export { HookBits };
 export { QueryBuilderOperation };

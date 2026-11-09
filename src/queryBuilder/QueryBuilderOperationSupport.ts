@@ -5,6 +5,7 @@ import { deprecate } from '../utils/deprecate';
 import { isPromise } from '../utils/promiseUtils/isPromise';
 import { effectiveWhereScope, createWhereGrouping } from './whereScopes';
 import type { WhereScope } from './whereScopes';
+import { HookBits } from './operations/QueryBuilderOperation';
 import type { QueryBuilderOperation, HookName } from './operations/QueryBuilderOperation';
 import type { QueryBuilder } from './QueryBuilder';
 import type {
@@ -54,9 +55,21 @@ const OrderBySelector = /orderBy/;
 const JoinSelector = /(join|joinRaw|joinRelated)$/i;
 const FromSelector = /^(from|fromRaw|into|table)$/;
 
+// What a walk of the operations found, for the version of the operations it
+// was made for. Queries ask the same questions about their operations many
+// times while they are built and executed, see `operationsSummary()`.
+interface OperationsSummary {
+  version: number;
+  // The `HookBits` of the hooks that any of the operations has.
+  hooks: number;
+}
+
 class QueryBuilderOperationSupport {
   declare _modelClass: ModelClass;
   declare _operations: Operation[];
+  // Goes up on every change of the operations or their child operations.
+  declare _operationsVersion: number;
+  declare _operationsSummary: OperationsSummary | null;
   declare _context: QueryBuilderContextBase;
   declare _parentQuery: QueryBuilderOperationSupport | null;
   declare _isPartialQuery: boolean;
@@ -67,10 +80,17 @@ class QueryBuilderOperationSupport {
     (this.constructor as typeof QueryBuilderOperationSupport).init(this, ...args);
   }
 
-  static init(self: QueryBuilderOperationSupport, modelClass: ModelClass): void {
+  // `skipContext` is for clones, which get the context of the original.
+  static init(
+    self: QueryBuilderOperationSupport,
+    modelClass: ModelClass,
+    skipContext = false,
+  ): void {
     self._modelClass = modelClass;
     self._operations = [];
-    self._context = new this.QueryBuilderContext(self);
+    self._operationsVersion = 0;
+    self._operationsSummary = null;
+    self._context = skipContext ? null! : new this.QueryBuilderContext(self);
     self._parentQuery = null;
     self._isPartialQuery = false;
     self._activeOperations = [];
@@ -383,6 +403,8 @@ class QueryBuilderOperationSupport {
       this._operations.push(opClone);
     }
 
+    this._operationsVersion++;
+
     return this;
   }
 
@@ -450,10 +472,59 @@ class QueryBuilderOperationSupport {
     return every;
   }
 
+  // The child operations that an earlier call of the hook added are removed
+  // before it's called again.
+  removeChildOperationsByHookName(operation: Operation, hookName: HookName): void {
+    const count = operation.childOperations.length;
+
+    if (count !== 0) {
+      operation.removeChildOperationsByHookName(hookName);
+
+      if (operation.childOperations.length !== count) {
+        this._operationsVersion++;
+      }
+    }
+  }
+
+  // The summary of the operations, made by one walk of them whenever they
+  // have changed.
+  operationsSummary(): OperationsSummary {
+    const summary = this._operationsSummary;
+
+    if (summary !== null && summary.version === this._operationsVersion) {
+      return summary;
+    }
+
+    return this.summarizeOperations();
+  }
+
+  summarizeOperations(): OperationsSummary {
+    const summary = this.createOperationsSummary();
+
+    this.forEachOperation(true, (op) => {
+      this.summarizeOperation(summary, op);
+    });
+
+    this._operationsSummary = summary;
+    return summary;
+  }
+
+  createOperationsSummary(): OperationsSummary {
+    return { version: this._operationsVersion, hooks: 0 };
+  }
+
+  // Takes one operation in, without its child operations. Returns false if the
+  // summary has to be made again by a walk instead, when the operation was
+  // added to a current one.
+  summarizeOperation(summary: OperationsSummary, op: Operation): boolean {
+    summary.hooks |= op.hookMask();
+    return true;
+  }
+
   // Returns whatever the hook returns.
   callOperationMethod(operation: Operation, hookName: HookName, args: unknown[]): unknown {
     try {
-      operation.removeChildOperationsByHookName(hookName);
+      this.removeChildOperationsByHookName(operation, hookName);
 
       this._activeOperations.push({
         operation,
@@ -475,7 +546,7 @@ class QueryBuilderOperationSupport {
     hookName: HookName,
     args: unknown[],
   ): unknown {
-    operation.removeChildOperationsByHookName(hookName);
+    this.removeChildOperationsByHookName(operation, hookName);
 
     const activeOperations = this._activeOperations;
     activeOperations.push({
@@ -515,7 +586,7 @@ class QueryBuilderOperationSupport {
     hookName: HookName,
     args: unknown[],
   ): Promise<unknown> {
-    operation.removeChildOperationsByHookName(hookName);
+    this.removeChildOperationsByHookName(operation, hookName);
 
     this._activeOperations.push({
       operation,
@@ -556,12 +627,25 @@ class QueryBuilderOperationSupport {
       } else {
         this._operations[arrayMethod](operation);
       }
+
+      // A new operation has no child operations yet, so a current summary
+      // only needs to take it in.
+      const summary = this._operationsSummary;
+      const isCurrent = summary !== null && summary.version === this._operationsVersion;
+
+      this._operationsVersion++;
+
+      if (isCurrent && this.summarizeOperation(summary, operation)) {
+        summary.version = this._operationsVersion;
+      }
     }
 
     return this;
   }
 
   removeOperation(operation: Operation): this {
+    this._operationsVersion++;
+
     if (operation.parentOperation) {
       operation.parentOperation.removeChildOperation(operation);
     } else {
@@ -576,6 +660,8 @@ class QueryBuilderOperationSupport {
   }
 
   replaceOperation(operation: Operation, newOperation: Operation): this {
+    this._operationsVersion++;
+
     if (operation.parentOperation) {
       operation.parentOperation.replaceChildOperation(operation, newOperation);
     } else {
@@ -598,6 +684,7 @@ class QueryBuilderOperationSupport {
   baseCloneInto<T extends QueryBuilderOperationSupport>(builder: T): T {
     builder._modelClass = this._modelClass;
     builder._operations = this._operations.map((it) => it.clone());
+    builder._operationsVersion++;
     builder._context = this._context.clone();
     builder._parentQuery = this._parentQuery;
     builder._isPartialQuery = this._isPartialQuery;
@@ -615,8 +702,12 @@ class QueryBuilderOperationSupport {
   }
 
   executeOnBuild(): void {
+    if ((this.operationsSummary().hooks & HookBits.onBuild) === 0) {
+      return;
+    }
+
     this.forEachOperation(true, (op) => {
-      if (op.hasOnBuild()) {
+      if ((op.hookMask() & HookBits.onBuild) !== 0) {
         this.callOperationMethod(op, 'onBuild', [this]);
       }
     });
@@ -628,7 +719,7 @@ class QueryBuilderOperationSupport {
     this.forEachOperation(true, (op) => {
       if (whereGrouping !== null && whereGrouping.isGrouped(op)) {
         knexBuilder = whereGrouping.build(op, knexBuilder);
-      } else if (op.hasOnBuildKnex()) {
+      } else if ((op.hookMask() & HookBits.onBuildKnex) !== 0) {
         const newKnexBuilder = this.callOperationMethod(op, 'onBuildKnex', [knexBuilder, this]);
         // Default to the input knex builder for backwards compatibility
         // with QueryBuilder.onBuildKnex hooks.
@@ -752,6 +843,7 @@ function getTableName(modelClassOrTableName: TableSource): string {
 
 export { QueryBuilderOperationSupport };
 export type {
+  OperationsSummary,
   TableSource,
   KnexLike,
   ModelClass,

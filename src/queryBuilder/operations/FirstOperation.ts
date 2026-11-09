@@ -5,7 +5,7 @@ class FirstOperation extends QueryBuilderOperation {
   onBuildKnex(knexBuilder: KnexBuilder, builder: QueryBuilder): KnexBuilder {
     const modelClass = builder.modelClass();
 
-    if (builder.isFind() && modelClass.useLimitInFirst) {
+    if (modelClass.useLimitInFirst && builder.isFind()) {
       knexBuilder = knexBuilder.limit(1);
     }
 
