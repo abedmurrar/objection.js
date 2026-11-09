@@ -164,10 +164,18 @@ function mapLastPart(mapper: StringMapper, separator: string): StringMapper {
   };
 }
 
+// The key mapper of each object mapper that `keyMapper` returns, so that the
+// keys of database rows can be mapped onto models without an object between.
+const keyMappers = new WeakMap<KeyMapper, StringMapper>();
+
+function getKeyMapper(objectMapper: unknown): StringMapper | undefined {
+  return keyMappers.get(objectMapper as KeyMapper);
+}
+
 // Returns a function that takes an object as an input and maps the object's keys
 // using `mapper`. If the input is not an object, the input is returned unchanged.
 function keyMapper(mapper: StringMapper): KeyMapper {
-  return (obj) => {
+  const objectMapper: KeyMapper = (obj) => {
     if (!isObject(obj) || Array.isArray(obj)) {
       return obj;
     }
@@ -182,6 +190,9 @@ function keyMapper(mapper: StringMapper): KeyMapper {
 
     return out;
   };
+
+  keyMappers.set(objectMapper, mapper);
+  return objectMapper;
 }
 
 function snakeCaseMappers(opt: SnakeCaseOptions = {}): { parse: KeyMapper; format: KeyMapper } {
@@ -254,4 +265,5 @@ export {
   knexIdentifierMapping,
   camelCaseKeys,
   snakeCaseKeys,
+  getKeyMapper,
 };

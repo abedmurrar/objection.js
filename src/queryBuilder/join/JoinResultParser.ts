@@ -1,5 +1,14 @@
 import { JoinResultColumn } from './JoinResultColumn';
 import { groupBy } from '../../utils/objectUtils';
+import {
+  hasDefaultFromDatabaseJson,
+  cachedDatabaseRowWriter,
+  findDatabaseRowWriter,
+  columnProperty,
+  isJsonProperty,
+  parseJsonValue,
+} from '../../model/modelDatabaseRows';
+import type { DatabaseRowWriter } from '../../model/modelDatabaseRows';
 import type { FlatRow, JoinModel } from './RelationJoiner';
 import type { TableNode } from './TableNode';
 import type { TableTree } from './TableTree';
@@ -22,6 +31,7 @@ class JoinResultParser {
   declare columnsByTableNode: Map<TableNode, JoinResultColumn[]> | null;
   declare rootModelsById: Map<string, ModelEntry> | null;
   declare rootModels: JoinModel[] | null;
+  declare columnWriters: Map<TableNode, ColumnWriter | null> | null;
 
   constructor({ tableTree, omitColumnAliases = [] }: JoinResultParserArgs) {
     this.tableTree = tableTree;
@@ -30,6 +40,7 @@ class JoinResultParser {
     this.columnsByTableNode = null;
     this.rootModelsById = null;
     this.rootModels = null;
+    this.columnWriters = null;
   }
 
   static create(args: JoinResultParserArgs) {
@@ -46,6 +57,7 @@ class JoinResultParser {
     this.columnsByTableNode = this._createColumns(flatRows[0]);
     this.rootModelsById = new Map();
     this.rootModels = [];
+    this.columnWriters = new Map();
 
     for (const flatRow of flatRows as FlatRow[]) {
       this._parseNode(this.tableTree.rootNode, flatRow, null, this.rootModelsById);
@@ -107,17 +119,35 @@ class JoinResultParser {
   }
 
   _createModel(tableNode: TableNode, flatRow: FlatRow): JoinModel {
-    const row: FlatRow = {};
+    const modelClass = tableNode.modelClass;
     const columns = this.columnsByTableNode!.get(tableNode);
+    let writer = this.columnWriters!.get(tableNode);
+    let model: JoinModel | null = null;
 
-    if (columns) {
-      for (let i = 0, l = columns.length; i < l; ++i) {
-        const column = columns[i];
-        row[column.name] = flatRow[column.columnAlias];
+    if (writer === undefined) {
+      let rowWriter = cachedDatabaseRowWriter(modelClass);
+
+      if (rowWriter === undefined) {
+        if (hasDefaultFromDatabaseJson(modelClass)) {
+          model = new modelClass();
+          rowWriter = findDatabaseRowWriter(modelClass, model);
+        } else {
+          rowWriter = findDatabaseRowWriter(modelClass, null);
+        }
       }
+
+      writer = rowWriter === null ? null : createColumnWriter(rowWriter, columns);
+      this.columnWriters!.set(tableNode, writer);
     }
 
-    const model = tableNode.modelClass.fromDatabaseJson(row);
+    if (writer !== null) {
+      model = writeColumns(writer, model ?? new modelClass(), flatRow);
+    } else if (model !== null) {
+      // What `fromDatabaseJson()` does with the model it creates.
+      model.$setDatabaseJson(collectColumns(columns, flatRow));
+    } else {
+      model = modelClass.fromDatabaseJson(collectColumns(columns, flatRow));
+    }
 
     // The child nodes and the node of a parent model always have a relation
     // and a relation property.
@@ -160,6 +190,57 @@ function getTableNode(column: JoinResultColumn): TableNode {
 }
 
 const NO_CHILD_MAPS: Map<string, ModelEntry>[] = [];
+
+// The columns of a node written to its models directly, for model classes
+// that keep the default database JSON methods, see `modelDatabaseRows`.
+interface ColumnWriter {
+  aliases: string[];
+  props: string[];
+  isJson: boolean[];
+}
+
+function createColumnWriter(
+  rowWriter: DatabaseRowWriter,
+  columns: JoinResultColumn[] | undefined,
+): ColumnWriter {
+  const aliases: string[] = [];
+  const props: string[] = [];
+  const isJson: boolean[] = [];
+
+  for (const column of columns ?? []) {
+    const prop = columnProperty(rowWriter, column.name);
+
+    aliases.push(column.columnAlias);
+    props.push(prop);
+    isJson.push(isJsonProperty(rowWriter, prop));
+  }
+
+  return { aliases, props, isJson };
+}
+
+function writeColumns(writer: ColumnWriter, model: JoinModel, flatRow: FlatRow): JoinModel {
+  const { aliases, props, isJson } = writer;
+
+  for (let i = 0, l = props.length; i < l; ++i) {
+    const value = flatRow[aliases[i]];
+    model[props[i]] = isJson[i] ? parseJsonValue(value) : value;
+  }
+
+  return model;
+}
+
+function collectColumns(columns: JoinResultColumn[] | undefined, flatRow: FlatRow): FlatRow {
+  const row: FlatRow = {};
+
+  if (columns) {
+    for (let i = 0, l = columns.length; i < l; ++i) {
+      const column = columns[i];
+      row[column.name] = flatRow[column.columnAlias];
+    }
+  }
+
+  return row;
+}
 
 function createChildMaps(tableNode: TableNode): Map<string, ModelEntry>[] {
   const childNodes = tableNode.childNodes;

@@ -46,6 +46,7 @@ import { FirstOperation } from './operations/FirstOperation';
 import { FromOperation } from './operations/FromOperation';
 import { KnexOperation } from './operations/KnexOperation';
 
+import { createModelsFromDatabaseRows } from '../model/modelDatabaseRows';
 import type { KnexLike, ModelClass, Operation } from './QueryBuilderOperationSupport';
 import type { FindOptions } from './operations/types';
 import type { HookName } from './operations/QueryBuilderOperation';
@@ -1504,10 +1505,12 @@ function createModels(result: unknown, builder: QueryBuilder): unknown {
   const modelClass = builder.resultModelClass();
 
   if (Array.isArray(result)) {
-    if (result.length && shouldBeConvertedToModel(result[0], modelClass)) {
-      for (let i = 0, l = result.length; i < l; ++i) {
-        result[i] = modelClass.fromDatabaseJson(result[i]);
-      }
+    if (result.length > 1 && shouldBeConvertedToModel(result[0], modelClass)) {
+      createModelsFromDatabaseRows(modelClass, result);
+    } else if (result.length === 1 && shouldBeConvertedToModel(result[0], modelClass)) {
+      // One row costs less through `fromDatabaseJson()` than the lookup of
+      // the writer of its class.
+      result[0] = modelClass.fromDatabaseJson(result[0]);
     }
   } else if (shouldBeConvertedToModel(result, modelClass)) {
     result = modelClass.fromDatabaseJson(result);

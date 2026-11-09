@@ -70,22 +70,49 @@ function callAfterFindArray(ctx: unknown, results: unknown[], deep: boolean | un
     return results;
   }
 
-  const mapped: unknown[] = new Array(results.length);
-  let containsPromise = false;
+  const start = deep ? 0 : firstWithAfterFindHook(results);
+  let promises: unknown[] | null = null;
 
-  for (let i = 0, l = results.length; i < l; ++i) {
-    mapped[i] = callAfterFindForOne(ctx, results[i], results[i], deep);
+  for (let i = start, l = results.length; i < l; ++i) {
+    const maybePromise = callAfterFindForOne(ctx, results[i], results[i], deep);
 
-    if (isPromise(mapped[i])) {
-      containsPromise = true;
+    if (isPromise(maybePromise)) {
+      if (promises === null) {
+        promises = [maybePromise];
+      } else {
+        promises.push(maybePromise);
+      }
     }
   }
 
-  if (containsPromise) {
-    return Promise.all(mapped);
+  if (promises !== null) {
+    return Promise.all(promises).then(() => results);
   } else {
-    return mapped;
+    return results;
   }
+}
+
+// The index of the first result that may have its own `$afterFind`, or the
+// length of `results` if none does. Usually no model class defines the hook,
+// and the results are all checked with one property read each.
+function firstWithAfterFindHook(results: unknown[]): number {
+  const first = results[0] as Model;
+
+  if (!first.$isObjectionModel) {
+    return 0;
+  }
+
+  const defaultHook = first.$objectionModelClass.prototype.$afterFind;
+
+  for (let i = 0, l = results.length; i < l; ++i) {
+    const result = results[i];
+
+    if (!isObject(result) || (result as Model).$afterFind !== defaultHook) {
+      return i;
+    }
+  }
+
+  return results.length;
 }
 
 function callAfterFindForOne(
