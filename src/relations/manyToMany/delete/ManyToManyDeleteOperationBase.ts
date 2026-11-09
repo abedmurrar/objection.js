@@ -4,6 +4,10 @@ import type { RelationOwner } from '../../RelationOwner';
 import type { ManyToManyRelation } from '../ManyToManyRelation';
 
 class ManyToManyDeleteOperationBase extends DeleteOperation {
+  // Defined by `ManyToManyModifyMixin`, which every concrete class uses.
+  declare applyModifyFilterForRelatedTable: (builder: RelationQueryBuilder) => RelationQueryBuilder;
+  declare applyModifyFilterForJoinTable: (builder: RelationQueryBuilder) => RelationQueryBuilder;
+
   declare relation: ManyToManyRelation;
   declare owner: RelationOwner;
   declare skipRelationFilter: boolean;
@@ -30,16 +34,6 @@ class ManyToManyDeleteOperationBase extends DeleteOperation {
 
   get modifiesJoinTableOnly(): boolean {
     return false;
-  }
-
-  /* istanbul ignore next */
-  applyModifyFilterForRelatedTable(builder: RelationQueryBuilder): RelationQueryBuilder {
-    throw new Error('not implemented');
-  }
-
-  /* istanbul ignore next */
-  applyModifyFilterForJoinTable(builder: RelationQueryBuilder): RelationQueryBuilder {
-    throw new Error('not implemented');
   }
 }
 

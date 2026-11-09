@@ -59,8 +59,8 @@ function copyHiddenProperties<M extends ModelClass>(modelClass: M, BoundModelCla
   }
 
   for (const prop of staticHiddenProps) {
-    // $$relations and $$relationArray are handled in separately.
-    if (Object.hasOwn(modelClass, prop) && prop !== '$$relations' && prop !== '$$relationArray') {
+    // $$relations is bound separately, see `bindRelations()`.
+    if (Object.hasOwn(modelClass, prop) && prop !== '$$relations') {
       defineNonEnumerableProperty(
         BoundModelClass,
         prop,
@@ -86,18 +86,15 @@ function putBoundModelToCache<M extends ModelClass>(
 
 function bindRelations<M extends ModelClass>(modelClass: M, BoundModelClass: M, knex: Knex): M {
   const boundRelations: Record<string, Relation> = Object.create(null);
-  const boundRelationArray: Relation[] = [];
 
   for (const relationName of modelClass.getRelationNames()) {
     const relation = modelClass.getRelation(relationName);
     const boundRelation = relation.bindKnex(knex);
 
     boundRelations[relation.name] = boundRelation;
-    boundRelationArray.push(boundRelation);
   }
 
   defineNonEnumerableProperty(BoundModelClass, '$$relations', boundRelations);
-  defineNonEnumerableProperty(BoundModelClass, '$$relationArray', boundRelationArray);
 
   return BoundModelClass;
 }

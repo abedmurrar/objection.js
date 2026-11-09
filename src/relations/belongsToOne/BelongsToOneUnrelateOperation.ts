@@ -6,18 +6,6 @@ import type { Model } from '../../model/Model';
 class BelongsToOneUnrelateOperation extends UnrelateOperation {
   declare relation: Relation;
   declare owner: RelationOwner;
-  declare ids: null[][];
-
-  onAdd(): boolean {
-    const ids = new Array<null>(this.relation.ownerProp.size);
-
-    this.relation.ownerProp.forEach((i) => {
-      ids[i] = null;
-    });
-
-    this.ids = [ids];
-    return true;
-  }
 
   queryExecutor(builder: RelationQueryBuilder): RelationQueryBuilder {
     const { relation, owner } = this;
@@ -25,7 +13,7 @@ class BelongsToOneUnrelateOperation extends UnrelateOperation {
     const patch = {};
 
     ownerProp.forEach((i) => {
-      ownerProp.patch(patch, i, this.ids[0][i]);
+      ownerProp.patch(patch, i, null);
     });
 
     const ownerIdProp = ownerModelClass.getIdRelationProperty();

@@ -142,10 +142,6 @@ class GraphOptions {
     );
   }
 
-  shouldInsertOrRelate(node: GraphNode, graphData: GraphData): boolean {
-    return this.shouldInsert(node, graphData) || this.shouldRelate(node, graphData);
-  }
-
   shouldDeleteOrUnrelate(currentNode: GraphNode, graphData: GraphData): boolean {
     return this.shouldDelete(currentNode, graphData) || this.shouldUnrelate(currentNode, graphData);
   }

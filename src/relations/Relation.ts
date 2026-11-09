@@ -35,7 +35,6 @@ export type RelationBeforeInsert = (model: RelationModel, queryContext: unknown)
 export interface RelationOperationOptions<R extends Relation = Relation> {
   relation: R;
   owner: RelationOwner;
-  relationProperty?: string;
   modelOptions?: { patch?: boolean };
   dontCopyReturning?: boolean;
   dontCopyOnConflict?: boolean;

@@ -190,7 +190,6 @@ class Model {
   declare static $$propToCol: Map<string, string>;
   declare static $$relationMappings: RelationMappings;
   declare static $$relations: Record<string, Relation>;
-  declare static $$relationArray: Relation[];
   declare static $$relationNames: string[];
   declare static $$jsonAttributes: string[];
   declare static $$columnNameMappers: ColumnNameMappers | null;

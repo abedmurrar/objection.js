@@ -24,23 +24,6 @@ class QueryBuilderBase extends QueryBuilderOperationSupport {
   // Defined on the prototype below.
   declare readonly isObjectionQueryBuilderBase: true;
 
-  modify(...args: unknown[]): this {
-    const func = args[0] as ((...args: unknown[]) => unknown) | null | undefined;
-
-    if (!func) {
-      return this;
-    }
-
-    if (args.length === 1) {
-      func.call(this, this);
-    } else {
-      args[0] = this;
-      func(...args);
-    }
-
-    return this;
-  }
-
   transacting(trx: KnexInstance | null | undefined): this {
     this._context.knex = trx || null;
     return this;
@@ -48,22 +31,6 @@ class QueryBuilderBase extends QueryBuilderOperationSupport {
 
   select(...args: unknown[]): this {
     return this.addOperation(new SelectOperation('select'), args);
-  }
-
-  insert(...args: unknown[]): this {
-    return this.addOperation(new KnexOperation('insert'), args);
-  }
-
-  update(...args: unknown[]): this {
-    return this.addOperation(new KnexOperation('update'), args);
-  }
-
-  delete(...args: unknown[]): this {
-    return this.addOperation(new KnexOperation('delete'), args);
-  }
-
-  del(...args: unknown[]): this {
-    return this.delete(...args);
   }
 
   forUpdate(...args: unknown[]): this {
@@ -102,10 +69,6 @@ class QueryBuilderBase extends QueryBuilderOperationSupport {
     return this.addOperation(new SelectOperation('column'), args);
   }
 
-  from(...args: unknown[]): this {
-    return this.addOperation(new KnexOperation('from'), args);
-  }
-
   fromJS(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('fromJS'), args);
   }
@@ -116,14 +79,6 @@ class QueryBuilderBase extends QueryBuilderOperationSupport {
 
   into(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('into'), args);
-  }
-
-  withSchema(...args: unknown[]): this {
-    return this.addOperation(new KnexOperation('withSchema'), args);
-  }
-
-  table(...args: unknown[]): this {
-    return this.addOperation(new KnexOperation('table'), args);
   }
 
   distinct(...args: unknown[]): this {
@@ -547,10 +502,6 @@ class QueryBuilderBase extends QueryBuilderOperationSupport {
 
   options(...args: unknown[]): this {
     return this.addOperation(new KnexOperation('options'), args);
-  }
-
-  columnInfo(...args: unknown[]): this {
-    return this.addOperation(new KnexOperation('columnInfo'), args);
   }
 
   off(...args: unknown[]): this {

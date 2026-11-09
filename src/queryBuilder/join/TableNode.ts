@@ -60,10 +60,6 @@ class TableNode {
     return this.expression.node.$name;
   }
 
-  getReferenceForColumn(column: string): string {
-    return `${this.alias}.${column}`;
-  }
-
   getColumnAliasForColumn(column: string): string {
     if (this.parentNode) {
       return `${this.alias}${this.options.separator}${column}`;

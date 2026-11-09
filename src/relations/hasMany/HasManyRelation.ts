@@ -29,10 +29,6 @@ class HasManyRelation extends Relation {
     });
   }
 
-  hasRelateProp(model: RelationModel): boolean {
-    return model.$hasId();
-  }
-
   setRelateProp(model: RelationModel, values: unknown[]): void {
     model.$id(values);
   }

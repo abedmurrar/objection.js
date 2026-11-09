@@ -3,7 +3,6 @@ import { afterReturn as afterReturnImpl } from './afterReturn';
 import { isPromise as isPromiseImpl } from './isPromise';
 import { promiseMap } from './map';
 import { mapAfterAllReturn as mapAfterAllReturnImpl } from './mapAfterAllReturn';
-import { promiseTry } from './try';
 
 // Re-exporting imported bindings makes tsc define the exports as getters,
 // which puts this module's exports object in V8's slow dictionary mode and
@@ -14,6 +13,5 @@ const after = afterImpl;
 const afterReturn = afterReturnImpl;
 const mapAfterAllReturn = mapAfterAllReturnImpl;
 const map = promiseMap;
-const promiseTryExport = promiseTry;
 
-export { after, afterReturn, isPromise, map, mapAfterAllReturn, promiseTryExport as try };
+export { after, afterReturn, isPromise, map, mapAfterAllReturn };

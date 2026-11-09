@@ -32,7 +32,7 @@ class RelationFindOperation extends FindOperation {
     this.owner = opt.owner;
     this.alwaysReturnArray = false;
     this.assignResultToOwner = true;
-    this.relationProperty = opt.relationProperty || this.relation.name;
+    this.relationProperty = this.relation.name;
     this.omitProps = [];
     this.alias = null;
     this.assignAfterHooks = false;
