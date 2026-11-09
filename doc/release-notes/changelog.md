@@ -4,6 +4,10 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+### Performance
+
+- A query walks its operations far less often. A plain find walked them 17 times while it was built and executed: once per hook phase (`onBefore1` ... `onAfter3`, `onBuild`), and once each for `isFind()`, the find operation, the eager operation, the query executor and `isInsert()`, and most of these walks found nothing. The query now keeps a summary of its operations, made by one walk and stamped with a version that changes with the operations: the hooks they have, and whether one is a write, insert, find or eager operation. An operation that is added is taken into a current summary. The hooks of an operation are found once, by comparing them with the base class, and its kind once for it and its clones. `clone()`, which every execution does, no longer creates a context, internal options and arrays that it then replaces. Instruction counts of the mock benchmarks: `findById()` −18.7%, a delete with a where −14.6%, a find −8.0%, building a query with where, orderBy and limit −9.6%, `upsertGraph()` of 20 persons with pets −6.6%. The SQL is the same.
+
 ## 4.2.4 (2026-11-09)
 
 ### Performance
