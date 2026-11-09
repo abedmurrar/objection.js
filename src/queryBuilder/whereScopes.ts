@@ -241,5 +241,5 @@ function containsRaw(value: any): boolean {
   }
 }
 
-export { withWhereScope, effectiveWhereScope, createWhereGrouping };
+export { withWhereScope, effectiveWhereScope, createWhereGrouping, hasWhereAncestor };
 export type { WhereScope, WhereGrouping };

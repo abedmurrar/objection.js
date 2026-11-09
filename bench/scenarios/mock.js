@@ -114,6 +114,13 @@ module.exports = {
     return () => Person.query().delete().where('age', '<', 20);
   },
 
+  'execute: deleteById': async (objection) => {
+    const { Person } = defineModels(objection);
+    bind(objection, { Person });
+
+    return () => Person.query().deleteById(1);
+  },
+
   // Per-row work.
 
   'rows: find 1000 rows': async (objection) => {

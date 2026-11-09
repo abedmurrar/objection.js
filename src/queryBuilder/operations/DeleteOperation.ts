@@ -5,9 +5,14 @@ import { deprecate } from '../../utils/deprecate';
 import type { KnexBuilder, QueryBuilder } from './types';
 
 class DeleteOperation extends QueryBuilderOperation {
-  async onBefore2(builder: QueryBuilder, result: unknown): Promise<unknown> {
-    await callBeforeDelete(builder);
-    return result;
+  // Without static hooks, the hooks return synchronously, so that the query
+  // doesn't wait for promises it doesn't need.
+  onBefore2(builder: QueryBuilder, result: unknown): unknown {
+    if (!hasStaticHook(builder.modelClass(), 'beforeDelete')) {
+      return result;
+    }
+
+    return callStaticBeforeDelete(builder, result);
   }
 
   onBuildKnex(knexBuilder: KnexBuilder, builder: QueryBuilder): KnexBuilder {
@@ -17,7 +22,11 @@ class DeleteOperation extends QueryBuilderOperation {
   }
 
   onAfter2(builder: QueryBuilder, result: unknown): unknown {
-    return callAfterDelete(builder, result);
+    if (!hasStaticHook(builder.modelClass(), 'afterDelete')) {
+      return result;
+    }
+
+    return callStaticAfterDelete(builder, result);
   }
 
   toFindOperation(): QueryBuilderOperation | null {
@@ -57,28 +66,13 @@ function warnOrderedLimit(builder: QueryBuilder): void {
   }
 }
 
-function callBeforeDelete(builder: QueryBuilder): unknown {
-  return callStaticBeforeDelete(builder);
-}
-
-function callStaticBeforeDelete(builder: QueryBuilder): unknown {
-  if (!hasStaticHook(builder.modelClass(), 'beforeDelete')) {
-    return undefined;
-  }
-
+async function callStaticBeforeDelete(builder: QueryBuilder, result: unknown): Promise<unknown> {
   const args = StaticHookArguments.create({ builder });
-  return builder.modelClass().beforeDelete(args);
-}
-
-function callAfterDelete(builder: QueryBuilder, result: unknown): Promise<unknown> {
-  return callStaticAfterDelete(builder, result);
+  await builder.modelClass().beforeDelete(args);
+  return result;
 }
 
 async function callStaticAfterDelete(builder: QueryBuilder, result: unknown): Promise<unknown> {
-  if (!hasStaticHook(builder.modelClass(), 'afterDelete')) {
-    return result;
-  }
-
   const args = StaticHookArguments.create({ builder, result });
   const maybeResult = await builder.modelClass().afterDelete(args);
 
