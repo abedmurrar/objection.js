@@ -21,11 +21,10 @@ The release script turns `## Unreleased` into `## <version> (<date>)`. The GitHu
 
 ## One-time setup
 
-1. On npmjs.com, signed in as [`abedmurrar`](https://www.npmjs.com/~abedmurrar), create an access token that can publish the package: a granular access token with read and write access to packages (the package doesn't exist before the first release, so it can't be selected yet). If the account uses 2FA for publishing, allow the token to bypass it.
-2. In the GitHub repository `abedmurrar/objection.js`, enable GitHub Actions (forks have them turned off), and add the token as the secret `NPM_TOKEN` (Settings → Secrets and variables → Actions).
-3. Optionally, after the first release, set up [trusted publishing](https://docs.npmjs.com/trusted-publishers) for the `release.yml` workflow on the package's settings page and remove the token.
+1. In the GitHub repository `abedmurrar/objection.js`, enable GitHub Actions (forks have them turned off).
+2. On npmjs.com, signed in as [`abedmurrar`](https://www.npmjs.com/~abedmurrar), open the settings of `@abedmurrar/objection` and add a [trusted publisher](https://docs.npmjs.com/trusted-publishers): GitHub Actions, user `abedmurrar`, repository `objection.js`, workflow `release.yml`, no environment. It works on GitHub-hosted runners, with npm 11.5.1 or later.
 
-Provenance needs the GitHub repository to be public.
+The `release` workflow then publishes with a short-lived token that npm issues for that workflow run, so no npm token is stored in GitHub. Provenance is created for each release, which needs the repository to be public and the `repository` URL in `package.json` to stay `https://github.com/abedmurrar/objection.js`. The trusted publisher's fields are case-sensitive, and the workflow name includes `.yml`. Once publishing works this way, the package can be set to require 2FA and disallow tokens.
 
 ## Making a release
 
