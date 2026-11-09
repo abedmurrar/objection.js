@@ -86,4 +86,4 @@ function tryParseJson(maybeJsonStr: string): unknown {
   }
 }
 
-export { parseJsonAttributes, formatJsonAttributes, getJsonAttributes };
+export { parseJsonAttributes, formatJsonAttributes, getJsonAttributes, tryParseJson };

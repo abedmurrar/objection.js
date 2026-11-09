@@ -4,6 +4,10 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+### Performance
+
+- The rows of a query are written to their models directly when the model class keeps the default `fromDatabaseJson()`, `$setDatabaseJson()` and `$parseDatabaseJson()`, and its `columnNameMappers` are `snakeCaseMappers()` or none. Each row used to go through those three methods, and with `snakeCaseMappers()` it was copied into a mapped object first and then onto the model. `withGraphJoined()` built an object for each model of each row and then copied it the same way; it now writes the columns of each table to its model directly, with the properties worked out once per query. The keys, the JSON parsing and the resulting models are the same. Classes that override one of the methods, or have other column name mappers, keep the old path. The `$afterFind()` hooks are now checked with one property read per model, and no array is allocated when no model has one. Instruction counts of the mock benchmarks: `withGraphJoined()` −22.5%, `withGraphFetched()` −13.8%, 1000 rows with `snakeCaseMappers()` −22.2%, 1000 rows with two JSON attributes −1.5%.
+
 ## 4.2.3 (2026-11-09)
 
 ### Performance
