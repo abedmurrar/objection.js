@@ -150,12 +150,15 @@ Older versions of knex compile some queries differently, so the queries objectio
 
 ## Graph operations run one query at a time on MySQL
 
-The default [`concurrency`](../api/model/static-properties.md#static-concurrency) of graph writes (`insertGraph()`, `upsertGraph()`, ...) on MySQL is now 1, as it already was on mssql. Without a transaction, concurrent `upsertGraph()` updates deadlocked: MySQL wraps those updates in subqueries that lock the rows of the join tables they read. Queries that only read, like those of `withGraphFetched()` and `fetchGraph()`, still run 4 at a time. To run graph writes in parallel again, set `concurrency` on the model, which then applies to all queries:
+**Undone in 4.2.2:** graph writes on MySQL run up to 4 queries at a time again, like on the other databases.
+
+From 4.0.0 to 4.2.1, the default [`concurrency`](../api/model/static-properties.md#static-concurrency) of graph writes (`insertGraph()`, `upsertGraph()`, ...) on MySQL was 1, as it is on mssql. Without a transaction, concurrent `upsertGraph()` calls deadlocked. The statements that deadlocked read the join table of a many-to-many relation in a subquery, which locks its rows: the patches of related rows, until 4.1.4, and the deletes of related rows, until 4.2.2. Both now filter the rows by their ids only, since `upsertGraph()` has just fetched them through the relation.
+
+To keep running graph writes one query at a time, set `concurrency` on the model. It then applies to eager loading too:
 
 ```js
 class BaseModel extends Model {
-  // Up to 4 queries at a time, for graph writes and for eager loading.
-  static concurrency = 4;
+  static concurrency = 1;
 }
 ```
 

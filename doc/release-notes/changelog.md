@@ -4,6 +4,14 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+### Bug fixes
+
+- MySQL and MariaDB: `upsertGraph()` deleted the many-to-many rows that were missing from the graph with a subquery that joins the join table, `delete from items where id in (select items.id from items inner join owner_items ...)`. The subquery locks the join rows it reads, and the delete deadlocked with concurrent writes of the join table, also between separate `upsertGraph()` calls that ran one query at a time. The rows are now deleted by their ids only, as the patches are since 4.1.4: `upsertGraph()` has just fetched them through the relation. In a stress test of 20 concurrent `upsertGraph()` calls without a transaction, repeated 20 times on MySQL 8.4, MariaDB 10.6 and 11.4, with and without foreign keys, 62 of 9,600 calls deadlocked before and none after. `delete()` through a relation outside `upsertGraph()` keeps its relation filter.
+
+### Performance
+
+- MySQL and MariaDB: graph writes like `insertGraph()` and `upsertGraph()` run up to 4 queries at a time again, as on the other databases. From 4.0.0 to 4.2.1 they ran one at a time, because of the deadlocks fixed above and in 4.1.4. Measured on MySQL 8.4, an `upsertGraph()` of a person, 2 pets and 4 toys takes 14.0 ms instead of 28.2 ms without a transaction, and 6.6 ms instead of 7.5 ms in one, where the queries share one connection. Set `static concurrency = 1` on the model to keep the old behaviour. The idea of patching many-to-many rows by their ids comes from Jürg Lehni's [ditojs/objection](https://github.com/ditojs/objection) (0d4d4c71, #135).
+
 ## 4.2.1 (2026-11-03)
 
 ### Bug fixes

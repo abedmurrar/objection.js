@@ -93,7 +93,7 @@ The source is TypeScript, compiled to CommonJS by `tsc`. The compiled code does 
 
 ## Eager loading on MySQL
 
-4.0.0-alpha.0 ran every query of `withGraphFetched()` and `fetchGraph()` one at a time on MySQL, along with the graph writes, which deadlocked when they ran concurrently. Reads don't deadlock, so eager loading runs its queries 4 at a time again, as in objection.js 3.1.5. Graph writes still run one at a time on MySQL, but since 4.1.2 they insert the rows of a table in one query. With 1 ms per query, `withGraphFetched('[pets.toys, movies]')` takes 23.5% less time than in 4.0.0-alpha.0.
+4.0.0-alpha.0 ran every query of `withGraphFetched()` and `fetchGraph()` one at a time on MySQL, along with the graph writes, which deadlocked when they ran concurrently. Reads don't deadlock, so eager loading runs its queries 4 at a time again, as in objection.js 3.1.5. Since 4.1.2, graph writes insert the rows of a table in one query, and since 4.2.2 they run 4 queries at a time on MySQL too: with 1 ms per query, `upsertGraph()` of 20 persons with pets takes 32 ms instead of 101 ms (68% less), and on a real MySQL 8.4 an `upsertGraph()` of a person, 2 pets and 4 toys takes 14.0 ms instead of 28.2 ms without a transaction, and 6.6 ms instead of 7.5 ms in one. See [Graph operations run 4 queries at a time](./mysql.md#graph-operations-run-4-queries-at-a-time). With 1 ms per query, `withGraphFetched('[pets.toys, movies]')` takes 23.5% less time than in 4.0.0-alpha.0.
 
 The number of queries doesn't change: eager loading runs one query per relation in the expression for all the models, not one per model.
 

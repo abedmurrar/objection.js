@@ -836,11 +836,11 @@ describe('Model', () => {
 
     after(() => Promise.all(knexes.map((knex) => knex.destroy())));
 
-    it('should run one query at a time on MySQL and mssql', () => {
+    it('should run one query at a time on mssql only', () => {
       class Person extends Model {}
 
-      expect(Person.getConcurrency(knexFor('mysql2'))).to.equal(1);
       expect(Person.getConcurrency(knexFor('mssql'))).to.equal(1);
+      expect(Person.getConcurrency(knexFor('mysql2'))).to.equal(4);
       expect(Person.getConcurrency(knexFor('pg'))).to.equal(4);
       expect(Person.getConcurrency(knexFor('sqlite3'))).to.equal(4);
       expect(Person.getConcurrency()).to.equal(4);
@@ -849,41 +849,18 @@ describe('Model', () => {
     it('should use the concurrency of the model', () => {
       class Person extends Model {
         static get concurrency() {
-          return 4;
+          return 2;
         }
       }
 
-      expect(Person.getConcurrency(knexFor('mysql2'))).to.equal(4);
-    });
-
-    describe('reads', () => {
-      const { getReadConcurrency } = require('../../../lib/model/modelConcurrency');
-
-      it('should run reads concurrently on MySQL', () => {
-        class Person extends Model {}
-
-        expect(getReadConcurrency(Person, knexFor('mysql2'))).to.equal(4);
-        expect(getReadConcurrency(Person, knexFor('pg'))).to.equal(4);
-        expect(getReadConcurrency(Person, knexFor('mssql'))).to.equal(1);
-        expect(getReadConcurrency(Person)).to.equal(4);
-      });
-
-      it('should use the concurrency of the model', () => {
-        class Person extends Model {
-          static get concurrency() {
-            return 2;
-          }
+      class Pet extends Model {
+        static getConcurrency() {
+          return 1;
         }
+      }
 
-        class Pet extends Model {
-          static getConcurrency() {
-            return 1;
-          }
-        }
-
-        expect(getReadConcurrency(Person, knexFor('mysql2'))).to.equal(2);
-        expect(getReadConcurrency(Pet, knexFor('mysql2'))).to.equal(1);
-      });
+      expect(Person.getConcurrency(knexFor('mysql2'))).to.equal(2);
+      expect(Pet.getConcurrency(knexFor('mysql2'))).to.equal(1);
     });
   });
 

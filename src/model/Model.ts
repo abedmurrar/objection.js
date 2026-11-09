@@ -1,7 +1,7 @@
 import { clone } from './modelClone';
 import { bindKnex } from './modelBindKnex';
 import { validate } from './modelValidate';
-import { isMsSql, isMySql } from '../utils/knexUtils';
+import { isMsSql } from '../utils/knexUtils';
 import { visitModels } from './modelVisitor';
 import { hasId, getSetId } from './modelId';
 import { map as promiseMap } from '../utils/promiseUtils';
@@ -26,7 +26,6 @@ import { fn } from '../queryBuilder/FunctionBuilder';
 import { AjvValidator } from './AjvValidator';
 import { QueryBuilder } from '../queryBuilder/QueryBuilder';
 import { markDefaultStaticHook } from '../queryBuilder/StaticHookArguments';
-import { setDefaultGetConcurrency } from './modelConcurrency';
 import { NotFoundError } from './NotFoundError';
 import { ValidationError } from './ValidationError';
 import { ModifierNotFoundError } from './ModifierNotFoundError';
@@ -558,10 +557,7 @@ class Model {
       }
 
       // The mssql driver is shit, and we cannot have concurrent queries.
-      // On MySQL, concurrent graph updates and deletes deadlock: MySQL needs
-      // them wrapped in a subquery, which locks the rows of the join tables
-      // it reads.
-      if (isMsSql(knex) || isMySql(knex)) {
+      if (isMsSql(knex)) {
         return 1;
       } else {
         return DEFAULT_CONCURRENCY;
@@ -901,8 +897,6 @@ for (const hookName of [
 ] as const) {
   markDefaultStaticHook(Model[hookName]);
 }
-
-setDefaultGetConcurrency(Model.getConcurrency);
 
 Model.QueryBuilder = QueryBuilder;
 

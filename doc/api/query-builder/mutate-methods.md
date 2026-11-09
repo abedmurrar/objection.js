@@ -123,8 +123,6 @@ queryBuilder = queryBuilder.insertGraph(graph, options);
 
 See the [section about graph inserts](/guide/query-examples.html#graph-inserts).
 
-On MySQL, graph writes run one query at a time by default. See [concurrency](/api/model/static-properties.html#static-concurrency).
-
 ##### Arguments
 
 | Argument | Type                                                                                                           | Description       |
@@ -404,8 +402,6 @@ queryBuilder = queryBuilder.upsertGraph(graph, options);
 ```
 
 See the [section about graph upserts](/guide/query-examples.html#graph-upserts).
-
-On MySQL, graph writes run one query at a time by default. See [concurrency](/api/model/static-properties.html#static-concurrency).
 
 ::: warning
 WARNING!

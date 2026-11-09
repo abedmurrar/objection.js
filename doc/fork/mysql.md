@@ -213,9 +213,20 @@ on duplicate key update `stock` = (`products`.`stock` + VALUES(`stock`))
 
 `fn.excluded('stock')` is `VALUES(stock)` here. See [`fn.excluded()`](./expressions.md#fn-excluded) and [Upserts](./knex.md#upserts).
 
-## Graph operations run one query at a time
+## Graph operations run 4 queries at a time
 
-On MySQL the default [`concurrency`](../api/model/static-properties.md#static-concurrency) of graph writes is 1, and eager loading still runs 4 queries at a time. See [Breaking changes](./breaking-changes.md#graph-operations-run-one-query-at-a-time-on-mysql).
+Since 4.2.2, graph writes like `upsertGraph()` run up to 4 queries at a time on MySQL, like eager loading and like on the other databases. From 4.0.0 to 4.2.1 they ran one at a time, see [Breaking changes](./breaking-changes.md#graph-operations-run-one-query-at-a-time-on-mysql). The [`concurrency`](../api/model/static-properties.md#static-concurrency) of the model changes it.
+
+Without a transaction, each query takes a connection from the pool, so up to 4 run at the same time. Inside a transaction, all queries go through one connection and MySQL runs them one after another, but the next query is sent without waiting for objection to handle the previous result. Measured with `bench/orms` on MySQL 8.4, an `upsertGraph()` that updates a person, 2 pets and 4 toys:
+
+| | 4.2.1, one at a time | 4.2.2, 4 at a time |
+| --- | --- | --- |
+| Without a transaction | 28.2 ms | 14.0 ms |
+| In a transaction | 7.5 ms | 6.6 ms |
+
+A transaction is faster either way: without one, MySQL commits each update to disk on its own.
+
+Graph patches and deletes of many-to-many rows filter the rows by their ids only, without a subquery that reads the join table. Such subqueries lock the join rows they read, and they deadlocked with concurrent writes of the join table, also between separate `upsertGraph()` calls at concurrency 1. Two calls that write the same rows at the same time can still deadlock, as with any other queries: run them in a transaction and retry on `ER_LOCK_DEADLOCK`.
 
 ## `fn` helpers for MySQL functions
 

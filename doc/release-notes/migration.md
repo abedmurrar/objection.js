@@ -14,7 +14,7 @@ These change what existing code does at runtime. Each one is explained, with exa
 - [`for()` is checked](/fork/breaking-changes.md#for-is-checked). A query that uses it without the static `relatedQuery()`, or calls a write method before it, is rejected.
 - [JSON features throw on unsupported databases](/fork/breaking-changes.md#json-features-throw-on-unsupported-databases). JSON field expressions and the `whereJson*` methods only work on postgres and MySQL.
 - [Patching a field of a `NULL` JSON column creates the object](/fork/breaking-changes.md#patching-a-field-of-a-null-json-column-creates-the-object). `patch({ 'col:key': value })` on a row where `col` is `NULL` sets `col` to `{ "key": value }`. Before, `col` stayed `NULL` on postgres.
-- [Graph operations run one query at a time on MySQL](/fork/breaking-changes.md#graph-operations-run-one-query-at-a-time-on-mysql). Graph writes like `insertGraph()` and `upsertGraph()` run one query at a time by default. Set `concurrency` on the model to run them in parallel again.
+- [Graph operations run one query at a time on MySQL](/fork/breaking-changes.md#graph-operations-run-one-query-at-a-time-on-mysql), from 4.0.0 to 4.2.1. Since 4.2.2, graph writes like `insertGraph()` and `upsertGraph()` run up to 4 queries at a time again.
 
 ## typescript: Custom query builders declare `'~rebind'` instead of five `*QueryBuilderType` properties
 

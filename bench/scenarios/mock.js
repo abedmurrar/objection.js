@@ -226,6 +226,25 @@ module.exports = {
     return () => models.Person.query().upsertGraph(graph);
   },
 
+  // Graph writes run their queries concurrently, which only shows when the
+  // queries take time.
+  'write: upsertGraph 20 persons with pets on MySQL, 1 ms per query': async (objection) => {
+    const models = defineModels(objection);
+    bind(objection, models, { personCount: 20, client: 'mysql2', latencyMs: 1 });
+
+    const graph = [];
+
+    for (let i = 1; i <= 20; ++i) {
+      graph.push({
+        id: i,
+        firstName: `Changed${i}`,
+        pets: [{ id: (i - 1) * 3 + 1, name: 'Renamed' }, { name: 'New pet' }],
+      });
+    }
+
+    return () => models.Person.query().upsertGraph(graph);
+  },
+
   // Validation.
 
   'validate: 1000 models with defaults': async (objection) => {

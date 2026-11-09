@@ -33,6 +33,23 @@ function nestedPerson(i) {
   };
 }
 
+// An existing person with its pets and toys, all renamed, for the upsert graph
+// scenarios: the ids are those of the seed data.
+function changedPerson(id, n) {
+  return {
+    id,
+    firstName: `Changed ${n}`,
+    pets: [0, 1].map((p) => {
+      const petId = (id - 1) * PETS_PER_PERSON + p + 1;
+      return {
+        id: petId,
+        name: `Pet ${n}`,
+        toys: [0, 1].map((t) => ({ id: (petId - 1) * TOYS_PER_PET + t + 1, name: `Toy ${n}` })),
+      };
+    }),
+  };
+}
+
 function personRow(i) {
   return { firstName: `First ${i}`, lastName: `Last ${i % 50}`, age: 18 + (i % 60) };
 }
@@ -142,6 +159,8 @@ const SCENARIOS = [
   'eager: 100 persons > pets > toys (one query)',
   'transaction: insert + update',
   'nested insert: person + 2 pets + 4 toys',
+  'upsert graph: person + 2 pets + 4 toys',
+  'upsert graph in a transaction: person + 2 pets + 4 toys',
 ];
 
 // Ids that `find by id` and `update by id` cycle through.
@@ -166,6 +185,7 @@ module.exports = {
   seed,
   personRow,
   nestedPerson,
+  changedPerson,
   hundredRows,
   idCycler,
 };

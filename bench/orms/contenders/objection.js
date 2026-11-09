@@ -6,7 +6,14 @@
 const path = require('node:path');
 const knexFactory = require('knex');
 const mysql2 = require('mysql2');
-const { connection, personRow, nestedPerson, hundredRows, idCycler } = require('../common');
+const {
+  connection,
+  personRow,
+  nestedPerson,
+  changedPerson,
+  hundredRows,
+  idCycler,
+} = require('../common');
 
 async function load(variant, lib) {
   if (variant === 'fork') {
@@ -76,6 +83,12 @@ async function create({ variant, lib, nativePool }) {
       }),
     'nested insert: person + 2 pets + 4 toys': () =>
       Person.transaction((trx) => Person.query(trx).insertGraph(nestedPerson(++n))),
+    // Updates the person and its 6 pets and toys, without a transaction the
+    // queries run on up to 4 connections at a time.
+    'upsert graph: person + 2 pets + 4 toys': () =>
+      Person.query().upsertGraph(changedPerson(nextId(), ++n)),
+    'upsert graph in a transaction: person + 2 pets + 4 toys': () =>
+      Person.transaction((trx) => Person.query(trx).upsertGraph(changedPerson(nextId(), ++n))),
   };
 
   // Batch inserts return ids on MySQL only in this fork; objection 3.1.5 and

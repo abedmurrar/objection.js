@@ -2,7 +2,6 @@ import { uniqBy } from '../../utils/objectUtils';
 import { Selection } from '../operations/select/Selection';
 import { createModifier } from '../../utils/createModifier';
 import { map as mapPromise } from '../../utils/promiseUtils';
-import { getReadConcurrency } from '../../model/modelConcurrency';
 import { ValidationErrorType } from '../../model/ValidationError';
 import type { RelationExpression } from '../RelationExpression';
 import type { Relation, RelationModelClass } from '../../relations/Relation';
@@ -117,7 +116,7 @@ class RelationJoiner {
       Array.from(allModelClasses),
       (modelClass: JoinModelClass) => modelClass.fetchTableMetadata({ parentBuilder: builder }),
       {
-        concurrency: getReadConcurrency(this.rootModelClass, builder.unsafeKnex()),
+        concurrency: this.rootModelClass.getConcurrency(builder.unsafeKnex()),
       },
     );
   }

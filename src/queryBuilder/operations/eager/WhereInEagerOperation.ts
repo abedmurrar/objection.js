@@ -7,7 +7,6 @@ import { ValidationErrorType } from '../../../model/ValidationError';
 import { createModifier } from '../../../utils/createModifier';
 import { RelationDoesNotExistError } from '../../../model/RelationDoesNotExistError';
 import { RelationOwner } from '../../../relations/RelationOwner';
-import { getReadConcurrency } from '../../../model/modelConcurrency';
 import type {
   KnexInstance,
   Model,
@@ -99,7 +98,7 @@ class WhereInEagerOperation extends EagerOperation {
     await promiseUtils.map(
       this.relationsToFetch,
       (it: RelationToFetch) => this.fetchRelation(builder, models, it.relation, it.childExpression),
-      { concurrency: getReadConcurrency(modelClass, builder.unsafeKnex()) },
+      { concurrency: modelClass.getConcurrency(builder.unsafeKnex()) },
     );
 
     const intOpt = builder.internalOptions();
@@ -135,7 +134,7 @@ class WhereInEagerOperation extends EagerOperation {
       modelBatches,
       (batch: Model[]) => this.fetchRelationBatch(builder, batch, relation, expr),
       {
-        concurrency: getReadConcurrency(modelClass, builder.unsafeKnex()),
+        concurrency: modelClass.getConcurrency(builder.unsafeKnex()),
       },
     );
 

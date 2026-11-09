@@ -44,9 +44,18 @@ class GraphDeleteAction extends GraphAction {
       nodesByParent.forEach((nodes, parentNode) => {
         const shouldUnrelate = this.graphOptions.shouldUnrelate(nodes[0], this.graphData);
 
+        // Forked, so that the options set below stay on this query.
         const builder: QueryBuilder = parentNode!.obj
           .$relatedQuery(relation.name)
-          .childQueryOf(parentBuilder);
+          .childQueryOf(parentBuilder, { fork: true });
+
+        if (!shouldUnrelate && relation.isObjectionManyToManyRelation) {
+          // The current graph was fetched through the relations, so the
+          // deleted rows are known to be related to their parents, and are
+          // deleted by their ids only. A subquery that joins the join table
+          // deadlocks with concurrent writes of the join table on MySQL.
+          builder.internalOptions({ skipRelationFilter: true });
+        }
 
         if (!relation.isObjectionBelongsToOneRelation) {
           // This is useless in case of BelongsToOneRelation.
