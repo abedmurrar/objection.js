@@ -3,7 +3,7 @@ import { QueryBuilderContextBase } from './QueryBuilderContextBase';
 import { QueryBuilderUserContext } from './QueryBuilderUserContext';
 import { deprecate } from '../utils/deprecate';
 import { isPromise } from '../utils/promiseUtils/isPromise';
-import { effectiveWhereScope, createWhereGrouping } from './whereScopes';
+import { effectiveWhereScope, createWhereGrouping, WhereSelector } from './whereScopes';
 import type { WhereScope } from './whereScopes';
 import { HookBits } from './operations/QueryBuilderOperation';
 import type { QueryBuilderOperation, HookName } from './operations/QueryBuilderOperation';
@@ -49,7 +49,6 @@ interface ActiveOperation {
 const AllSelector = () => true;
 const SelectSelector =
   /^(select|columns|column|distinct|count|countDistinct|min|max|sum|sumDistinct|avg|avgDistinct)$/;
-const WhereSelector = /^(where|orWhere|andWhere|find\w+)/;
 const OnSelector = /^(on|orOn|andOn)/;
 const OrderBySelector = /orderBy/;
 const JoinSelector = /(join|joinRaw|joinRelated)$/i;

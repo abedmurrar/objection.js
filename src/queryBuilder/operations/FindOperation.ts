@@ -1,12 +1,12 @@
 import { QueryBuilderOperation } from './QueryBuilderOperation';
-import { StaticHookArguments, hasStaticHook } from '../StaticHookArguments';
+import { callStaticBeforeHook, callStaticAfterHook } from '../StaticHookArguments';
 import { isPromise, after, afterReturn } from '../../utils/promiseUtils';
 import { isObject } from '../../utils/objectUtils';
 import type { Model, QueryBuilder } from './types';
 
 class FindOperation extends QueryBuilderOperation {
   onBefore2(builder: QueryBuilder, result: unknown): unknown {
-    return afterReturn(callStaticBeforeFind(builder), result);
+    return afterReturn(callStaticBeforeHook(builder, 'beforeFind'), result);
   }
 
   onAfter3(builder: QueryBuilder, results: unknown): unknown {
@@ -20,37 +20,11 @@ class FindOperation extends QueryBuilderOperation {
   }
 }
 
-function callStaticBeforeFind(builder: QueryBuilder): unknown {
-  if (!hasStaticHook(builder.modelClass(), 'beforeFind')) {
-    return undefined;
-  }
-
-  const args = StaticHookArguments.create({ builder });
-  return builder.modelClass().beforeFind(args);
-}
-
 function callAfterFind(builder: QueryBuilder, result: unknown): unknown {
   const opt = builder.findOptions();
   const maybePromise = callInstanceAfterFind(builder.context(), result, opt.callAfterFindDeeply);
 
-  return after(maybePromise, () => callStaticAfterFind(builder, result));
-}
-
-function callStaticAfterFind(builder: QueryBuilder, result: unknown): unknown {
-  if (!hasStaticHook(builder.modelClass(), 'afterFind')) {
-    return result;
-  }
-
-  const args = StaticHookArguments.create({ builder, result });
-  const maybePromise = builder.modelClass().afterFind(args);
-
-  return after(maybePromise, (maybeResult: unknown) => {
-    if (maybeResult === undefined) {
-      return result;
-    } else {
-      return maybeResult;
-    }
-  });
+  return after(maybePromise, () => callStaticAfterHook(builder, 'afterFind', result));
 }
 
 function callInstanceAfterFind(ctx: unknown, results: unknown, deep: boolean | undefined): unknown {

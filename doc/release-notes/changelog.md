@@ -4,6 +4,14 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+### Performance
+
+- Inserts and updates no longer wait for promises when no hook returns one, as deletes since 4.2.7: their `onBefore2` and `onAfter2` were `async` functions, so every insert and update waited on promises that had nothing to do. The static hooks of finds, inserts, updates and deletes are called through one helper, which only returns a promise when the hook does. The instance hooks (`$beforeUpdate()`, `$afterInsert()`, ...) and the static hooks still run in the same order, async hooks are still waited for, and a throwing hook still rejects the query before it runs. Instruction counts of the mock benchmarks: an insert of 1 row −5% to −18%, `bindKnex()` with a validated insert −5.3%, `upsertGraph()` of 20 persons −1.8%, `findById()` on SQLite −2.5%. On MySQL, a single insert's time is mostly its commit, so the difference doesn't show there.
+
+### Internal
+
+- Removed duplicated code from the query builder, about 210 lines: one base class for the five operations that hold a callback (`runBefore()`, `runAfter()`, `onBuild()`, `onBuildKnex()`, `onError()`), one `fetchGraph()` for `insertGraphAndFetch()` and `upsertGraphAndFetch()`, one-line `*JoinRelated()` methods, one definition of the where selector, and fewer helper functions in the static hook arguments. Behaviour, SQL and the public API are the same.
+
 ## 4.2.10 (2026-11-09)
 
 ### Internal

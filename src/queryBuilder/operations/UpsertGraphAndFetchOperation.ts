@@ -1,6 +1,6 @@
 import { DelegateOperation } from './DelegateOperation';
 import { UpsertGraphOperation } from './UpsertGraphOperation';
-import { RelationExpression } from '../RelationExpression';
+import { fetchGraph } from './InsertGraphAndFetchOperation';
 import type { Model, OperationOptions, QueryBuilder } from './types';
 
 class UpsertGraphAndFetchOperation extends DelegateOperation {
@@ -22,22 +22,8 @@ class UpsertGraphAndFetchOperation extends DelegateOperation {
     return this.delegate.isArray;
   }
 
-  async onAfter3(builder: QueryBuilder): Promise<unknown> {
-    if (this.models.length === 0) {
-      return this.isArray ? [] : null;
-    }
-
-    const eager = RelationExpression.fromModelGraph(this.models);
-    const modelClass = this.models[0].constructor;
-    const ids = this.models.map((model) => model.$id());
-
-    const models = await modelClass
-      .query()
-      .childQueryOf(builder)
-      .findByIds(ids)
-      .withGraphFetched(eager);
-
-    return this.isArray ? models : models[0] || null;
+  onAfter3(builder: QueryBuilder): Promise<unknown> {
+    return fetchGraph(builder, this.models, this.isArray);
   }
 }
 

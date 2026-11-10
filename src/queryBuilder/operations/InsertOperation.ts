@@ -1,7 +1,7 @@
 /* global BigInt */
 
 import { QueryBuilderOperation } from './QueryBuilderOperation';
-import { StaticHookArguments, hasStaticHook } from '../StaticHookArguments';
+import { callStaticBeforeHook, callStaticAfterHook } from '../StaticHookArguments';
 import { after, mapAfterAllReturn } from '../../utils/promiseUtils';
 import { isSqlite, isMySql } from '../../utils/knexUtils';
 import { isObject, isString } from '../../utils/objectUtils';
@@ -41,21 +41,28 @@ class InsertOperation extends QueryBuilderOperation {
     return true;
   }
 
-  async onBefore2(builder: QueryBuilder, result: unknown): Promise<unknown> {
-    await callBeforeInsert(builder, this.models);
+  // Returns synchronously when no hook returns a promise and no query is
+  // needed, so that the query doesn't wait for promises it doesn't need.
+  onBefore2(builder: QueryBuilder, result: unknown): unknown {
+    const maybePromise = callBeforeInsert(builder, this.models);
 
     if (this.models.length > 1 && isMySql(builder.knex())) {
-      await this.prepareMySqlBatchInsert(builder);
+      return after(
+        after(maybePromise, () => this.prepareMySqlBatchInsert(builder)),
+        () => result,
+      );
     }
 
-    return result;
+    return after(maybePromise, () => result);
   }
 
   // MySQL only returns the id of the first row of a multi-row insert. InnoDB
   // gives the rows of one multi-row VALUES insert consecutive ids (in every
   // `innodb_autoinc_lock_mode`), so the other ids can be computed from it and
   // `@@auto_increment_increment`.
-  async prepareMySqlBatchInsert(builder: QueryBuilder): Promise<void> {
+  // Only queries `@@auto_increment_increment` once per knex instance, and
+  // returns synchronously after that.
+  prepareMySqlBatchInsert(builder: QueryBuilder): void | Promise<void> {
     const withId = this.models.filter((model) => model.$hasId()).length;
 
     if (withId === this.models.length) {
@@ -73,15 +80,18 @@ class InsertOperation extends QueryBuilderOperation {
     }
 
     const knex = builder.knex();
-    let increment = autoIncrementIncrements.get(knex.client.config);
+    const increment = autoIncrementIncrements.get(knex.client.config);
 
-    if (increment === undefined) {
-      const [rows] = await knex.raw('select @@auto_increment_increment as increment');
-      increment = Number(rows[0].increment);
-      autoIncrementIncrements.set(knex.client.config, increment);
+    if (increment !== undefined) {
+      this.autoIncrementIncrement = increment;
+      return;
     }
 
-    this.autoIncrementIncrement = increment;
+    return knex.raw('select @@auto_increment_increment as increment').then(([rows]: any) => {
+      const increment = Number(rows[0].increment);
+      autoIncrementIncrements.set(knex.client.config, increment);
+      this.autoIncrementIncrement = increment;
+    });
   }
 
   onBuildKnex(knexBuilder: KnexBuilder, builder: QueryBuilder): KnexBuilder {
@@ -366,7 +376,7 @@ function createMatchError(): Error {
 
 function callBeforeInsert(builder: QueryBuilder, models: Model[]): unknown {
   const maybePromise = callInstanceBeforeInsert(builder, models);
-  return after(maybePromise, () => callStaticBeforeInsert(builder));
+  return after(maybePromise, () => callStaticBeforeHook(builder, 'beforeInsert'));
 }
 
 function callInstanceBeforeInsert(builder: QueryBuilder, models: Model[]): unknown {
@@ -377,39 +387,13 @@ function callInstanceBeforeInsert(builder: QueryBuilder, models: Model[]): unkno
   );
 }
 
-function callStaticBeforeInsert(builder: QueryBuilder): unknown {
-  if (!hasStaticHook(builder.modelClass(), 'beforeInsert')) {
-    return undefined;
-  }
-
-  const args = StaticHookArguments.create({ builder });
-  return builder.modelClass().beforeInsert(args);
-}
-
 function callAfterInsert(builder: QueryBuilder, models: Model[], result: unknown): unknown {
   const maybePromise = callInstanceAfterInsert(builder, models);
-  return after(maybePromise, () => callStaticAfterInsert(builder, result));
+  return after(maybePromise, () => callStaticAfterHook(builder, 'afterInsert', result));
 }
 
 function callInstanceAfterInsert(builder: QueryBuilder, models: Model[]): unknown {
   return mapAfterAllReturn(models, (model: Model) => model.$afterInsert(builder.context()), models);
-}
-
-function callStaticAfterInsert(builder: QueryBuilder, result: unknown): unknown {
-  if (!hasStaticHook(builder.modelClass(), 'afterInsert')) {
-    return result;
-  }
-
-  const args = StaticHookArguments.create({ builder, result });
-  const maybePromise = builder.modelClass().afterInsert(args);
-
-  return after(maybePromise, (maybeResult: unknown) => {
-    if (maybeResult === undefined) {
-      return result;
-    } else {
-      return maybeResult;
-    }
-  });
 }
 
 export { InsertOperation };

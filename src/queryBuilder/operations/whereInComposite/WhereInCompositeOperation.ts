@@ -29,12 +29,6 @@ class WhereInCompositeOperation extends ObjectionToKnexConvertingOperation {
       return knexBuilder.whereIn(...whereInArgs);
     }
   }
-
-  clone(): this {
-    const clone = super.clone();
-    clone.prefix = this.prefix;
-    return clone;
-  }
 }
 
 function buildWhereInArgs(knex: KnexInstance, columns: unknown, values: unknown): unknown[] {

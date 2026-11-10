@@ -130,12 +130,6 @@ class WhereInCompositeMsSqlOperation extends ObjectionToKnexConvertingOperation 
       return knexBuilder.whereIn(col, val);
     }
   }
-
-  clone(): this {
-    const clone = super.clone();
-    clone.prefix = this.prefix;
-    return clone;
-  }
 }
 
 function pickNonNull(values: unknown[], output: unknown[]): unknown[] {
