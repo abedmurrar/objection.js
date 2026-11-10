@@ -288,40 +288,22 @@ function setsDefaultValues(jsonSchema: JsonSchema): boolean {
   return result;
 }
 
+// Whether a schema, or a part of it, has a `default`. Arrays are walked by
+// their indexes, which are never called `default`.
 function hasDefaults(obj: object): boolean {
-  if (Array.isArray(obj)) {
-    return arrayHasDefaults(obj);
-  } else {
-    return objectHasDefaults(obj as Record<string, unknown>);
-  }
-}
-
-function arrayHasDefaults(arr: unknown[]): boolean {
-  for (let i = 0, l = arr.length; i < l; ++i) {
-    const val = arr[i];
-
-    if (isObject(val) && hasDefaults(val as object)) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-function objectHasDefaults(obj: Record<string, unknown>): boolean {
   const keys = Object.keys(obj);
 
   for (let i = 0, l = keys.length; i < l; ++i) {
     const key = keys[i];
 
-    if (key === 'default') {
+    if (key === 'default' && !Array.isArray(obj)) {
       return true;
-    } else {
-      const val = obj[key];
+    }
 
-      if (isObject(val) && hasDefaults(val as object)) {
-        return true;
-      }
+    const val = (obj as Record<string, unknown>)[key];
+
+    if (isObject(val) && hasDefaults(val as object)) {
+      return true;
     }
   }
 

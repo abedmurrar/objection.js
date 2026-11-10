@@ -64,9 +64,7 @@ const JSON_CAST = 'CAST(? AS JSON)';
 // `JSON_COMPACT(?)` on MariaDB. The values are always bindings, so the text
 // only contains what objection generated.
 function jsonCastsForDialect(sql: string, knex: unknown): string {
-  return isMariaDb(knex) && sql.includes(JSON_CAST)
-    ? sql.split(JSON_CAST).join('JSON_COMPACT(?)')
-    : sql;
+  return isMariaDb(knex) ? sql.replaceAll(JSON_CAST, 'JSON_COMPACT(?)') : sql;
 }
 
 export {

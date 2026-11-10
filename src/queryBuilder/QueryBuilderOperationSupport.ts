@@ -1,4 +1,4 @@
-import { isString, isFunction, isRegExp, mergeMaps, last } from '../utils/objectUtils';
+import { isString, isFunction, isRegExp, mergeMaps } from '../utils/objectUtils';
 import { QueryBuilderContextBase } from './QueryBuilderContextBase';
 import { QueryBuilderUserContext } from './QueryBuilderUserContext';
 import { deprecate } from '../utils/deprecate';
@@ -627,7 +627,7 @@ class QueryBuilderOperationSupport {
       }
 
       if (this._activeOperations.length) {
-        const { operation: parentOperation, hookName } = last(this._activeOperations);
+        const { operation: parentOperation, hookName } = this._activeOperations.at(-1)!;
         parentOperation.addChildOperation(hookName, operation);
       } else {
         this._operations[arrayMethod](operation);

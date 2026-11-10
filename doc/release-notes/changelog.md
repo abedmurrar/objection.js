@@ -4,6 +4,18 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+### Security
+
+- Binding a model class to a knex instance, which `bindKnex()`, `bindTransaction()` and every transaction do, created the bound subclass with `new Function` and put the class's `name` into its code. A model class whose `name` came from data, for example one class per tenant named after it, could run code from that name, and a name that isn't an identifier, like `'Weird Model'`, threw a `SyntaxError`. The subclass is now named through a computed property, without any code built from the name. This came from objection.js.
+
+### Performance
+
+- Binding a model class to a knex instance takes 13.9% fewer instructions (mock benchmark of `bindKnex()` with a validated insert): it no longer compiles a new function for each bound class.
+
+### Internal
+
+- Removed duplicated code from the model and the utilities: `transaction.start()` is `knex.transaction()`, `transaction()` uses the `isModelClass()` of `resolveModel`, `bindKnex()` uses its cache directly, `jsonEquals()` lost a comparison parameter that was always strict equality, and the walk for schema defaults is one function. `objectUtils.flatten()` and `groupBy()` stay: on the small arrays objection passes, they are faster than `Array.prototype.flat()` (several times) and `Map.groupBy()`.
+
 ## 4.2.12 (2026-11-10)
 
 ### Internal
