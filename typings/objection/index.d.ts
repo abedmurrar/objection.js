@@ -1408,8 +1408,18 @@ declare namespace Objection {
       }[keyof Other]
     | Exclude<keyof Other, keyof M>;
 
-  // The query builder `QB` after loading the relations of expression `E`.
-  type WithGraphQueryBuilder<QB extends AnyQueryBuilder, E> = QB['~state'] extends {
+  /**
+   * The query builder `QB` after loading the relations of expression `E`, the
+   * type `withGraphFetched(E)` and `withGraphJoined(E)` return. A custom query
+   * builder method can use it to say which relations it loads:
+   *
+   * ```ts
+   * withUser(): WithGraphQueryBuilder<this, 'user'> {
+   *   return this.withGraphFetched<MessageModel, 'user'>('user');
+   * }
+   * ```
+   */
+  export type WithGraphQueryBuilder<QB extends AnyQueryBuilder, E> = QB['~state'] extends {
     cast: true;
   }
     ? OpaqueQueryBuilder<QB>
@@ -2287,6 +2297,20 @@ declare namespace Objection {
   type ForIdValue = MaybeCompositeId | AnyQueryBuilder;
 
   interface WithGraphMethod<QB extends AnyQueryBuilder> {
+    // With the model given explicitly, for code where it isn't known, like the
+    // methods of a custom query builder, where `this` is generic:
+    // `withGraphFetched<MessageModel>('user')` returns the query builder as it
+    // was. Given the expression type too, the expression is checked against the
+    // model and the result has the loaded relations:
+    // `withGraphFetched<MessageModel, 'user'>('user')`.
+    <RM extends Model = never, const E extends RelationExpression<RM> = never>(
+      expr: [RM] extends [never]
+        ? never
+        : [E] extends [never]
+          ? RelationExpression<RM>
+          : CheckRelationExpression<RelationsModel<RM>, E>,
+      options?: GraphOptions,
+    ): [E] extends [never] ? QB : WithGraphQueryBuilder<QB, E>;
     <const E extends RelationExpression<ModelType<QB>>>(
       expr: CheckRelationExpression<GraphModel<QB>, E, ChecksModifierNames<QB>>,
       options?: GraphOptions,
@@ -2312,6 +2336,14 @@ declare namespace Objection {
         : M;
 
   interface AllowGraphMethod<QB extends AnyQueryBuilder> {
+    // With the model given explicitly, as for `withGraphFetched<RM>()`.
+    <RM extends Model = never, const E extends RelationExpression<RM> = never>(
+      expr: [RM] extends [never]
+        ? never
+        : [E] extends [never]
+          ? RelationExpression<RM>
+          : CheckRelationExpression<RelationsModel<RM>, E>,
+    ): QB;
     <const E extends RelationExpression<ModelType<QB>>>(
       expr: CheckRelationExpression<GraphModel<QB>, E, ChecksModifierNames<QB>>,
     ): QB;
@@ -2404,6 +2436,11 @@ declare namespace Objection {
   }
 
   interface RunAfterMethod<QB extends AnyQueryBuilder> {
+    // A callback that returns the result type keeps the query builder type, so
+    // a custom query builder method can return `this.runAfter(...)` as `this`.
+    // The result type is a constraint and not the callback's return type, which
+    // would make query builders invariant in their result type.
+    <T extends ResultType<QB> | PromiseLike<ResultType<QB>>>(cb: RunAfterCallback<QB, T>): QB;
     // The callback's return value replaces the result of the query.
     <T>(
       cb: RunAfterCallback<QB, T>,

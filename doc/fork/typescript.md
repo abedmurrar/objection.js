@@ -503,6 +503,76 @@ const numDeleted = await Person.query().where('id', 1).softDelete(); // number
 - `first()`, `findById()` and the other result-kind changes resolve inside custom methods too, where `this` is generic.
 - `patch()`, `update()` and `insert()` take an explicit type argument in generic code where the model type isn't known.
 
+### Builder methods that load relations
+
+Inside a builder method `this` is generic: the types don't know that the builder belongs to `Message`, so they can't check relation names on their own. Give the model as a type argument, as `modifyGraph<RM>()` already took. To also say which relations the method loads, give the expression as a second type argument and use the `WithGraphQueryBuilder` type:
+
+```ts
+import { type ModelInstance, type WithGraphQueryBuilder } from 'objection';
+
+type MessageModel = ModelInstance<typeof Message>;
+type UserModel = ModelInstance<typeof User>;
+
+class MessageQueryBuilder<
+  M extends Model,
+  R = M[],
+  S extends QueryBuilderState = DefaultQueryBuilderState<M, R>,
+> extends QueryBuilder<M, R, S> {
+  declare '~rebind': MessageQueryBuilder<this['~M'], this['~R'], this['~S']>;
+
+  // The model only: the query builder stays `this`.
+  forBasic(): this {
+    return this.withGraphFetched<MessageModel>('[user, threadedMessage]')
+      .modifyGraph<UserModel>('user', (user) => user.forBasic())
+      .modifyGraph<MessageModel>('threadedMessage', (threaded) => threaded.forInfo());
+  }
+
+  // The model and the expression: the expression is checked against the
+  // model, and the rows of `Message.query().withUser()` have `user`.
+  withUser(): WithGraphQueryBuilder<this, 'user'> {
+    return this.withGraphFetched<MessageModel, 'user'>('user');
+  }
+}
+
+const messages = await Message.query().withUser();
+messages[0].user; // User | null
+```
+
+`withGraphJoined()` and `allowGraph()` take the same type arguments. Outside builder methods, where the model is known, call them without type arguments, and relation names are checked as before.
+
+### A `runAfter()` that returns its input keeps `this`
+
+A `runAfter()` callback that returns the rows it got, or a promise of them, keeps the type of the query builder, so a builder method can return it:
+
+```ts
+forList(): this {
+  return this.select('id').runAfter(async (rows) => {
+    await audit(rows);
+    return rows;
+  });
+}
+```
+
+A callback that returns something else changes the result type, as before, and then the method can't return `this`.
+
+### Builders in their own files
+
+A builder in its own file usually imports its model, for `Message.ref()`, while the model imports the builder. When the builder's file is loaded first, the model's class body runs before the builder's module has finished loading, and `static QueryBuilder = MessageQueryBuilder` is `undefined`. A getter is read only when a query is built, so it works in either order:
+
+```ts
+class Message extends BaseModel {
+  static get QueryBuilder() {
+    return MessageQueryBuilder;
+  }
+
+  declare QueryBuilderType: MessageQueryBuilder<this>;
+}
+```
+
+`Message.query()` is typed as a `MessageQueryBuilder` with the getter too.
+
+`select()` doesn't narrow the row type in builder methods either: a method that selects a few columns still returns rows typed with all of them, and the columns it didn't select are `undefined` at runtime. Use [`castTo<T>()`](#runafter-and-castto-t-set-the-result-type) to type rows with only some columns.
+
 ## `runAfter()` and `castTo<T>()` set the result type
 
 ```ts

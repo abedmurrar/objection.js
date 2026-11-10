@@ -4,6 +4,15 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+### What's new
+
+- Custom query builder methods can load relations without casts. Inside a builder method `this` is generic, so the types can't know which model the builder belongs to, and `this.withGraphFetched('user')` didn't compile (TS2345, then TS2349 and TS7006 on a following `modifyGraph()`). `withGraphFetched()`, `withGraphJoined()` and `allowGraph()` now take the model as a type argument, like `modifyGraph<RM>()`: `this.withGraphFetched<MessageModel>('user')` returns the query builder as it was. Given the expression as a second type argument, `this.withGraphFetched<MessageModel, 'user'>('user')` checks the expression against the model and returns a `WithGraphQueryBuilder<this, 'user'>`, so a method can say which relations it loads, and `(await Message.query().withUser())[0].user` is typed. `WithGraphQueryBuilder` is now exported explicitly and documented. Calls without type arguments are checked as before, with the same error messages. Reported from chat-api.
+- A `runAfter()` callback that returns its input, or a promise of it, keeps the type of the query builder, so a builder method typed `this` can return `this.runAfter(...)`. Callbacks that return something else change the result type as before.
+
+### Docs
+
+- The TypeScript guide shows builder methods that load relations, a `runAfter()` that keeps `this`, and `static get QueryBuilder()` for a builder in its own file: with `static QueryBuilder = MessageQueryBuilder`, the builder is `undefined` when its file, which imports the model, is loaded first. It also says that `select()` doesn't narrow the row type in builder methods.
+
 ## 4.2.13 (2026-11-10)
 
 ### Security
