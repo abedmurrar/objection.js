@@ -2,6 +2,7 @@ import { isPostgres } from '../../../utils/knexUtils';
 import { normalizeIds } from '../../../utils/normalizeIds';
 import { RelateOperation } from '../../../queryBuilder/operations/RelateOperation';
 import type { RelationModel, RelationOperationOptions, RelationQueryBuilder } from '../../Relation';
+import { assertSingleOwner } from '../../RelationOwner';
 import type { RelationOwner } from '../../RelationOwner';
 import type { ManyToManyRelation } from '../ManyToManyRelation';
 
@@ -61,10 +62,6 @@ function assertOwnerIsSingleItem(
   relation: ManyToManyRelation,
 ): void {
   const { isModels, isIdentifiers, isQueryBuilder } = owner;
-  const { ownerProp } = relation;
-
-  const singleModel = isModels && owner.modelArray.length === 1;
-  const singleId = isIdentifiers && owner.getNormalizedIdentifiers(ownerProp).length === 1;
 
   if (isPostgres(builder.unsafeKnex())) {
     if (!isModels && !isIdentifiers && !isQueryBuilder) {
@@ -73,17 +70,7 @@ function assertOwnerIsSingleItem(
       );
     }
   } else {
-    if (!singleModel && !singleId && !isQueryBuilder) {
-      throw new Error(
-        [
-          'Can only relate items for one parent at a time in case of ManyToManyRelation.',
-          'Otherwise multiple insert queries would need to be created.',
-
-          'If you need to relate items for multiple parents, simply loop through them.',
-          `That's the most performant way.`,
-        ].join(' '),
-      );
-    }
+    assertSingleOwner(owner, relation, 'relate', 'ManyToManyRelation', 'insert');
   }
 }
 

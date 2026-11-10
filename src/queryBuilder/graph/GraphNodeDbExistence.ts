@@ -5,6 +5,7 @@ import type { Graph, GraphNode } from './GraphData';
 import type { GraphOptions } from './GraphOptions';
 import type { QueryBuilder } from '../QueryBuilder';
 import type { ModelClass } from '../QueryBuilderOperationSupport';
+import { INTERNAL_CHILD_QUERY } from './internalQuery';
 
 // Model class -> id key -> id.
 type ExistenceMap = Map<ModelClass, Map<string, unknown>>;
@@ -191,20 +192,13 @@ function createExistenceCheckQueries({
     builders.push(
       modelClass
         .query()
-        .childQueryOf(builder, childQueryOptions())
+        .childQueryOf(builder, INTERNAL_CHILD_QUERY)
         .findByIds(ids)
         .select(modelClass.getIdColumnArray()),
     );
   }
 
   return builders;
-}
-
-function childQueryOptions(): { fork: boolean; isInternalQuery: boolean } {
-  return {
-    fork: true,
-    isInternalQuery: true,
-  };
 }
 
 function cloneExistenceMap(exixtenseMap: ExistenceMap): ExistenceMap {

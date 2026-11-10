@@ -6,6 +6,7 @@ import type { Graph, GraphModel, GraphNode } from './GraphData';
 import type { GraphOptions } from './GraphOptions';
 import type { QueryBuilder } from '../QueryBuilder';
 import type { ManyToManyRelation } from '../../relations/manyToMany/ManyToManyRelation';
+import { INTERNAL_CHILD_QUERY } from './internalQuery';
 
 type BuilderCallback = (builder: QueryBuilder) => void;
 
@@ -35,7 +36,7 @@ class GraphFetcher {
     const eagerExpr = RelationExpression.fromModelGraph(rootObjects);
     const models = await modelClass
       .query()
-      .childQueryOf(builder, childQueryOptions())
+      .childQueryOf(builder, INTERNAL_CHILD_QUERY)
       .modify(propagateMethodCallsFromQuery(builder))
       .modify(buildFetchQuerySelects(graph, graphOptions, eagerExpr))
       .findByIds(rootIds)
@@ -192,13 +193,6 @@ function createManyToManyExtraSelectionIfNeeded(
 
 function createSelection(builder: QueryBuilder, column: string, node: GraphNode): string {
   return `${builder.tableRefFor(node.modelClass)}.${column}`;
-}
-
-function childQueryOptions(): { fork: boolean; isInternalQuery: boolean } {
-  return {
-    fork: true,
-    isInternalQuery: true,
-  };
 }
 
 function fetchQueryInternalOptions(): { keepImplicitJoinProps: boolean } {

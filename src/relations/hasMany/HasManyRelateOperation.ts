@@ -2,6 +2,7 @@ import { withWhereScope } from '../../queryBuilder/whereScopes';
 import { normalizeIds } from '../../utils/normalizeIds';
 import { RelateOperation } from '../../queryBuilder/operations/RelateOperation';
 import type { Relation, RelationQueryBuilder } from '../Relation';
+import { assertSingleOwner } from '../RelationOwner';
 import type { RelationOwner } from '../RelationOwner';
 
 class HasManyRelateOperation extends RelateOperation {
@@ -15,7 +16,7 @@ class HasManyRelateOperation extends RelateOperation {
       arrayOutput: true,
     });
 
-    assertOwnerIsSingleItem(this.owner, this.relation);
+    assertSingleOwner(this.owner, this.relation, 'relate', 'HasManyRelation', 'update');
     return true;
   }
 
@@ -39,26 +40,6 @@ class HasManyRelateOperation extends RelateOperation {
     withWhereScope(query, () => query.modify(this.relation.modify));
 
     return query;
-  }
-}
-
-function assertOwnerIsSingleItem(owner: RelationOwner, relation: Relation): void {
-  const { isModels, isIdentifiers, isQueryBuilder } = owner;
-  const { ownerProp } = relation;
-
-  const singleModel = isModels && owner.modelArray.length === 1;
-  const singleId = isIdentifiers && owner.getNormalizedIdentifiers(ownerProp).length === 1;
-
-  if (!singleModel && !singleId && !isQueryBuilder) {
-    throw new Error(
-      [
-        'Can only relate items for one parent at a time in case of HasManyRelation.',
-        'Otherwise multiple update queries would need to be created.',
-
-        'If you need to relate items for multiple parents, simply loop through them.',
-        `That's the most performant way.`,
-      ].join(' '),
-    );
   }
 }
 

@@ -15,6 +15,7 @@ interface ManyToManyModifyOperation {
   // table extras), and whether it writes only those (unrelate).
   readonly modifiesJoinTable: boolean;
   readonly modifiesJoinTableOnly: boolean;
+  onAdd(builder: RelationQueryBuilder, args: unknown[]): boolean;
   onBuild(builder: RelationQueryBuilder): void;
   clone(): this;
   applyModifyFilterForRelatedTable(builder: RelationQueryBuilder): RelationQueryBuilder;
@@ -49,6 +50,17 @@ const ManyToManyModifyMixin = <T extends ManyToManyModifyOperationClass>(Operati
       this.joinRowFilterSubquery = null;
       this.skipRelationFilter = false;
       this.joinRowRelatedIds = null;
+    }
+
+    // `upsertGraph()` sets `skipRelationFilter` for the rows it deletes,
+    // unrelates and patches. They are known to be related to the owner, so
+    // they keep their own filters, like the ids of `findByIds()`, and the join
+    // rows are filtered by the ids of both sides, see `relatedIdsOfFilters()`.
+    // A subquery that joins the join table deadlocks concurrent updates on
+    // MySQL (#135).
+    onAdd(builder: RelationQueryBuilder, args: unknown[]): boolean {
+      this.skipRelationFilter = builder.internalOptions().skipRelationFilter;
+      return super.onAdd(builder, args);
     }
 
     // Unrelate doesn't execute the main query, and updates of rows that are
