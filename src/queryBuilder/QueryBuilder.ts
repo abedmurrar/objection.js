@@ -4,7 +4,7 @@ import { wrapError } from 'db-errors';
 import { raw } from './RawBuilder';
 import { createModifier } from '../utils/createModifier';
 import { ValidationErrorType } from '../model/ValidationError';
-import { isObject, isFunction, last } from '../utils/objectUtils';
+import { isObject, isFunction } from '../utils/objectUtils';
 import { isPromise } from '../utils/promiseUtils/isPromise';
 import { RelationExpression, DuplicateRelationError } from './RelationExpression';
 import { assertIdNotUndefined } from '../utils/assert';
@@ -772,7 +772,7 @@ class QueryBuilder extends QueryBuilderBase {
     const knex = this.knex();
     const tableParts = table.split('.');
     // knex's types make `columnInfo()` a promise, but it's the query builder.
-    const columnInfoQuery: KnexLike = knex(last(tableParts)).columnInfo();
+    const columnInfoQuery: KnexLike = knex(tableParts.at(-1)!).columnInfo();
     const schema = this.internalOptions().schema;
 
     if (schema) {

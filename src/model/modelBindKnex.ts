@@ -13,43 +13,34 @@ type KnexWithCache = Knex & {
 };
 
 function bindKnex<M extends ModelClass>(modelClass: M, knex: Knex): M {
-  let BoundModelClass = getBoundModelFromCache(modelClass, knex);
+  const cache = boundModels(knex);
+  const cacheKey = modelClass.uniqueTag();
+  let BoundModelClass = cache.get(cacheKey) as M | undefined;
 
-  if (BoundModelClass === null) {
+  if (BoundModelClass === undefined) {
     BoundModelClass = inheritModel(modelClass);
-    BoundModelClass = copyHiddenProperties(modelClass, BoundModelClass);
-
+    copyHiddenProperties(modelClass, BoundModelClass);
     BoundModelClass.knex(knex);
 
-    BoundModelClass = putBoundModelToCache(modelClass, BoundModelClass, knex);
-    BoundModelClass = bindRelations(modelClass, BoundModelClass, knex);
+    // Cached before its relations are bound: binding them binds the related
+    // model classes, whose relations can lead back to this one.
+    cache.set(cacheKey, BoundModelClass);
+    bindRelations(modelClass, BoundModelClass, knex);
   }
 
   return BoundModelClass;
 }
 
-function getBoundModelFromCache<M extends ModelClass>(modelClass: M, knex: Knex): M | null {
-  const cache = getCache(knex);
-  const cacheKey = modelClass.uniqueTag();
-
-  return (cache.get(cacheKey) as M | undefined) || null;
-}
-
-function getCache(knex: KnexWithCache): Map<string, ModelClass> {
+// The model classes bound to a knex instance (or transaction), by their unique tag.
+function boundModels(knex: KnexWithCache): Map<string, ModelClass> {
   if (!knex.$$objection) {
-    createCache(knex);
+    defineNonEnumerableProperty(knex, '$$objection', { boundModels: new Map() });
   }
 
   return knex.$$objection!.boundModels;
 }
 
-function createCache(knex: KnexWithCache): void {
-  defineNonEnumerableProperty(knex, '$$objection', {
-    boundModels: new Map(),
-  });
-}
-
-function copyHiddenProperties<M extends ModelClass>(modelClass: M, BoundModelClass: M): M {
+function copyHiddenProperties(modelClass: ModelClass, BoundModelClass: ModelClass): void {
   // Bound classes share the validator of the class they are bound from, which
   // is copied below. Create it first, so that a class bound to a new knex
   // instance, like every transaction, doesn't create and compile a validator
@@ -68,23 +59,9 @@ function copyHiddenProperties<M extends ModelClass>(modelClass: M, BoundModelCla
       );
     }
   }
-
-  return BoundModelClass;
 }
 
-function putBoundModelToCache<M extends ModelClass>(
-  modelClass: M,
-  BoundModelClass: M,
-  knex: Knex,
-): M {
-  const cache = getCache(knex);
-  const cacheKey = modelClass.uniqueTag();
-
-  cache.set(cacheKey, BoundModelClass);
-  return BoundModelClass;
-}
-
-function bindRelations<M extends ModelClass>(modelClass: M, BoundModelClass: M, knex: Knex): M {
+function bindRelations(modelClass: ModelClass, BoundModelClass: ModelClass, knex: Knex): void {
   const boundRelations: Record<string, Relation> = Object.create(null);
 
   for (const relationName of modelClass.getRelationNames()) {
@@ -95,8 +72,6 @@ function bindRelations<M extends ModelClass>(modelClass: M, BoundModelClass: M, 
   }
 
   defineNonEnumerableProperty(BoundModelClass, '$$relations', boundRelations);
-
-  return BoundModelClass;
 }
 
 export { bindKnex };

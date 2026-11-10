@@ -13,7 +13,7 @@ function resolveModel(
 ): ModelClassLike | undefined {
   try {
     if (isString(modelRef)) {
-      if (isAbsolutePath(modelRef)) {
+      if (path.isAbsolute(modelRef)) {
         return requireModel(modelRef);
       } else if (modelPaths) {
         return requireUsingModelPaths(modelRef, modelPaths);
@@ -100,10 +100,6 @@ function requireModel(modelPath: string): ModelClassLike {
   }
 
   return modelClass;
-}
-
-function isAbsolutePath(pth: string): boolean {
-  return path.normalize(pth + '/') === path.normalize(path.resolve(pth) + '/');
 }
 
 // The `T &` keeps an `any` argument `any`.

@@ -1,28 +1,12 @@
 import type { ModelClass } from './Model';
 
-type ClassInheritor = <M extends ModelClass>(BaseClass: M) => M;
-
-const cache = new Map<string, ClassInheritor>();
-
+// Creates an empty subclass with the same name. A class defined as a computed
+// property is named after the key, so the name needs no code built from it.
 function inheritModel<M extends ModelClass>(modelClass: M): M {
-  let inherit = cache.get(modelClass.name);
+  const name = modelClass.name;
+  const BaseClass = modelClass as unknown as new (...args: any[]) => object;
 
-  if (!inherit) {
-    inherit = createClassInheritor(modelClass.name);
-    cache.set(modelClass.name, inherit);
-  }
-
-  return inherit(modelClass);
-}
-
-function createClassInheritor(className: string): ClassInheritor {
-  return new Function(
-    'BaseClass',
-    `
-    'use strict';
-    return class ${className} extends BaseClass {}
-  `,
-  ) as ClassInheritor;
+  return { [name]: class extends BaseClass {} }[name] as unknown as M;
 }
 
 export { inheritModel };

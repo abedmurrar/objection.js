@@ -1,4 +1,5 @@
 import { isFunction } from './utils/objectUtils';
+import { isModelClass } from './utils/resolveModel';
 import type { Knex } from 'knex';
 import type { ModelClass } from './model/Model';
 
@@ -79,19 +80,8 @@ transaction.start = function (modelClassOrKnex: ModelClass | Knex): Promise<Knex
     );
   }
 
-  return new Promise((resolve, reject) => {
-    knex
-      .transaction((trx) => {
-        resolve(trx);
-      })
-      .catch((err: unknown) => {
-        reject(err);
-      });
-  });
+  // Without a callback, knex resolves to the transaction once it has started.
+  return knex.transaction();
 };
-
-function isModelClass(maybeModel: unknown): boolean {
-  return isFunction(maybeModel) && (maybeModel as ModelClass).isObjectionModelClass;
-}
 
 export { transaction };

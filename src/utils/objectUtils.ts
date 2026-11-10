@@ -10,7 +10,6 @@ const SMALL_ARRAY_SIZE = 10;
 
 // An object whose properties are read and written by key.
 type AnyObject = Record<PropertyKey, unknown>;
-type Compare = (val1: unknown, val2: unknown) => boolean;
 
 function isEmpty(item: unknown): boolean {
   if (Array.isArray(item) || Buffer.isBuffer(item)) {
@@ -61,19 +60,9 @@ function asSingle<T>(value: T | readonly T[]): T {
   return Array.isArray(value) ? value[0] : (value as T);
 }
 
-function uniqBy<T, K = T>(items: ArrayLike<T>, keyGetter: ((item: T) => K) | null = null): T[] {
-  const map = new Map<K, T>();
-
-  for (let i = 0, l = items.length; i < l; ++i) {
-    const item = items[i];
-    const key = keyGetter !== null ? keyGetter(item) : (item as unknown as K);
-
-    map.set(key, item);
-  }
-
-  return Array.from(map.values());
-}
-
+// Kept instead of `Map.groupBy()` and `Array.prototype.flat()`: on the small
+// arrays objection passes (a `select()`'s arguments, a row's columns), these
+// loops are faster, `flat()` several times so (measured on Node.js 24).
 function groupBy<T, K = T>(
   items: Iterable<T>,
   keyGetter: ((item: T) => K) | null = null,
@@ -93,6 +82,37 @@ function groupBy<T, K = T>(
   }
 
   return groups;
+}
+
+function flatten<T>(arrays: ArrayLike<T | readonly T[]>): T[] {
+  const out: T[] = [];
+
+  for (let i = 0, l = arrays.length; i < l; ++i) {
+    const value = arrays[i];
+
+    if (Array.isArray(value)) {
+      for (let j = 0; j < value.length; ++j) {
+        out.push(value[j]);
+      }
+    } else {
+      out.push(value as T);
+    }
+  }
+
+  return out;
+}
+
+function uniqBy<T, K = T>(items: ArrayLike<T>, keyGetter: ((item: T) => K) | null = null): T[] {
+  const map = new Map<K, T>();
+
+  for (let i = 0, l = items.length; i < l; ++i) {
+    const item = items[i];
+    const key = keyGetter !== null ? keyGetter(item) : (item as unknown as K);
+
+    map.set(key, item);
+  }
+
+  return Array.from(map.values());
 }
 
 function omit(obj: object, keysToOmit: string | readonly string[]): AnyObject {
@@ -163,10 +183,6 @@ function unionGeneric<T>(arr1: readonly T[], arr2: readonly T[]): T[] {
   return Array.from(all);
 }
 
-function last<T>(arr: ArrayLike<T>): T {
-  return arr[arr.length - 1];
-}
-
 function once<This, Args extends unknown[], R>(
   func: (this: This, ...args: Args) => R,
 ): (this: This, ...args: Args) => R {
@@ -181,24 +197,6 @@ function once<This, Args extends unknown[], R>(
 
     return value;
   };
-}
-
-function flatten<T>(arrays: ArrayLike<T | readonly T[]>): T[] {
-  const out: T[] = [];
-
-  for (let i = 0, l = arrays.length; i < l; ++i) {
-    const value = arrays[i];
-
-    if (Array.isArray(value)) {
-      for (let j = 0; j < value.length; ++j) {
-        out.push(value[j]);
-      }
-    } else {
-      out.push(value as T);
-    }
-  }
-
-  return out;
 }
 
 function get(obj: unknown, path: readonly PropertyKey[]): unknown {
@@ -288,49 +286,49 @@ function chunk<T>(arr: ArrayLike<T>, chunkSize: number): T[][] {
 }
 
 function jsonEquals(val1: unknown, val2: unknown): boolean {
-  return jsonEqualsBase(val1, val2, compareStrict);
+  return jsonEqualsBase(val1, val2);
 }
 
-function jsonEqualsBase(val1: unknown, val2: unknown, compare: Compare): boolean {
+function jsonEqualsBase(val1: unknown, val2: unknown): boolean {
   if (val1 === val2) {
     return true;
   }
 
-  return jsonEqualsSlowPath(val1, val2, compare);
+  return jsonEqualsSlowPath(val1, val2);
 }
 
-function jsonEqualsSlowPath(val1: unknown, val2: unknown, compare: Compare): boolean {
+function jsonEqualsSlowPath(val1: unknown, val2: unknown): boolean {
   const type1 = typeof val1;
   const type2 = typeof val2;
 
-  const isNonNullObject1 = type1 === 'object' && !compare(val1, null);
-  const isNonNullObject2 = type2 === 'object' && !compare(val2, null);
+  const isNonNullObject1 = type1 === 'object' && val1 !== null;
+  const isNonNullObject2 = type2 === 'object' && val2 !== null;
 
   if (isNonNullObject1 && isNonNullObject2) {
     const isArray1 = Array.isArray(val1);
     const isArray2 = Array.isArray(val2);
 
     if (isArray1 && isArray2) {
-      return jsonEqualsArray(val1 as unknown[], val2 as unknown[], compare);
+      return jsonEqualsArray(val1 as unknown[], val2 as unknown[]);
     } else if (!isArray1 && !isArray2) {
-      return jsonEqualsObject(val1 as AnyObject, val2 as AnyObject, compare);
+      return jsonEqualsObject(val1 as AnyObject, val2 as AnyObject);
     } else {
       return false;
     }
   } else if (isNonNullObject1 !== isNonNullObject2) {
     return false;
   } else {
-    return compare(val1, val2);
+    return val1 === val2;
   }
 }
 
-function jsonEqualsArray(arr1: unknown[], arr2: unknown[], compare: Compare): boolean {
+function jsonEqualsArray(arr1: unknown[], arr2: unknown[]): boolean {
   if (arr1.length !== arr2.length) {
     return false;
   }
 
   for (let i = 0, l = arr1.length; i < l; ++i) {
-    if (!jsonEqualsBase(arr1[i], arr2[i], compare)) {
+    if (!jsonEqualsBase(arr1[i], arr2[i])) {
       return false;
     }
   }
@@ -338,7 +336,7 @@ function jsonEqualsArray(arr1: unknown[], arr2: unknown[], compare: Compare): bo
   return true;
 }
 
-function jsonEqualsObject(obj1: AnyObject, obj2: AnyObject, compare: Compare): boolean {
+function jsonEqualsObject(obj1: AnyObject, obj2: AnyObject): boolean {
   if (obj1.constructor === Date && obj2.constructor === Date) {
     return equalsDate(obj1 as unknown as Date, obj2 as unknown as Date);
   }
@@ -353,7 +351,7 @@ function jsonEqualsObject(obj1: AnyObject, obj2: AnyObject, compare: Compare): b
   for (let i = 0, l = keys1.length; i < l; ++i) {
     const key = keys1[i];
 
-    if (!jsonEqualsBase(obj1[key], obj2[key], compare)) {
+    if (!jsonEqualsBase(obj1[key], obj2[key])) {
       return false;
     }
   }
@@ -363,10 +361,6 @@ function jsonEqualsObject(obj1: AnyObject, obj2: AnyObject, compare: Compare): b
 
 function equalsDate(date1: Date, date2: Date): boolean {
   return date1.getTime() === date2.getTime();
-}
-
-function compareStrict(val1: unknown, val2: unknown): boolean {
-  return val1 === val2;
 }
 
 function isSafeKey(key: unknown): key is string | number {
@@ -410,7 +404,6 @@ export {
   chunk,
   omit,
   once,
-  last,
   get,
   set,
 };

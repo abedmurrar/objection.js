@@ -273,8 +273,8 @@ function createReferenceNotFoundError(ref: unknown): Error {
   );
 }
 
-function createNotModelError(modelClass: ModelClass, value: unknown): never {
-  throw modelClass.createValidationError({
+function createNotModelError(modelClass: ModelClass, value: unknown): Error {
+  return modelClass.createValidationError({
     type: ValidationErrorType.InvalidGraph,
     message: `expected value "${value}" to be an instance of ${modelClass.name}`,
   });
