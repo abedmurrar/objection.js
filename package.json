@@ -1,6 +1,6 @@
 {
   "name": "@abedmurrar/objection",
-  "version": "4.2.12",
+  "version": "4.2.13",
   "description": "A fast, strictly typed SQL ORM for Node.js and TypeScript, built on knex: models, relations, eager loading, graph upserts and transactions on Postgres, MySQL, MariaDB and SQLite. A maintained fork of objection.js.",
   "main": "lib/objection.js",
   "type": "commonjs",

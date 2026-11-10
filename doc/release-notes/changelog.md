@@ -4,6 +4,8 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+## 4.2.13 (2026-11-10)
+
 ### Security
 
 - Binding a model class to a knex instance, which `bindKnex()`, `bindTransaction()` and every transaction do, created the bound subclass with `new Function` and put the class's `name` into its code. A model class whose `name` came from data, for example one class per tenant named after it, could run code from that name, and a name that isn't an identifier, like `'Weird Model'`, threw a `SyntaxError`. The subclass is now named through a computed property, without any code built from the name. This came from objection.js.
