@@ -1419,7 +1419,32 @@ declare namespace Objection {
    * }
    * ```
    */
-  export type WithGraphQueryBuilder<QB extends AnyQueryBuilder, E> = QB['~state'] extends {
+  //
+  // It's always a rebound `QB`, with the conditions in its type arguments, so
+  // that its methods can be called while `QB` is generic, as `this` is in a
+  // builder method: a conditional type around it would have no methods there.
+  export type WithGraphQueryBuilder<QB extends AnyQueryBuilder, E> = RebindQueryBuilder<
+    QB,
+    ModelType<QB>,
+    ReplaceResultItem<ResultType<QB>, WithGraphItem<QB, E>>,
+    WithGraphState<QB, E>
+  >;
+
+  // The result item of `WithGraphQueryBuilder`. After `castTo(ModelClass)` the
+  // relations aren't known, so the item stays as it is.
+  type WithGraphItem<QB extends AnyQueryBuilder, E> = QB['~state'] extends { cast: true }
+    ? QB['~state']['item']
+    : WithGraph<QB['~state']['item'], GraphModel<QB>, E>;
+
+  type WithGraphState<QB extends AnyQueryBuilder, E> = QB['~state'] extends { cast: true }
+    ? QB['~state']
+    : QB['~state'] extends { opaque: true }
+      ? OpaqueItemState<WithGraphItem<QB, E>>
+      : QueryBuilderItemState<WithGraphItem<QB, E>>;
+
+  // What `withGraphFetched(E)` and `withGraphJoined(E)` return when the model
+  // is known: an expression that can't be parsed makes the result opaque.
+  type GraphQueryBuilder<QB extends AnyQueryBuilder, E> = QB['~state'] extends {
     cast: true;
   }
     ? OpaqueQueryBuilder<QB>
@@ -2314,7 +2339,7 @@ declare namespace Objection {
     <const E extends RelationExpression<ModelType<QB>>>(
       expr: CheckRelationExpression<GraphModel<QB>, E, ChecksModifierNames<QB>>,
       options?: GraphOptions,
-    ): WithGraphQueryBuilder<QB, E>;
+    ): GraphQueryBuilder<QB, E>;
   }
 
   // The model whose relations the graph methods of `QB` use, or `any` if they're
