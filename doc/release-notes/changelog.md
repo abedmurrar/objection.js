@@ -4,6 +4,8 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+## 4.3.0 (2026-11-10)
+
 ### What's new
 
 - Custom query builder methods can load relations without casts. Inside a builder method `this` is generic, so the types can't know which model the builder belongs to, and `this.withGraphFetched('user')` didn't compile (TS2345, then TS2349 and TS7006 on a following `modifyGraph()`). `withGraphFetched()`, `withGraphJoined()` and `allowGraph()` now take the model as a type argument, like `modifyGraph<RM>()`: `this.withGraphFetched<MessageModel>('user')` returns the query builder as it was. Given the expression as a second type argument, `this.withGraphFetched<MessageModel, 'user'>('user')` checks the expression against the model and returns a `WithGraphQueryBuilder<this, 'user'>`, so a method can say which relations it loads, and `(await Message.query().withUser())[0].user` is typed. `WithGraphQueryBuilder` is now exported explicitly and documented. Calls without type arguments are checked as before, with the same error messages. Reported from chat-api.
