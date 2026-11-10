@@ -14,6 +14,7 @@ class ManyToManyUpdateOperationBase extends UpdateOperation {
 
   declare hasExtraProps: boolean;
   declare joinTablePatch: Record<string, unknown>;
+  // Set by `ManyToManyModifyMixin.onAdd()`.
   declare skipRelationFilter: boolean;
 
   constructor(name: string, opt: RelationOperationOptions<ManyToManyRelation>) {
@@ -24,7 +25,6 @@ class ManyToManyUpdateOperationBase extends UpdateOperation {
 
     this.hasExtraProps = false;
     this.joinTablePatch = {};
-    this.skipRelationFilter = false;
   }
 
   // Only patches with join table extras write join rows.
@@ -38,12 +38,6 @@ class ManyToManyUpdateOperationBase extends UpdateOperation {
 
   onAdd(builder: RelationQueryBuilder, args: unknown[]): boolean {
     const obj = args[0] as Record<string, unknown>;
-
-    // The updated rows are known to be related to the owner, so they keep
-    // their own filters, and the join rows are filtered by the ids of the
-    // owner and the updated model. A subquery that joins the join table
-    // deadlocks concurrent updates on MySQL (#135).
-    this.skipRelationFilter = builder.internalOptions().skipRelationFilter;
 
     // Copy all extra properties to the `joinTablePatch` object.
     for (const extra of this.relation.joinTableExtras) {
@@ -110,7 +104,6 @@ class ManyToManyUpdateOperationBase extends UpdateOperation {
 
     clone.hasExtraProps = this.hasExtraProps;
     clone.joinTablePatch = this.joinTablePatch;
-    clone.skipRelationFilter = this.skipRelationFilter;
 
     return clone;
   }

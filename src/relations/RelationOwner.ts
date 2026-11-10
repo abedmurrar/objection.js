@@ -246,4 +246,30 @@ function isOwnerModelClassQuery(query: RelationQueryBuilder, relation: Relation)
   return query.modelClass().getTableName() === relation.ownerModelClass.getTableName();
 }
 
-export { RelationOwner };
+// Inserting or relating through a has-many or many-to-many relation needs one
+// owner: a single model, a single id, or a query that selects the owner.
+function assertSingleOwner(
+  owner: RelationOwner,
+  relation: Relation,
+  verb: string,
+  relationName: string,
+  queryKind: string,
+): void {
+  const singleModel = owner.isModels && owner.modelArray.length === 1;
+  const singleId =
+    owner.isIdentifiers && owner.getNormalizedIdentifiers(relation.ownerProp).length === 1;
+
+  if (!singleModel && !singleId && !owner.isQueryBuilder) {
+    throw new Error(
+      [
+        `Can only ${verb} items for one parent at a time in case of ${relationName}.`,
+        `Otherwise multiple ${queryKind} queries would need to be created.`,
+
+        `If you need to ${verb} items for multiple parents, simply loop through them.`,
+        `That's the most performant way.`,
+      ].join(' '),
+    );
+  }
+}
+
+export { RelationOwner, assertSingleOwner };

@@ -6,6 +6,7 @@ import { difference, isObject, jsonEquals } from '../../../utils/objectUtils';
 import * as promiseUtils from '../../../utils/promiseUtils';
 import type { GraphData, GraphNode } from '../GraphData';
 import type { QueryBuilder } from '../../QueryBuilder';
+import { INTERNAL_CHILD_QUERY } from '../internalQuery';
 
 class GraphPatchAction extends GraphAction {
   declare nodes: GraphNode[];
@@ -107,11 +108,11 @@ class GraphPatchAction extends GraphAction {
 
     node.obj.$validate(null, {
       dataPath: node.dataPathKey,
-      patch: shouldPatch || (!shouldPatch && !shouldUpdate),
+      patch: shouldPatch || !shouldUpdate,
     });
 
     const updateBuilder: QueryBuilder = this._createBuilder(node)
-      .childQueryOf(builder, childQueryOptions())
+      .childQueryOf(builder, INTERNAL_CHILD_QUERY)
       // The current graph was fetched through the relations, so the patched
       // models are known to be related to their parents.
       .internalOptions({ skipRelationFilter: true })
@@ -122,7 +123,7 @@ class GraphPatchAction extends GraphAction {
         // Call handleUpdate in the runBefore hook which runs after the
         // $beforeUpdate hook, allowing it to modify the object before the
         // updated properties are determined. See issue #2233.
-        if (hasBeforeUpdate && !handleUpdate()) {
+        if (!handleUpdate()) {
           builder.internalOptions().returnImmediatelyValue = null;
         }
         return result;
@@ -268,13 +269,6 @@ class GraphPatchAction extends GraphAction {
 
     return currentObj ? currentObj.$query() : node.obj.$query();
   }
-}
-
-function childQueryOptions(): { fork: boolean; isInternalQuery: boolean } {
-  return {
-    fork: true,
-    isInternalQuery: true,
-  };
 }
 
 function nonStrictEquals(val1: unknown, val2: unknown): boolean {

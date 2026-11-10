@@ -4,6 +4,10 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+### Internal
+
+- Removed duplicated code from the relations, about 170 lines: the many-to-many update, delete and unrelate classes for SQLite, MySQL and the other databases are built in one place instead of eight one-line files, `skipRelationFilter` is read in one place instead of three, the check that inserts and relates have one owner is shared, and the relation mapping helpers and the default join options are defined once. Behaviour, SQL, error messages and the public API are the same.
+
 ## 4.2.11 (2026-11-10)
 
 ### Performance

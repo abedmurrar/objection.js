@@ -467,28 +467,33 @@ function createRelationProperty(
 }
 
 function parseModify(ctx: MappingContext): MappingContext {
-  const mapping = ctx.mapping;
-  const modifier = mapping.modify || mapping.filter;
-  const modify: RelationModifier | null | undefined =
-    modifier &&
-    createModifier({
-      modifier,
-      modelClass: ctx.relatedModelClass,
-    });
-
-  return Object.assign(ctx, { modify });
+  return Object.assign(ctx, { modify: mappingModifier(ctx.mapping, ctx.relatedModelClass) });
 }
 
 function parseBeforeInsert(ctx: MappingContext): MappingContext {
-  let beforeInsert: RelationBeforeInsert;
+  return Object.assign(ctx, { beforeInsert: mappingBeforeInsert(ctx.mapping) });
+}
 
-  if (isFunction(ctx.mapping.beforeInsert)) {
-    beforeInsert = ctx.mapping.beforeInsert;
+// The `modify` (or `filter`) of a relation mapping, or of its join table.
+function mappingModifier(
+  mapping: { modify?: unknown; filter?: unknown },
+  modelClass: RelationModelClass | null,
+): RelationModifier | null | undefined {
+  const modifier = mapping.modify || mapping.filter;
+  return (modifier && createModifier({ modifier, modelClass })) as
+    | RelationModifier
+    | null
+    | undefined;
+}
+
+// The `beforeInsert` of a relation mapping, or of its join table. Without one,
+// the model is inserted as it is.
+function mappingBeforeInsert(mapping: { beforeInsert?: unknown }): RelationBeforeInsert {
+  if (isFunction(mapping.beforeInsert)) {
+    return mapping.beforeInsert as RelationBeforeInsert;
   } else {
-    beforeInsert = (model) => model;
+    return (model) => model;
   }
-
-  return Object.assign(ctx, { beforeInsert });
 }
 
 function aliasedTableName(tableName: string, alias: string): string {
@@ -499,4 +504,4 @@ function aliasedTableName(tableName: string, alias: string): string {
   }
 }
 
-export { Relation };
+export { Relation, aliasedTableName, mappingModifier, mappingBeforeInsert };
