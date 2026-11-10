@@ -530,7 +530,10 @@ class MessageQueryBuilder<
   // The model and the expression: the expression is checked against the
   // model, and the rows of `Message.query().withUser()` have `user`.
   withUser(): WithGraphQueryBuilder<this, 'user'> {
-    return this.withGraphFetched<MessageModel, 'user'>('user');
+    return this.withGraphFetched<MessageModel, 'user'>('user').modifyGraph<UserModel>(
+      'user',
+      (user) => user.forBasic(),
+    );
   }
 }
 
@@ -538,7 +541,7 @@ const messages = await Message.query().withUser();
 messages[0].user; // User | null
 ```
 
-`withGraphJoined()` and `allowGraph()` take the same type arguments. Outside builder methods, where the model is known, call them without type arguments, and relation names are checked as before.
+In a builder method, `modifyGraph()` takes the related model as a type argument too, since the types can't look it up from a generic `this`. `withGraphJoined()` and `allowGraph()` take the same type arguments as `withGraphFetched()`. Outside builder methods, where the model is known, call them without type arguments, and relation names are checked as before.
 
 ### A `runAfter()` that returns its input keeps `this`
 

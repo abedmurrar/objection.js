@@ -4,6 +4,10 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+### Fixes
+
+- In a custom query builder method, the methods of the query builder that `withGraphFetched<RM, E>()` and `withGraphJoined<RM, E>()` return couldn't be called: `this.withGraphFetched<MessageModel, 'user'>('user').modifyGraph<UserModel>('user', ...)` failed with TS2349 and TS7006. `WithGraphQueryBuilder` was a conditional type, which has no members while `this` is generic. It's now always a rebound query builder, with the conditions in its type arguments, like the builders that `first()` and `findById()` return there. The types of `withGraphFetched()` calls without type arguments are unchanged. Reported from chat-api.
+
 ## 4.3.0 (2026-11-10)
 
 ### What's new

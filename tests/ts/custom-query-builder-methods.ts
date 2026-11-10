@@ -47,6 +47,21 @@ class MessageQueryBuilder<
     return this.withGraphFetched<MessageModel, 'user'>('user');
   }
 
+  // A `modifyGraph()` after the expression form (reported by chat-api on 4.3.0).
+  withUserForBasic(): WithGraphQueryBuilder<this, 'user'> {
+    return this.select('id')
+      .withGraphFetched<MessageModel, 'user'>('user')
+      .modifyGraph<UserModel>('user', (user) => user.forBasic())
+      .forInfo();
+  }
+
+  withThreadedUser(): WithGraphQueryBuilder<this, '[user, threadedMessage]'> {
+    return this.withGraphFetched<MessageModel, '[user, threadedMessage]'>('[user, threadedMessage]')
+      .modifyGraph<UserModel>('user', (user) => user.forBasic())
+      .modifyGraph<MessageModel>('threadedMessage', (threaded) => threaded.forInfo())
+      .where('id', '>', 0);
+  }
+
   forInfo(): this {
     return this.select('id', 'userId');
   }
@@ -117,6 +132,10 @@ async function usage(): Promise<void> {
   const withUser = await Message.query().withUser();
   // A belongs-to-one relation can be null.
   const firstName: string | undefined = withUser[0].user?.firstName;
+  const chained = await Message.query().withUserForBasic().findById(1);
+  const chainedName: string | undefined = chained?.user?.firstName;
+  const threaded = await Message.query().withThreadedUser();
+  const threadedId: number | undefined = threaded[0].threadedMessage?.id;
   const one = await Message.query().withUser().findById(1);
   const maybeName: string | undefined = one?.user?.firstName;
 
@@ -130,7 +149,7 @@ async function usage(): Promise<void> {
   // A `runAfter()` that returns nothing makes the result `undefined`.
   const nothing: undefined = await Message.query().runAfter(() => {});
 
-  void [builder, id, firstName, maybeName, listId, contents, nothing];
+  void [builder, id, firstName, chainedName, threadedId, maybeName, listId, contents, nothing];
 }
 
 void usage;
