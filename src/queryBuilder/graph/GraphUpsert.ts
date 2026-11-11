@@ -133,7 +133,38 @@ function pruneRelatedBranches(graphData: GraphData): void {
     );
   });
 
-  removeBranchesFromGraph(findRoots(relateNodes), graphData.graph);
+  const roots = findRoots(relateNodes);
+  checkForReferencesIntoRelatedBranches(roots, graphData.graph);
+  removeBranchesFromGraph(roots, graphData.graph);
+}
+
+// The branches below related nodes are written by a recursive `upsertGraph()`,
+// after the rest of the graph. A reference from the rest of the graph into one
+// of them can't be resolved: what it refers to doesn't exist yet when the node
+// that refers to it is written. References between two such branches work.
+function checkForReferencesIntoRelatedBranches(branchRoots: GraphNode[], graph: Graph): void {
+  if (
+    !branchRoots.length ||
+    !graph.edges.some((edge) => edge.type === ModelGraphEdge.Type.Reference)
+  ) {
+    return;
+  }
+
+  const branches = branchRoots.map((root) => ({ root, nodes: root.descendantRelationNodes }));
+  const branchNodes = new Set(branches.flatMap((branch) => branch.nodes));
+
+  for (const { root, nodes } of branches) {
+    for (const node of nodes) {
+      for (const edge of node.refEdges) {
+        if (edge.isRelatedNode(node) && !branchNodes.has(edge.ownerNode)) {
+          throw node.modelClass.createValidationError({
+            type: ValidationErrorType.InvalidGraph,
+            message: `could not resolve reference ${node.uid} at ${edge.ownerNode.dataPath.join('.') || 'the root'}: the model with that #id is in the graph of a related model (${root.dataPath.join('.')}), which upsertGraph() writes after the rest of the graph. Only the graphs of other related models can refer to it.`,
+          });
+        }
+      }
+    }
+  }
 }
 
 // Nothing is written below nodes that `noInsert` skips, as their descendants
