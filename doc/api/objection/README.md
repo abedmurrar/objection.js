@@ -43,6 +43,23 @@ const { QueryBuilderOperation } = require('objection');
 
 The base class of the operations a query is made of. Every operation matches it, so `query.clear(QueryBuilderOperation)` removes all operations of the query.
 
+##### Examples
+
+[has()](/api/query-builder/other-methods.html#has) and [clear()](/api/query-builder/other-methods.html#clear) find operations by name, by a regular expression or by class:
+
+```js
+const { QueryBuilderOperation } = require('objection');
+
+const query = Person.query().where('age', '>', 20).orderBy('lastName');
+
+query.has('where'); // true
+query.has(/order/); // true
+query.has(QueryBuilderOperation); // true, the query has operations
+
+// select `persons`.* from `persons` where `age` > 20
+query.clear('orderBy');
+```
+
 ## Relation
 
 ```js
@@ -65,6 +82,28 @@ const { RelationExpression } = require('objection');
 ```
 
 The class of parsed [relation expressions](/api/types/#type-relationexpression). `RelationExpression.create(expr)` parses a string or an object expression. The query builder methods take strings and objects, so you don't need it to pass expressions to them.
+
+##### Examples
+
+```js
+const { RelationExpression } = require('objection');
+
+const expr = RelationExpression.create('[pets, movies.actors]');
+
+// Is an expression inside another one?
+expr.isSubExpression('movies.actors'); // true
+expr.isSubExpression('[pets, movies]'); // true
+expr.isSubExpression('pets.owner'); // false
+
+// Merge two expressions.
+RelationExpression.create('pets').merge('movies.actors').toString(); // '[pets, movies.actors]'
+
+// The relations a graph of models has.
+const graph = Person.fromJson({ firstName: 'Jennifer', pets: [{ name: 'Fluffy' }], movies: [{ name: 'Mother!', actors: [] }] });
+RelationExpression.fromModelGraph(graph).toString(); // '[pets, movies.actors]'
+```
+
+To limit the relations that a query loads or a graph inserts, use [allowGraph()](/api/query-builder/eager-methods.html#allowgraph) instead of checking expressions yourself.
 
 ## defineRelations
 
@@ -134,7 +173,49 @@ await initialize([Person, Movie, Pet, SomeOtherModelClass]);
 const { transaction } = require('objection');
 ```
 
-[The transaction function](/guide/transactions.html)
+[The transaction function](/guide/transactions.html). It runs a callback in a transaction, and commits when the callback's promise resolves, or rolls back when it rejects or throws.
+
+##### Examples
+
+Pass model classes to get copies of them bound to the transaction. Every query of the bound classes runs in the transaction:
+
+```js
+const { transaction } = require('objection');
+
+const jennifer = await transaction(Person, Pet, async (Person, Pet) => {
+  const jennifer = await Person.query().insert({ firstName: 'Jennifer', lastName: 'Lawrence' });
+  await Pet.query().insert({ name: 'Fluffy', ownerId: jennifer.id });
+
+  return jennifer;
+});
+```
+
+Or pass a knex instance, and pass the transaction to each query:
+
+```js
+try {
+  await transaction(Person.knex(), async (trx) => {
+    await Person.query(trx).insert({ firstName: 'Sylvester' });
+    throw new Error('Something went wrong');
+  });
+} catch (err) {
+  // The insert was rolled back.
+}
+```
+
+`transaction.start()` starts a transaction without a callback. It takes a model class or a knex instance. You then commit or roll back yourself:
+
+```js
+const trx = await transaction.start(Person);
+
+try {
+  await Person.query(trx).insert({ firstName: 'Arnold' });
+  await trx.commit();
+} catch (err) {
+  await trx.rollback();
+  throw err;
+}
+```
 
 ## ref
 
@@ -170,6 +251,27 @@ await Model.query()
     ref('OtherModel.name')
   )
   .where('age', '>', ref('OtherModel.ageLimit'));
+```
+
+A string on the right side of `where()` is a value. Use `ref()` to compare two columns, or to set a column to another column:
+
+```js
+// select `firstName` from `persons` where `updatedAt` > `createdAt`
+await Person.query().select('firstName').where('updatedAt', '>', ref('createdAt'));
+
+// update `persons` set `nickname` = `firstName` where `nickname` is null
+await Person.query().patch({ nickname: ref('firstName') }).whereNull('nickname');
+```
+
+`Model.ref()` follows the alias of the table, so the same code works with and without `alias()`:
+
+```js
+// select `p`.`id`, `p`.`firstName`, `pets`.`name` as `petName`
+// from `persons` as `p` inner join `pets` on `pets`.`ownerId` = `p`.`id`
+await Person.query()
+  .alias('p')
+  .joinRelated('pets')
+  .select(Person.ref('id'), Person.ref('firstName'), Pet.ref('name').as('petName'));
 ```
 
 `withGraphJoined` and `joinRelated` methods also use `:` as a separator which can lead to ambiquous queries when combined with json references. For example:
@@ -290,6 +392,16 @@ await Model.query().insert({
 });
 ```
 
+Select a constant, for example to tell the rows of a union apart:
+
+```js
+// select `id`, `firstName` as `name`, 'person' as `type` from `persons`
+// union all select `id`, `name`, 'pet' as `type` from `pets`
+const rows = await Person.query()
+  .select('id', 'firstName as name', val('person').as('type'))
+  .unionAll(Pet.query().select('id', 'name', val('pet').as('type')));
+```
+
 ## fn
 
 ```js
@@ -362,6 +474,27 @@ await Model.query().where(fn.coalesce(ref('age'), 0), '>', 30);
 
 // The same example using an expression
 await Model.query().where(fn.coalesce(ref('age'), 0).gt(30));
+```
+
+Functions work in `select()` with `as()`, and in `orderBy()`:
+
+```js
+// select `id`, UPPER(`firstName`) as `upperName` from `persons` order by LOWER(`lastName`) asc
+await Person.query()
+  .select('id', fn.upper(ref('firstName')).as('upperName'))
+  .orderBy(fn.lower(ref('lastName')));
+
+// Count the pets of each person, zero included
+await Person.query()
+  .select('persons.id', fn.count(ref('pets.id')).as('petCount'))
+  .leftJoinRelated('pets')
+  .groupBy('persons.id');
+```
+
+`fn.now()` is `CURRENT_TIMESTAMP(6)`, and `fn.now(precision)` sets the number of fractional digits. It works on postgres, MySQL and MariaDB. SQLite doesn't accept a precision, so use `raw('CURRENT_TIMESTAMP')` there.
+
+```js
+await Person.query().patch({ updatedAt: fn.now() }).where('id', 1);
 ```
 
 ## Expressions
@@ -491,21 +624,57 @@ await CourseUser.query()
 const { mixin } = require('objection');
 ```
 
-The mixin helper for applying multiple [plugins](/guide/plugins.html).
+The mixin helper for applying multiple [plugins](/guide/plugins.html). `mixin(Model, [a, b])` is `b(a(Model))`.
 
 ##### Examples
+
+A plugin is a function that takes a model class and returns a subclass of it. A plugin with options is a function that returns a plugin. These two set timestamps and lowercase some properties:
 
 ```js
 const { mixin, Model } = require('objection');
 
-class Person extends mixin(Model, [
-  SomeMixin,
-  SomeOtherMixin,
-  EvenMoreMixins,
-  LolSoManyMixins,
-  ImAMixinWithOptions({ foo: 'bar' })
-]) {}
+const Timestamps =
+  ({ createdAt = 'createdAt', updatedAt = 'updatedAt' } = {}) =>
+  (Model) =>
+    class extends Model {
+      $beforeInsert(context) {
+        this[createdAt] = this[updatedAt] = new Date();
+        return super.$beforeInsert(context);
+      }
+
+      $beforeUpdate(opt, context) {
+        this[updatedAt] = new Date();
+        return super.$beforeUpdate(opt, context);
+      }
+    };
+
+const LowerCase =
+  (...props) =>
+  (Model) =>
+    class extends Model {
+      $parseJson(json, opt) {
+        json = super.$parseJson(json, opt);
+
+        for (const prop of props) {
+          if (typeof json[prop] === 'string') {
+            json[prop] = json[prop].toLowerCase();
+          }
+        }
+
+        return json;
+      }
+    };
+
+class Person extends mixin(Model, [Timestamps(), LowerCase('email')]) {
+  static tableName = 'persons';
+}
+
+// insert into `persons` (`createdAt`, `email`, `firstName`, `updatedAt`)
+// values ('2026-11-11 12:00:00.000', 'jennifer@example.com', 'Jennifer', '2026-11-11 12:00:00.000')
+await Person.query().insert({ firstName: 'Jennifer', email: 'Jennifer@Example.com' });
 ```
+
+The hooks return what `super` returns instead of being `async`. An `async` hook works too, but objection only waits for hooks that return a promise, so the query then waits where it wouldn't have to. See "Hooks run without promises" in [What is faster](/fork/performance.html#what-is-faster).
 
 ## compose
 
@@ -513,22 +682,24 @@ class Person extends mixin(Model, [
 const { compose } = require('objection');
 ```
 
-The compose helper for applying multiple [plugins](/guide/plugins.html).
+The compose helper for applying multiple [plugins](/guide/plugins.html). It combines plugins into one, which you can apply to several models.
 
 ##### Examples
+
+With the `Timestamps` and `LowerCase` plugins of the [mixin](#mixin) example:
 
 ```js
 const { compose, Model } = require('objection');
 
-const mixins = compose(
-  SomeMixin,
-  SomeOtherMixin,
-  EvenMoreMixins,
-  LolSoManyMixins,
-  ImAMixinWithOptions({ foo: 'bar' })
-);
+const plugins = compose(Timestamps(), LowerCase('email'));
 
-class Person extends mixins(Model) {}
+class Person extends plugins(Model) {
+  static tableName = 'persons';
+}
+
+class Admin extends plugins(Model) {
+  static tableName = 'admins';
+}
 ```
 
 ## snakeCaseMappers
@@ -567,6 +738,22 @@ class Person extends Model {
     return snakeCaseMappers({ upperCase: true });
   }
 }
+```
+
+The mappers have a `format()` that turns properties into columns and a `parse()` that turns columns into properties. Use them to check what an option does:
+
+```js
+const { format, parse } = snakeCaseMappers({ underscoreBeforeDigits: true });
+
+format({ firstName: 'Jennifer', addressLine1: 'Main Street 1' });
+// { first_name: 'Jennifer', address_line_1: 'Main Street 1' }
+
+parse({ address_line_1: 'Main Street 1' });
+// { addressLine1: 'Main Street 1' }
+
+// Without the option, `addressLine1` is `address_line1`.
+snakeCaseMappers().format({ addressLine1: 'Main Street 1' });
+// { address_line1: 'Main Street 1' }
 ```
 
 ## knexSnakeCaseMappers
@@ -704,13 +891,62 @@ const { AjvValidator } = require('objection');
 
 The [AjvValidator](/api/types/#class-ajvvalidator) class, the default validator.
 
+##### Examples
+
+Return one from `createValidator()` to set Ajv's options, or to add formats and keywords. Here with [ajv-formats](https://github.com/ajv-validator/ajv-formats) for `format: 'email'`, and `allErrors` to report every invalid property instead of the first one:
+
+```js
+const { Model, AjvValidator } = require('objection');
+const addFormats = require('ajv-formats');
+
+class Person extends Model {
+  static jsonSchema = {
+    type: 'object',
+    required: ['firstName'],
+    properties: {
+      firstName: { type: 'string', minLength: 1 },
+      email: { type: 'string', format: 'email' },
+    },
+  };
+
+  static createValidator() {
+    return new AjvValidator({
+      onCreateAjv: (ajv) => addFormats(ajv),
+      options: { allErrors: true },
+    });
+  }
+}
+```
+
+See [Custom validation](/recipes/custom-validation.html) for more.
+
 ## ValidationError
 
 ```js
 const { ValidationError } = require('objection');
 ```
 
-The [ValidationError](/api/types/#class-validationerror) class.
+The [ValidationError](/api/types/#class-validationerror) class. `type` is `'ModelValidation'` for invalid models, `statusCode` is 400, and `data` has the errors of each property.
+
+##### Examples
+
+With the `Person` of the [AjvValidator](#ajvvalidator) example:
+
+```js
+try {
+  await Person.query().insert({ firstName: '', email: 'not an email' });
+} catch (err) {
+  if (err instanceof ValidationError) {
+    console.log(err.data);
+    // {
+    //   firstName: [{ message: 'must NOT have fewer than 1 characters', keyword: 'minLength', params: { limit: 1 } }],
+    //   email: [{ message: 'must match format "email"', keyword: 'format', params: { format: 'email' } }]
+    // }
+  }
+}
+```
+
+See [Error handling](/recipes/error-handling.html) for the other types.
 
 ## NotFoundError
 
@@ -718,7 +954,20 @@ The [ValidationError](/api/types/#class-validationerror) class.
 const { NotFoundError } = require('objection');
 ```
 
-The [NotFoundError](/api/types/#class-notfounderror) class.
+The [NotFoundError](/api/types/#class-notfounderror) class, thrown by [throwIfNotFound()](/api/query-builder/other-methods.html#throwifnotfound). `statusCode` is 404, and `data` has the properties passed to `throwIfNotFound()`.
+
+##### Examples
+
+```js
+try {
+  await Person.query().findById(id).throwIfNotFound({ message: 'No such person', id });
+} catch (err) {
+  if (err instanceof NotFoundError) {
+    err.message; // 'No such person'
+    err.data; // { message: 'No such person', id }
+  }
+}
+```
 
 ## DBError
 
@@ -726,7 +975,33 @@ The [NotFoundError](/api/types/#class-notfounderror) class.
 const { DBError } = require('objection');
 ```
 
-The [DBError](https://github.com/Vincit/db-errors#dberror) from [db-errors](https://github.com/Vincit/db-errors) library.
+The [DBError](https://github.com/Vincit/db-errors#dberror) from [db-errors](https://github.com/Vincit/db-errors) library. Every error of the database is wrapped in a `DBError` or one of the classes below, which extend it. `nativeError` is the error of the database driver.
+
+##### Examples
+
+```js
+const { UniqueViolationError, ForeignKeyViolationError } = require('objection');
+
+try {
+  await Person.query().insert({ email: 'taken@example.com' });
+} catch (err) {
+  if (err instanceof UniqueViolationError) {
+    // On postgres: err.table is 'persons', err.columns is ['email']
+    // and err.constraint is 'persons_email_unique'.
+  } else if (err instanceof ForeignKeyViolationError) {
+    // ...
+  }
+}
+```
+
+Which properties are set depends on the database:
+
+| Error                      | postgres                          | MySQL and MariaDB    | SQLite              |
+| -------------------------- | --------------------------------- | -------------------- | ------------------- |
+| `UniqueViolationError`     | `table`, `columns`, `constraint`  | `constraint`         | `table`, `columns`  |
+| `ForeignKeyViolationError` | `table`, `constraint`             | `table`, `constraint` | none               |
+
+On MySQL and MariaDB the `constraint` of a unique violation is the name of the unique index, as the database reports it: `persons.persons_email_unique` on MySQL 8.4 and `persons_email_unique` on MariaDB 11.4.
 
 ## ConstraintViolationError
 

@@ -4,6 +4,10 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+### Docs
+
+- The objection module API page has examples for `transaction()` and `transaction.start()`, `ref()` and `Model.ref()`, `val()`, `fn()`, `RelationExpression`, `has()` and `clear()`, `mixin()` and `compose()` with two real plugins, the `format()` and `parse()` of `snakeCaseMappers()`, `AjvValidator`, `ValidationError`, `NotFoundError` and the database errors, with a table of which error properties each database sets. Every example was run on SQLite, MySQL 8.4, MariaDB 11.4 and postgres. It also notes that `fn.now()` doesn't work on SQLite, which doesn't accept a precision.
+
 ## 4.4.5 (2026-11-11)
 
 ### Fixes
