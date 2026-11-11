@@ -7,6 +7,7 @@ npm run bench                                   # all scenarios
 npm run bench -- --filter rows                  # scenarios whose name matches a regex
 npm run bench:compare -- --baseline ../other    # compare against another checkout
 node bench/sql-check.js --baseline ../other     # check that both generate the same SQL
+npm run sql-check:upstream                      # compare with objection.js 3.1.5
 ```
 
 - `scenarios/mock.js` runs against a mocked knex (`testUtils/mockKnex.js`) that answers queries with canned rows. These scenarios measure only objection: building queries, running them through the operation pipeline, turning rows into models, eager loading, graph inserts and validation.
@@ -23,6 +24,12 @@ ln -s "$PWD/node_modules" ../objection-baseline/node_modules
 (cd ../objection-baseline && [ -d src ] && npm run build)
 npm run bench:compare -- --baseline ../objection-baseline
 ```
+
+## Compared with objection.js 3.1.5
+
+`npm run sql-check:upstream` installs objection.js 3.1.5 into `.upstream/` and runs `sql-check.js` against it, with the known differences in `upstream-differences.json`. Each entry names a scenario, optionally a client, the reason, and the docs that describe the change. The check fails on a difference that isn't listed, and on an entry that no longer differs. Of the 22 mocked scenarios, 15 generate the same SQL and results as 3.1.5 on postgres, MySQL and SQLite. The others differ on purpose: the expression methods the fork adds, `orWhere()` that no longer escapes a relation's conditions, and batch inserts on MySQL and SQLite.
+
+A new difference is either a change to document, in the changelog and `upstream-differences.json`, or a bug.
 
 ## Concurrent graph writes
 
@@ -52,7 +59,7 @@ With `--max-change 1`, `count.js` exits with 1 when a scenario takes more than 1
 
 ## In CI
 
-`.github/workflows/checks.yml` runs on every pull request. It builds the pull request and `main` in two checkouts whose paths have the same length, and runs `sql-check.js`, `scripts/typings-bench.js --check` and `count.js --max-change 1` against `main`. A pull request with the `sql-change` label reports SQL differences without failing.
+`.github/workflows/checks.yml` runs on every pull request. It builds the pull request and `main` in two checkouts whose paths have the same length, and runs `sql-check.js`, `scripts/typings-bench.js --check` and `count.js --max-change 1` against `main`, and `sql-check.js` against objection.js 3.1.5 with `upstream-differences.json`. A pull request with the `sql-change` label reports SQL differences without failing.
 
 GitHub's runners don't have the hardware counters `perf` needs, so CI counts with valgrind (`--counter valgrind`). Its counts of the same code repeat within 0.2%, but every process takes about 20 seconds longer, so CI runs one count per checkout (`--runs 1`), fewer iterations (`--target 3e8`) and a scenario per CPU (`--jobs`). It only checks the scenarios on the mocked knex: under valgrind, the SQLite scenarios (SQLite's threads) and the "1 ms per query" ones (timers) vary by several percent between runs of the same code. See [checks on pull requests](../doc/guide/contributing.md#checks-on-pull-requests).
 
