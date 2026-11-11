@@ -4,6 +4,8 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+## 4.4.2 (2026-11-11)
+
 ### Fixes
 
 - In `upsertGraph()` with `relate: true`, a related model that has relations of its own is upserted with them by a separate `upsertGraph()` call, after the rest of the graph. A `#ref` or `#ref{}` from the graph of one such model to a model in another one's graph threw `could not resolve reference`, because the calls ran at the same time and couldn't see each other's models. The calls now run in the order of their references, and the reference gets the written model, with its id. Calls without references between them still run at the same time. A cycle of references throws `the object graph contains cyclic references` before anything is written.
