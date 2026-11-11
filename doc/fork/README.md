@@ -40,4 +40,14 @@ Releases are published under npm's `latest` dist-tag. Prereleases, when there ar
 | [Ported from ditojs/objection](./dito.md) | Fixes ported from Jürg Lehni's fork, which publishes the `objection` package, with links to the original commits.                                                                                                              |
 | [TypeScript](./typescript.md)             | Relations inferred from `relationMappings`, results that only contain loaded relations, checked relation expressions, modifiers and `Model.ref()` columns, typed `fn`/`ref` results, and a simpler custom query builder setup. |
 
+## Compared with objection.js 3.1.5
+
+Every pull request is checked against objection.js 3.1.5: the [benchmark scenarios](https://github.com/abedmurrar/objection.js/tree/main/bench#compared-with-objectionjs-315) run on both on postgres, MySQL and SQLite, and the SQL, the bindings and the returned models are compared. Finds, `findById()`, eager loading with `withGraphFetched()` and `withGraphJoined()`, deletes, `toJSON()`, validation and transactions generate the same SQL and results as 3.1.5. The scenarios that differ, on purpose:
+
+- **`orWhere()` through a relation** is grouped, so it can't match the rows of other owners. See [`orWhere` no longer escapes the conditions objection adds](./breaking-changes.md#orwhere-no-longer-escapes-the-conditions-objection-adds).
+- **Batch inserts** (`insert([...])`) work on MySQL and SQLite, where 3.1.5 throws. `insertGraph()` and `upsertGraph()` on MySQL insert the new rows of a table together, instead of one query per row. See [batch inserts](./mysql.md#batch-inserts).
+- **Expression methods** like `ref('age').gte(18)` are new. See [expressions](./expressions.md#expression-methods).
+
+A difference that isn't on this list fails the check.
+
 The [changelog](../release-notes/changelog.md) lists each change per release. The [migration guide](../release-notes/migration.md) has before and after examples for upgrading TypeScript code.

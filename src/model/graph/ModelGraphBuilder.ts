@@ -262,15 +262,7 @@ function forEachMatch(regex: RegExp, str: string, cb: (match: RegExpExecArray) =
 }
 
 function createReferenceNotFoundError(ref: unknown): Error {
-  return new Error(
-    [
-      `could not resolve reference ${ref} in a graph.`,
-      `If you are sure the #id exist in the same graph,`,
-      `this may be due to a limitation that a subgraph under a related item`,
-      `cannot reference an item in a subgraph under another related item.`,
-      `If you run into this limitation, please open an issue in objection github.`,
-    ].join(' '),
-  );
+  return new Error(`could not resolve reference ${ref} in a graph: no model in it has that #id.`);
 }
 
 function createNotModelError(modelClass: ModelClass, value: unknown): Error {

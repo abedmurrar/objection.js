@@ -75,9 +75,15 @@ class GraphData {
   declare currentGraph: Graph;
   declare graphOptions: GraphOptions;
   declare nodeDbExistence: GraphNodeDbExistence;
+  // The nodes of `graph` before `upsertGraph()` removes the branches that need
+  // no operations, or that a recursive `upsertGraph()` writes. References into
+  // those branches are resolved with these.
+  declare nodesBeforePruning: GraphNode[];
 
   constructor({ graph, currentGraph, graphOptions, nodeDbExistence }: GraphDataOptions) {
     this.graph = graph;
+    // Pruning replaces `graph.nodes` with a new array, so this one stays whole.
+    this.nodesBeforePruning = graph.nodes;
     this.currentGraph = currentGraph;
     this.graphOptions = graphOptions;
     this.nodeDbExistence = nodeDbExistence;

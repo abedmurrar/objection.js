@@ -1,6 +1,6 @@
 {
   "name": "@abedmurrar/objection",
-  "version": "4.4.1",
+  "version": "4.4.3",
   "description": "A fast, strictly typed SQL ORM for Node.js and TypeScript, built on knex: models, relations, eager loading, graph upserts and transactions on Postgres, MySQL, MariaDB and SQLite. A maintained fork of objection.js.",
   "main": "lib/objection.js",
   "type": "commonjs",
@@ -44,6 +44,7 @@
     "release": "node scripts/release.js",
     "prepublishOnly": "npm run build && npm run lint && npm run test:typings",
     "sql-check": "npm run build && node bench/sql-check.js",
+    "sql-check:upstream": "npm run build && npm install --no-save --no-package-lock --prefix .upstream objection@3.1.5 && node bench/sql-check.js --baseline .upstream/node_modules/objection --expected bench/upstream-differences.json",
     "stress:graph": "npm run build && node bench/stress-graph-writes.js"
   },
   "publishConfig": {
