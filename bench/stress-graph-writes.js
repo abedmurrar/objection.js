@@ -1,9 +1,10 @@
 'use strict';
 
 // Runs many upsertGraph() calls at once, without a transaction, on MySQL and
-// MariaDB, and fails on any deadlock, lock wait timeout or wrong result. It
-// repeats the test of the 4.2.2 fix, which deleted the many-to-many rows of
-// upsertGraph() by id: before it, 62 of 9,600 calls deadlocked.
+// MariaDB, and fails on a deadlock or lock wait timeout between calls that
+// write different rows, and on any wrong result or other error. It repeats the
+// test of the 4.2.2 fix, which deleted the many-to-many rows of upsertGraph()
+// by id: before it, such calls deadlocked.
 //
 //   npm run stress:graph
 //   node bench/stress-graph-writes.js --rounds 3 --databases mysql
@@ -16,6 +17,12 @@
 // and unrelated for odd ones. Every combination of database, foreign keys on
 // the join table, the shared item and the concurrency of the graph writes runs.
 // The databases are those of docker-compose.yml, as root without a password.
+//
+// With the shared item, the calls write the same rows: even owners delete it,
+// which with foreign keys deletes its join rows, while odd owners unrelate it.
+// Writes of the same rows can deadlock with any queries (see "Graph operations
+// run 4 queries at a time" in doc/fork/mysql.md), so those deadlocks are
+// counted, but don't fail the test.
 
 const path = require('node:path');
 const knexFactory = require('knex');
@@ -35,6 +42,7 @@ const { Model } = require(path.resolve(opt.lib));
 
 async function main() {
   const totals = { calls: 0, deadlocks: 0, lockWaits: 0, otherErrors: 0, wrongResults: 0 };
+  let failingLocks = 0;
 
   for (const database of opt.databases.split(',')) {
     for (const fk of [false, true]) {
@@ -45,16 +53,21 @@ async function main() {
           for (const key of Object.keys(totals)) {
             totals[key] += result[key];
           }
+
+          if (!shared) {
+            failingLocks += result.deadlocks + result.lockWaits;
+          }
         }
       }
     }
   }
 
-  const failed = totals.deadlocks + totals.lockWaits + totals.otherErrors + totals.wrongResults > 0;
+  const failed = failingLocks + totals.otherErrors + totals.wrongResults > 0;
 
   console.log(
     `\n${totals.calls} calls: ${totals.deadlocks} deadlocks, ${totals.lockWaits} lock wait timeouts, ` +
-      `${totals.otherErrors} other errors, ${totals.wrongResults} rounds with wrong results`,
+      `${totals.otherErrors} other errors, ${totals.wrongResults} rounds with wrong results. ` +
+      `${failingLocks} of the deadlocks and lock waits were between calls that write different rows.`,
   );
 
   process.exitCode = failed ? 1 : 0;
@@ -133,10 +146,10 @@ async function runConfig({ database, fk, shared, concurrency }) {
     await knex.destroy();
   }
 
-  const failed = result.calls - result.deadlocks - result.lockWaits - result.otherErrors;
+  const ok = result.calls - result.deadlocks - result.lockWaits - result.otherErrors;
   console.log(
     `${database.padEnd(9)} fk ${fk ? 'yes' : 'no '}  shared ${shared ? 'yes' : 'no '}  ` +
-      `concurrency ${concurrency}: ${failed}/${result.calls} ok, ${result.deadlocks} deadlocks, ` +
+      `concurrency ${concurrency}: ${ok}/${result.calls} ok, ${result.deadlocks} deadlocks, ` +
       `${result.lockWaits} lock waits, ${result.otherErrors} other, ${result.wrongResults} wrong rounds`,
   );
 
