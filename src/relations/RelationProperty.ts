@@ -1,11 +1,8 @@
 import { asArray, isObject, uniqBy, get, set } from '../utils/objectUtils';
 import { ref as createRef } from '../queryBuilder/ReferenceBuilder';
 import { propToStr, PROP_KEY_PREFIX } from '../model/modelValues';
-import type { ReferenceBuilder as ReferenceBuilderClass } from '../queryBuilder/ReferenceBuilder';
+import type { ReferenceBuilder } from '../queryBuilder/ReferenceBuilder';
 import type { RelationModelClass, RelationQueryBuilder } from './Relation';
-
-// The still-JavaScript ReferenceBuilder class is only a value to TypeScript.
-export type ReferenceBuilder = InstanceType<typeof ReferenceBuilderClass>;
 
 // An object that holds the property values: a model, a plain object such as
 // a join table row or a patch.

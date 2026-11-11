@@ -16,19 +16,10 @@ import type {
   Relation,
 } from '../types';
 import type { RelationFindOperation } from '../../../relations/RelationFindOperation';
-
-// A `RelationExpression`, which is still JavaScript.
-interface ChildExpression {
-  node: { $name: string | null; $modify: string[] };
-  forEachChildExpression(
-    modelClass: ModelClass,
-    // `relation` is only null for a recursive relation that doesn't exist.
-    cb: (childExpression: ChildExpression, relation: Relation | null) => void,
-  ): void;
-}
+import type { RelationExpression } from '../../RelationExpression';
 
 interface RelationToFetch {
-  childExpression: ChildExpression;
+  childExpression: RelationExpression;
   relation: Relation;
 }
 
@@ -124,7 +115,7 @@ class WhereInEagerOperation extends EagerOperation {
     builder: QueryBuilder,
     models: Model[],
     relation: Relation,
-    expr: ChildExpression,
+    expr: RelationExpression,
   ): Promise<unknown[]> {
     const modelClass = builder.resultModelClass();
     const batchSize = this.batchSize(builder.knex());
@@ -145,7 +136,7 @@ class WhereInEagerOperation extends EagerOperation {
     builder: QueryBuilder,
     models: Model[],
     relation: Relation,
-    expr: ChildExpression,
+    expr: RelationExpression,
   ): QueryBuilder | PromiseLike<unknown> {
     if (this.shouldSkipFetched(models, relation, expr)) {
       return this.createSkippedQuery(builder, models, relation, expr);
@@ -197,7 +188,7 @@ class WhereInEagerOperation extends EagerOperation {
     }
   }
 
-  shouldSkipFetched(models: Model[], relation: Relation, expr: ChildExpression): boolean {
+  shouldSkipFetched(models: Model[], relation: Relation, expr: RelationExpression): boolean {
     if (!this.graphOptions.skipFetched) {
       return false;
     }
@@ -233,7 +224,7 @@ class WhereInEagerOperation extends EagerOperation {
     builder: QueryBuilder,
     models: Model[],
     relation: Relation,
-    expr: ChildExpression,
+    expr: RelationExpression,
   ): QueryBuilder {
     const childModels = getRelatedModels(models, expr);
 
@@ -248,7 +239,7 @@ class WhereInEagerOperation extends EagerOperation {
   createRelationQuery(
     builder: QueryBuilder,
     relation: Relation,
-    expr: ChildExpression,
+    expr: RelationExpression,
   ): QueryBuilder {
     return relation.relatedModelClass
       .query()
@@ -269,7 +260,7 @@ class WhereInEagerOperation extends EagerOperation {
 
 function findRelationsToFetch(
   modelClass: ModelClass,
-  eagerExpression: ChildExpression,
+  eagerExpression: RelationExpression,
 ): RelationToFetch[] {
   const relationsToFetch: RelationToFetch[] = [];
 
@@ -323,7 +314,7 @@ function findRelationPropsToSelect(
   };
 }
 
-function getRelatedModels(models: Model[], expr: ChildExpression): Model[] {
+function getRelatedModels(models: Model[], expr: RelationExpression): Model[] {
   const allRelated: Model[] = [];
 
   for (const model of models) {

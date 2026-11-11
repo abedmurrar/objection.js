@@ -4,11 +4,8 @@ import { JoinedStaticHookArguments, hasStaticHook } from '../../StaticHookArgume
 import { asArray } from '../../../utils/objectUtils';
 import type { Model, OperationOptions, QueryBuilder } from '../types';
 
-// `RelationJoiner` is still JavaScript, exported as a value only.
-type RelationJoinerInstance = InstanceType<typeof RelationJoiner>;
-
 class JoinEagerOperation extends EagerOperation {
-  declare joiner: RelationJoinerInstance | null;
+  declare joiner: RelationJoiner | null;
   // The root models that the joined rows were parsed into.
   declare models: unknown;
 
