@@ -8,7 +8,10 @@
 //   node bench/count.js --baseline ../objection-main --max-change 1
 //
 // With `--max-change`, it exits with 1 when a scenario executes more than that
-// many percent more instructions than in the baseline.
+// many percent more instructions than in the baseline. A scenario over the
+// limit is measured twice more, and only fails if the median of the three is
+// still over it: when the garbage collector runs moves single counts of
+// scenarios that allocate a lot by up to about 1%.
 //
 // `--counter valgrind` counts with valgrind's cachegrind instead of perf, for
 // machines without hardware counters, like GitHub's runners. Counts of the
@@ -150,7 +153,15 @@ async function measure(testCase) {
   const before = await perOp(testCase, opt.baseline, iterations);
   const after = await perOp(testCase, opt.lib, iterations);
   console.error(`${testCase.name}: ${format(before)} -> ${format(after)} instructions/op`);
-  return { name: testCase.name, before, after };
+  return { testCase, name: testCase.name, before, after };
+}
+
+function changeOf({ before, after }) {
+  return ((after - before) / before) * 100;
+}
+
+function limitOf({ name }) {
+  return MAX_CHANGE_OVERRIDES[name] ?? Number(opt.maxChange);
 }
 
 // Runs `fn` for every item, at most `limit` at a time, keeping the order.
@@ -172,12 +183,25 @@ async function mapLimit(items, limit, fn) {
 async function main() {
   const cases = listCases(opt.filter ? new RegExp(opt.filter) : null);
   const results = await mapLimit(cases, Math.max(1, opt.jobs), measure);
+
+  if (opt.maxChange !== '') {
+    const overLimit = results.filter((result) => changeOf(result) > limitOf(result));
+
+    await mapLimit(overLimit, Math.max(1, opt.jobs), async (result) => {
+      console.error(`${result.name}: over the limit, measuring twice more`);
+      const more = [await measure(result.testCase), await measure(result.testCase)];
+      result.before = median([result.before, ...more.map((it) => it.before)]);
+      result.after = median([result.after, ...more.map((it) => it.after)]);
+    });
+  }
+
   const rows = [];
   const tooSlow = [];
 
-  for (const { name, before, after } of results) {
-    const change = ((after - before) / before) * 100;
-    const limit = MAX_CHANGE_OVERRIDES[name] ?? Number(opt.maxChange);
+  for (const result of results) {
+    const { name, before, after } = result;
+    const change = changeOf(result);
+    const limit = limitOf(result);
 
     if (opt.maxChange !== '' && change > limit) {
       tooSlow.push(`${name}: +${change.toFixed(1)}% (limit ${limit}%)`);
