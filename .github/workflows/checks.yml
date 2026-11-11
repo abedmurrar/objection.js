@@ -1,0 +1,62 @@
+name: checks
+
+# Compares a pull request with the commit it's merged into: the SQL it
+# generates, the size of its types, and the CPU instructions per operation.
+# See "Checks on pull requests" in doc/guide/contributing.md.
+
+on:
+  pull_request:
+    branches: [main]
+    # Labels change whether a SQL difference fails the check.
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+jobs:
+  compare-with-main:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Use Node.js 24
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.x
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build the pull request and main
+        run: |
+          # The checkout is the pull request merged into main, whose first parent
+          # is main. The baseline's path has the same length as this one's.
+          baseline="$(dirname "$PWD")/$(basename "$PWD" | sed 's/./b/g')"
+          git worktree add "$baseline" HEAD^1
+          ln -s "$PWD/node_modules" "$baseline/node_modules"
+          (cd "$baseline" && npm run build)
+          npm run build
+          echo "BASELINE=$baseline" >> "$GITHUB_ENV"
+
+      - name: Compare the SQL with main
+        # Add the sql-change label to a pull request that changes SQL on purpose.
+        continue-on-error: ${{ contains(github.event.pull_request.labels.*.name, 'sql-change') }}
+        run: node bench/sql-check.js --baseline "$BASELINE"
+
+      - name: Compare the size of the types with the baseline
+        run: node scripts/typings-bench.js --check
+
+      - name: Install valgrind
+        # GitHub's runners don't expose the hardware counters that perf needs.
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq valgrind
+
+      - name: Compare the CPU instructions per operation with main
+        # Only the scenarios on the mocked knex: their counts repeat within 0.2%.
+        # The SQLite scenarios run SQLite's threads, and the "1 ms per query"
+        # ones real timers, so their counts vary by several percent between runs.
+        run: >
+          node bench/count.js --baseline "$BASELINE" --max-change 1
+          --counter valgrind --runs 1 --target 3e8 --jobs "$(nproc)"
+          --filter '^(?!sqlite:)(?!.*1 ms per query)'
