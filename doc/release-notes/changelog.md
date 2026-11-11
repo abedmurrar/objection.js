@@ -8,6 +8,14 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 - On MySQL and MariaDB, an `upsertGraph()` without a transaction could deadlock with itself when it unrelated the many-to-many rows of several parents, for example a tag removed from two posts. It ran one unrelate per parent, 4 at a time, and each locked a range of the join table's key. On MariaDB 10.6, 109 of 300 such calls failed with `ER_LOCK_DEADLOCK`, with no other query running. The unrelates of a relation are now one query for all parents, which deletes the join rows by their (owner, related) pairs: 0 of 300, and faster, since it's one round trip (one tag unrelated from each of 20 owners, median of 30 calls in three runs: 31.7–35.2 → 5.8–5.9 ms on MySQL 8.4, 11.1–11.8 → 3.5–3.6 ms on MariaDB 10.6). An unrelate of one parent's rows keeps its query. Where one query wouldn't be the same as the queries it replaces (relations with a `modify` filter, join models with static `beforeDelete` or `afterDelete` hooks), the queries of a relation run one at a time instead, like its many-to-many deletes. Found by the new random graph tests.
 
+## 4.4.2 (2026-11-11)
+
+### Fixes
+
+- In `upsertGraph()` with `relate: true`, a related model that has relations of its own is upserted with them by a separate `upsertGraph()` call, after the rest of the graph. A `#ref` or `#ref{}` from the graph of one such model to a model in another one's graph threw `could not resolve reference`, because the calls ran at the same time and couldn't see each other's models. The calls now run in the order of their references, and the reference gets the written model, with its id. Calls without references between them still run at the same time. A cycle of references throws `the object graph contains cyclic references` before anything is written.
+- A `#ref` from the rest of the graph to a model inside such a graph threw `TypeError: Cannot read properties of null (reading 'obj')`, after the deletes, inserts and patches before it had run. It can't work, since the rest of the graph is written first, so it now throws a `ValidationError` that says so, before anything is written.
+- The `could not resolve reference` error no longer mentions that limitation, which is gone.
+
 ## 4.4.1 (2026-11-11)
 
 ### Internal

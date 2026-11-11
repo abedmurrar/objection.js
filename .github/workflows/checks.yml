@@ -43,6 +43,14 @@ jobs:
         continue-on-error: ${{ contains(github.event.pull_request.labels.*.name, 'sql-change') }}
         run: node bench/sql-check.js --baseline "$BASELINE"
 
+      - name: Compare the SQL with objection.js 3.1.5
+        # The differences from 3.1.5 that are on purpose are listed, with their
+        # reasons, in bench/upstream-differences.json. The sql-change label
+        # doesn't apply: a new difference goes in that list.
+        run: |
+          npm install --no-save --no-package-lock --prefix .upstream objection@3.1.5
+          node bench/sql-check.js --baseline .upstream/node_modules/objection --expected bench/upstream-differences.json
+
       - name: Compare the size of the types with the baseline
         run: node scripts/typings-bench.js --check
 

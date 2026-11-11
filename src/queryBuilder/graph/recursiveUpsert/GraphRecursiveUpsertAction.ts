@@ -7,71 +7,171 @@ import type { QueryBuilder } from '../../QueryBuilder';
 import type { ModelClass } from '../../QueryBuilderOperationSupport';
 import type { GraphOptionsInput } from '../GraphOptions';
 
+// The related models of one relation of one parent, which one recursive
+// `upsertGraph()` writes, with the nodes of their graphs.
+interface UpsertGroup {
+  nodes: GraphNode[];
+  graphNodes: Set<GraphNode> | null;
+}
+
 class GraphRecursiveUpsertAction extends GraphAction {
   declare nodes: GraphNode[];
+  declare waves: UpsertGroup[][];
 
   constructor(graphData: GraphData, { nodes }: { nodes: GraphNode[] }) {
     super(graphData);
     // Nodes to upsert.
     this.nodes = nodes;
+    // Computed before anything is written, so that a cycle throws first.
+    this.waves = this._orderGroups(this._groupNodes(nodes));
   }
 
+  // The groups of a wave run at the same time. A group whose graph refers to a
+  // model in another group's graph runs in a later wave, after that model is
+  // written.
   run(builder: QueryBuilder): PromiseLike<unknown> {
-    const builders = this._createUpsertBuilders(builder, this.nodes);
+    const concurrency = this._getConcurrency(builder, this.nodes);
 
-    return promiseUtils.map(builders, (builder: QueryBuilder) => builder.execute(), {
-      concurrency: this._getConcurrency(builder, this.nodes),
-    });
+    return this.waves.reduce<PromiseLike<unknown>>(
+      (promise, wave) =>
+        promise.then(() =>
+          promiseUtils.map(wave, (group) => this._createUpsertBuilder(builder, group).execute(), {
+            concurrency,
+          }),
+        ),
+      Promise.resolve(),
+    );
   }
 
-  _createUpsertBuilders(parentBuilder: QueryBuilder, nodesToUpsert: GraphNode[]): QueryBuilder[] {
-    const nodesByRelation = groupBy(nodesToUpsert, getRelation);
-    const builders: QueryBuilder[] = [];
+  _groupNodes(nodesToUpsert: GraphNode[]): UpsertGroup[] {
+    const groups: UpsertGroup[] = [];
 
-    nodesByRelation.forEach((nodes) => {
-      const nodesByParent = groupBy(nodes, getParent);
-
-      nodesByParent.forEach((nodes) => {
-        for (const node of nodes) {
-          this._resolveReferences(node);
-          node.userData.upserted = true;
-        }
-
-        builders.push(
-          nodes[0].modelClass
-            .query()
-            .childQueryOf(parentBuilder)
-            .copyFrom(parentBuilder, GraphAction.ReturningAllSelector)
-            .upsertGraph(
-              nodes.map((node) => node.obj),
-              // `GraphOptions` also takes a `GraphOptions` as its options.
-              this.graphOptions.rebasedOptions(nodes[0]) as unknown as GraphOptionsInput,
-            ),
-        );
+    groupBy(nodesToUpsert, getRelation).forEach((nodes) => {
+      groupBy(nodes, getParent).forEach((nodes) => {
+        groups.push({ nodes, graphNodes: null });
       });
     });
 
-    return builders;
+    return groups;
+  }
+
+  _orderGroups(groups: UpsertGroup[]): UpsertGroup[][] {
+    // Without `allowRefs`, a graph can't have references.
+    if (groups.length < 2 || !this.graphOptions.allowRefs()) {
+      return [groups];
+    }
+
+    // The branches of the related nodes are removed from `this.graph`, with the
+    // edges from the related nodes into them, so their nodes are found through
+    // their models.
+    const nodeByObj = new Map(this.graphData.nodesBeforePruning.map((node) => [node.obj, node]));
+    const groupByNode = new Map<GraphNode, UpsertGroup>();
+
+    for (const group of groups) {
+      group.graphNodes = new Set();
+
+      for (const node of group.nodes) {
+        node.obj.$traverse((obj: GraphModel) => {
+          const graphNode = nodeByObj.get(obj);
+
+          if (graphNode) {
+            group.graphNodes!.add(graphNode);
+            groupByNode.set(graphNode, group);
+          }
+        });
+      }
+    }
+
+    const dependencies = new Map<UpsertGroup, Set<UpsertGroup>>();
+
+    for (const group of groups) {
+      const groupDependencies = new Set<UpsertGroup>();
+
+      for (const node of group.graphNodes!) {
+        for (const edge of node.refEdges) {
+          const referencedGroup = edge.isOwnerNode(node) && groupByNode.get(edge.relatedNode);
+
+          if (referencedGroup && referencedGroup !== group) {
+            groupDependencies.add(referencedGroup);
+          }
+        }
+      }
+
+      dependencies.set(group, groupDependencies);
+    }
+
+    const waves: UpsertGroup[][] = [];
+    const done = new Set<UpsertGroup>();
+    let remaining = groups;
+
+    while (remaining.length) {
+      const wave = remaining.filter((group) =>
+        [...dependencies.get(group)!].every((it) => done.has(it)),
+      );
+
+      if (!wave.length) {
+        throw new Error('the object graph contains cyclic references');
+      }
+
+      for (const group of wave) {
+        done.add(group);
+      }
+
+      remaining = remaining.filter((group) => !done.has(group));
+      waves.push(wave);
+    }
+
+    return waves;
+  }
+
+  _createUpsertBuilder(
+    parentBuilder: QueryBuilder,
+    { nodes, graphNodes }: UpsertGroup,
+  ): QueryBuilder {
+    for (const node of nodes) {
+      this._resolveSubgraphReferences(node, graphNodes);
+    }
+
+    return nodes[0].modelClass
+      .query()
+      .childQueryOf(parentBuilder)
+      .copyFrom(parentBuilder, GraphAction.ReturningAllSelector)
+      .upsertGraph(
+        nodes.map((node) => node.obj),
+        // `GraphOptions` also takes a `GraphOptions` as its options.
+        this.graphOptions.rebasedOptions(nodes[0]) as unknown as GraphOptionsInput,
+      );
   }
 
   /**
    * The nodes inside the subgraph we are about to recursively upsert may
    * have references outside that graph that won't be available during the
-   * recursive upsertGraph call. This method resolves the references.
-   *
-   * TODO: This doesn't work if a recursively upserted node refers to
-   *       a node inside another recursively upsertable graph.
+   * recursive upsertGraph call: to the rest of the graph, or to the graph of
+   * another related model, which an earlier wave wrote. This method resolves
+   * them. References inside the subgraph are left to the recursive call.
    */
-  _resolveReferences(node: GraphNode): void {
-    node.obj.$traverse((obj: GraphModel) => this._resolveReferencesForObject(obj));
+  _resolveSubgraphReferences(node: GraphNode, ownNodes: Set<GraphNode> | null): void {
+    node.obj.$traverse((obj: GraphModel) => this._resolveReferencesForObject(obj, ownNodes));
   }
 
-  _resolveReferencesForObject(obj: GraphModel): void {
-    this._resolveObjectReference(obj);
-    this._resolvePropertyReferences(obj);
+  // The node a reference from the subgraph refers to, if it's outside it.
+  // `ownNodes` is null when there is only one subgraph, or no references: then
+  // only the rest of the graph, without the subgraph, can be referred to.
+  _findReferencedNode(ref: unknown, ownNodes: Set<GraphNode> | null): GraphNode | undefined {
+    if (!ownNodes) {
+      return this.graph.nodes.find((it) => it.uid === ref);
+    }
+
+    const node = this.graphData.nodesBeforePruning.find((it) => it.uid === ref);
+    return node && !ownNodes.has(node) ? node : undefined;
   }
 
-  _resolveObjectReference(obj: GraphModel): void {
+  _resolveReferencesForObject(obj: GraphModel, ownNodes: Set<GraphNode> | null): void {
+    this._resolveObjectReference(obj, ownNodes);
+    this._resolvePropertyReferences(obj, ownNodes);
+  }
+
+  _resolveObjectReference(obj: GraphModel, ownNodes: Set<GraphNode> | null): void {
     const modelClass = obj.constructor as ModelClass;
     const ref = obj[modelClass.uidRefProp];
 
@@ -79,7 +179,7 @@ class GraphRecursiveUpsertAction extends GraphAction {
       return;
     }
 
-    const referencedNode = this.graph.nodes.find((it) => it.uid === ref);
+    const referencedNode = this._findReferencedNode(ref, ownNodes);
 
     if (!referencedNode) {
       return;
@@ -98,7 +198,7 @@ class GraphRecursiveUpsertAction extends GraphAction {
     delete obj[modelClass.uidRefProp];
   }
 
-  _resolvePropertyReferences(obj: GraphModel): void {
+  _resolvePropertyReferences(obj: GraphModel, ownNodes: Set<GraphNode> | null): void {
     forEachPropertyReference(
       obj,
       ({
@@ -112,7 +212,7 @@ class GraphRecursiveUpsertAction extends GraphAction {
         ref: unknown;
         refPath: string[];
       }) => {
-        const referencedNode = this.graph.nodes.find((it) => it.uid === ref);
+        const referencedNode = this._findReferencedNode(ref, ownNodes);
 
         if (!referencedNode) {
           return;

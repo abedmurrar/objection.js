@@ -1135,6 +1135,8 @@ The [upsertGraph](/api/query-builder/mutate-methods.html#upsertgraph) method wor
 
 [upsertGraph](/api/query-builder/mutate-methods.html#upsertgraph) uses [insertGraph](/api/query-builder/mutate-methods.html#insertgraph) under the hood for inserts. That means that you can insert object graphs for relations and use all [insertGraph](/api/query-builder/mutate-methods.html#insertgraph) features like `#ref` references.
 
+With `relate: true`, a related model that has relations of its own is upserted with them by a separate [upsertGraph](/api/query-builder/mutate-methods.html#upsertgraph) call, after the rest of the graph. The graphs of two such models can refer to each other with `#ref` and `#ref{}`: the one that refers to the other is upserted after it. The rest of the graph can't refer to a model inside them, since it's written first: that is rejected with a `ValidationError` before anything is written.
+
 [upsertGraph](/api/query-builder/mutate-methods.html#upsertgraph) operation is **not** atomic by default! You need to start a transaction and pass it to the query using any of the supported ways. See the section about [transactions](/guide/transactions.html) for more information.
 
 See the [allowGraph](/api/query-builder/eager-methods.html#allowgraph) method if you need to limit which relations can be modified using [upsertGraph](/api/query-builder/mutate-methods.html#upsertgraph) method to avoid security issues.

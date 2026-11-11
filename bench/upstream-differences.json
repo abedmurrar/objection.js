@@ -1,0 +1,41 @@
+[
+  {
+    "scenario": "build: expressions",
+    "reason": "uses the expression methods the fork adds (gte(), eq(), and(), between(), plus()), which objection.js 3.1.5 doesn't have",
+    "link": "doc/fork/expressions.md#expression-methods"
+  },
+  {
+    "scenario": "build: $relatedQuery with orWhere",
+    "reason": "the user's where clauses are grouped, so that orWhere() doesn't escape the relation's own conditions",
+    "link": "doc/fork/breaking-changes.md#orwhere-no-longer-escapes-the-conditions-objection-adds"
+  },
+  {
+    "scenario": "write: batch insert 100 rows",
+    "client": "mysql2",
+    "reason": "insert([...]) works on MySQL, in one query; 3.1.5 throws 'batch insert only works with Postgresql and SQL Server'",
+    "link": "doc/fork/mysql.md#batch-inserts"
+  },
+  {
+    "scenario": "write: batch insert 100 rows",
+    "client": "sqlite3",
+    "reason": "insert([...]) works on SQLite, in one query; 3.1.5 throws 'batch insert only works with Postgresql and SQL Server'",
+    "link": "doc/fork/mysql.md#batch-inserts"
+  },
+  {
+    "scenario": "write: insertGraph 50 persons with pets (validated)",
+    "client": "mysql2",
+    "reason": "graph inserts on MySQL insert the new rows of a table together, instead of one query per row",
+    "link": "doc/fork/mysql.md#batch-inserts"
+  },
+  {
+    "scenario": "write: upsertGraph 20 persons with pets",
+    "client": "mysql2",
+    "reason": "the new rows of upsertGraph() on MySQL are inserted together, instead of one query per row; the selects, updates and deletes are the same",
+    "link": "doc/fork/mysql.md#batch-inserts"
+  },
+  {
+    "scenario": "write: upsertGraph 20 persons with pets on MySQL, 1 ms per query",
+    "reason": "runs on MySQL with every client: the new rows of upsertGraph() are inserted together, instead of one query per row; the selects, updates and deletes are the same",
+    "link": "doc/fork/mysql.md#batch-inserts"
+  }
+]

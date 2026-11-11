@@ -3452,6 +3452,164 @@ module.exports = (session) => {
               );
             });
         });
+
+        it('references between two recursively upserted graphs should work', async () => {
+          // Both related models have relations, so each gets its own recursive
+          // upsertGraph(): one through model1Relation2, one through
+          // model1Relation3. The second refers to a model the first inserts.
+          const upsert = {
+            id: 5,
+
+            model1Relation2: [
+              {
+                idCol: 1,
+                model2Relation2: {
+                  '#id': 'new',
+                  model1Prop1: 'new',
+                },
+              },
+            ],
+
+            model1Relation3: [
+              {
+                idCol: 2,
+                model2Relation2: {
+                  '#ref': 'new',
+                },
+              },
+            ],
+          };
+
+          const result = await Model1.query(session.knex).upsertGraph(upsert, {
+            relate: true,
+            allowRefs: true,
+            fetchStrategy,
+          });
+
+          const inserted = result.model1Relation2[0].model2Relation2;
+          expect(inserted.model1Prop1).to.equal('new');
+          expect(result.model1Relation3[0].model2Relation2.id).to.equal(inserted.id);
+
+          const fetched = await Model1.query(session.knex)
+            .findById(5)
+            .withGraphFetched('[model1Relation2.model2Relation2, model1Relation3.model2Relation2]');
+
+          expect(fetched.model1Relation2.map((it) => it.idCol)).to.eql([1]);
+          expect(fetched.model1Relation3.map((it) => it.idCol)).to.eql([2]);
+          expect(fetched.model1Relation2[0].model2Relation2.id).to.equal(inserted.id);
+          expect(fetched.model1Relation3[0].model2Relation2.id).to.equal(inserted.id);
+          expect(await session.knex('Model1').where('model1Prop1', 'new')).to.have.length(1);
+        });
+
+        it('property references between two recursively upserted graphs should work', async () => {
+          const upsert = {
+            id: 5,
+
+            model1Relation2: [
+              {
+                idCol: 1,
+                model2Relation2: {
+                  '#id': 'new',
+                  model1Prop1: 'new',
+                },
+              },
+            ],
+
+            model1Relation3: [
+              {
+                idCol: 2,
+                model2Relation2: {
+                  model1Prop1: 'copy of #ref{new.model1Prop1}',
+                },
+              },
+            ],
+          };
+
+          const result = await Model1.query(session.knex).upsertGraph(upsert, {
+            relate: true,
+            allowRefs: true,
+            fetchStrategy,
+          });
+
+          expect(result.model1Relation3[0].model2Relation2.model1Prop1).to.equal('copy of new');
+
+          const fetched = await Model1.query(session.knex)
+            .findById(5)
+            .withGraphFetched('model1Relation3.model2Relation2');
+
+          expect(fetched.model1Relation3[0].model2Relation2.model1Prop1).to.equal('copy of new');
+        });
+
+        it('cyclic references between two recursively upserted graphs should fail before writing', async () => {
+          const upsert = {
+            id: 5,
+
+            model1Relation2: [
+              {
+                idCol: 1,
+                model2Relation2: {
+                  '#id': 'a',
+                  model1Prop1: 'a of #ref{b.model1Prop2}',
+                  model1Prop2: 1,
+                },
+              },
+            ],
+
+            model1Relation3: [
+              {
+                idCol: 2,
+                model2Relation2: {
+                  '#id': 'b',
+                  model1Prop1: 'b of #ref{a.model1Prop2}',
+                  model1Prop2: 2,
+                },
+              },
+            ],
+          };
+
+          const err = await Model1.query(session.knex)
+            .upsertGraph(upsert, { relate: true, allowRefs: true, fetchStrategy })
+            .catch((err) => err);
+
+          expect(err.message).to.equal('the object graph contains cyclic references');
+          expect((await session.knex('model2').where('id_col', 1))[0].model1_id).to.equal(null);
+          expect(await session.knex('Model1Model2').where('model1Id', 5)).to.have.length(0);
+        });
+
+        it('references from the parent graph into a recursively upserted graph should fail before writing', async () => {
+          // model1Relation1 is written by the outer upsertGraph(), before the
+          // recursive upsertGraph() of model1Relation2 inserts what it refers to.
+          const upsert = {
+            id: 5,
+
+            model1Relation1: {
+              '#ref': 'new',
+            },
+
+            model1Relation2: [
+              {
+                idCol: 1,
+                model2Relation2: {
+                  '#id': 'new',
+                  model1Prop1: 'new',
+                },
+              },
+            ],
+          };
+
+          const err = await Model1.query(session.knex)
+            .upsertGraph(upsert, { relate: true, allowRefs: true, fetchStrategy })
+            .catch((err) => err);
+
+          expect(err).to.be.a(ValidationError);
+          expect(err.type).to.equal('InvalidGraph');
+          expect(err.message).to.contain('could not resolve reference new at model1Relation1');
+
+          const root = await Model1.query(session.knex).findById(5);
+          expect(root.model1Id).to.equal(null);
+          expect(await session.knex('Model1').where('model1Prop1', 'new')).to.have.length(0);
+          expect((await session.knex('model2').where('id_col', 1))[0].model1_id).to.equal(null);
+        });
       });
 
       describe('validation and transactions', () => {
