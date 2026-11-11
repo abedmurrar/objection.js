@@ -155,14 +155,21 @@ function union<T>(arr1: readonly T[], arr2: readonly T[]): T[] {
   }
 }
 
+// Returns the same as `unionGeneric`: the unique values of both arrays, in the
+// order they are first seen. `includes` compares like a `Set` does (`NaN`
+// equals `NaN`).
 function unionSmall<T>(arr1: readonly T[], arr2: readonly T[]): T[] {
-  const all = arr1.slice();
+  const all: T[] = [];
+
+  for (let i = 0, l = arr1.length; i < l; ++i) {
+    if (!all.includes(arr1[i])) {
+      all.push(arr1[i]);
+    }
+  }
 
   for (let i = 0, l = arr2.length; i < l; ++i) {
-    const item = arr2[i];
-
-    if (all.indexOf(item) === -1) {
-      all.push(item);
+    if (!all.includes(arr2[i])) {
+      all.push(arr2[i]);
     }
   }
 

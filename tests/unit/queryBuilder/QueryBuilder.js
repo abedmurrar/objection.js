@@ -1658,6 +1658,62 @@ describe('QueryBuilder', () => {
       .catch(done);
   });
 
+  it('withGraphFetched() should apply a modifier listed twice once', async () => {
+    let calls = 0;
+
+    class M1 extends Model {
+      static get tableName() {
+        return 'M1';
+      }
+
+      static get modifiers() {
+        return {
+          f(query) {
+            calls++;
+            query.where('M1.x', 1);
+          },
+          g(query) {
+            query.where('M1.y', 2);
+          },
+        };
+      }
+    }
+
+    class M2 extends Model {
+      static get tableName() {
+        return 'M2';
+      }
+
+      static get relationMappings() {
+        return {
+          m1: {
+            relation: Model.HasManyRelation,
+            modelClass: M1,
+            join: {
+              from: 'M2.id',
+              to: 'M1.m2Id',
+            },
+          },
+        };
+      }
+    }
+
+    M1.knex(mockKnex);
+    M2.knex(mockKnex);
+
+    mockKnexQueryResults = [[{ id: 1 }], [], [{ id: 1 }], []];
+    await M2.query().withGraphFetched('m1(f, f)');
+    await M2.query().withGraphFetched('m1(f, f)').withGraphFetched('m1(g)');
+
+    expect(calls).to.equal(2);
+    expect(executedQueries[1]).to.equal(
+      'select "M1".* from "M1" where "M1"."m2Id" in (1) and "M1"."x" = 1',
+    );
+    expect(executedQueries[3]).to.equal(
+      'select "M1".* from "M1" where "M1"."m2Id" in (1) and "M1"."x" = 1 and "M1"."y" = 2',
+    );
+  });
+
   it('undefined values as query builder method arguments should raise an exception', () => {
     expect(() => {
       QueryBuilder.forClass(TestModel).where('id', undefined).toKnexQuery();
