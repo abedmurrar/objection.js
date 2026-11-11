@@ -13,8 +13,8 @@ jobs:
 
     strategy:
       matrix:
-        # Node 24 and 26 are the supported LTS lines.
-        node-version: [24.x, 26.x]
+        # Node 22, 24 and 26 are the maintained LTS lines.
+        node-version: [22.x, 24.x, 26.x]
 
     steps:
       - uses: actions/checkout@v7

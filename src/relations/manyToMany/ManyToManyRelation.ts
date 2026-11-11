@@ -468,8 +468,6 @@ function finalizeJoinModelClass(ctx: MappingContext): MappingContext {
 
 export { ManyToManyRelation };
 
-// Updates and unrelates need dialect specific code on sqlite and mysql, see
-// the `ManyToMany*ModifyMixin` classes.
 // The update, delete and unrelate operations of each database. SQLite and MySQL
 // can't use the correlated subquery of `ManyToManyModifyMixin`, see their
 // mixins. Deletes on MySQL only read the related table, which it allows.

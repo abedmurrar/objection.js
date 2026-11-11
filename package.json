@@ -1,6 +1,6 @@
 {
   "name": "@abedmurrar/objection",
-  "version": "4.3.1",
+  "version": "4.4.1",
   "description": "A fast, strictly typed SQL ORM for Node.js and TypeScript, built on knex: models, relations, eager loading, graph upserts and transactions on Postgres, MySQL, MariaDB and SQLite. A maintained fork of objection.js.",
   "main": "lib/objection.js",
   "type": "commonjs",
@@ -69,7 +69,7 @@
   },
   "homepage": "https://abedmurrar.github.io/objection.js/",
   "engines": {
-    "node": ">=24"
+    "node": ">=22"
   },
   "keywords": [
     "orm",
@@ -119,7 +119,7 @@
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",
     "@biomejs/biome": "2.6.4",
-    "@types/node": "^24.19.2",
+    "@types/node": "^22.20.5",
     "chai": "^6.3.0",
     "chai-subset": "^1.6.0",
     "expect.js": "^0.3.1",

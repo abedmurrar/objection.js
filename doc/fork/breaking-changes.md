@@ -132,9 +132,9 @@ A `static init(self, ...args)` method of a `QueryBuilder`, `Validator` or `AjvVa
 
 package.json has an `exports` map, so `require('@abedmurrar/objection')` and `import ... from '@abedmurrar/objection'` are the only entry points. Imports of files inside the package, like `@abedmurrar/objection/lib/utils/...`, which were never documented, now throw `ERR_PACKAGE_PATH_NOT_EXPORTED`. Everything public is exported from the entry.
 
-## Node.js 24 or newer is required
+## Node.js 22 or newer is required
 
-The fork supports the Node.js versions that are still maintained: 24 and 26, the two current LTS lines. Node.js 20 reached its end of life in April 2026 and 22 is close to it.
+The fork supports the Node.js versions that are still maintained: 22, 24 and 26, and the tests run on all three. Node.js 20 reached its end of life in April 2026. 22 is maintained until April 2027; support for it may be dropped in a minor release after that. Releases 4.0.0 to 4.3.1 required Node.js 24, but ran on 22 as well.
 
 ## MySQL 8.0.17 or newer is required
 

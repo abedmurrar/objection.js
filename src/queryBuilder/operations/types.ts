@@ -1,8 +1,5 @@
-// Internal types for the query builder operations.
-//
-// The model classes are still JavaScript, so these interfaces only describe
-// the parts of them that the operations use. The query builder and the
-// relations are TypeScript, and their types are used here. The public types
+// Internal types for the query builder operations: the model, query builder and
+// relation types they use, and the shapes of their options. The public types
 // are the hand-written ones in `typings/`.
 
 import type { Knex } from 'knex';
@@ -69,7 +66,8 @@ export interface InternalOptions {
   keepImplicitJoinProps: boolean;
 }
 
-// A modifier function or the name of a named modifier.
+// The modifiers of `withGraphFetched()`, `withGraphJoined()` and `modifiers()`,
+// by name.
 export type Modifiers = Record<string, unknown>;
 
 // A model instance and a model class.

@@ -4,6 +4,18 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+## 4.4.1 (2026-11-11)
+
+### Internal
+
+- Removed the type stand-ins left from the move to TypeScript. The operations, the joins and the relation properties use the classes' own types (`GraphUpsert`, `RelationJoiner`, `RelationExpression`, `ReferenceBuilder`, `Model` and `QueryBuilder`) instead of `InstanceType<typeof X>` aliases and interfaces that copied parts of them, and the joins share the `Modifiers` type of the operations. Comments that described removed code are fixed. The compiled JavaScript is the same apart from comments.
+
+## 4.4.0 (2026-11-11)
+
+### What's new
+
+- Node.js 22 is supported again. Nothing in the library needed Node.js 24: the whole test suite passes on Node.js 22, and only one test used `Promise.try()`, which Node.js 22 doesn't have. `engines` now says `>=22`, the tests run on 22, 24 and 26, and `@types/node` stays at 22 so the compiler rejects newer APIs. Node.js 22 is maintained until April 2027; see [Node.js 22 or newer is required](/fork/breaking-changes.md#node-js-22-or-newer-is-required).
+
 ## 4.3.1 (2026-11-10)
 
 ### Fixes

@@ -3,12 +3,9 @@ import { GraphUpsert } from '../graph/GraphUpsert';
 import { RelationFindOperation } from '../../relations/RelationFindOperation';
 import type { Model, OperationOptions, QueryBuilder } from './types';
 
-// `GraphUpsert` is still JavaScript, exported as a value only.
-type GraphUpsertInstance = InstanceType<typeof GraphUpsert>;
-
 class UpsertGraphOperation extends QueryBuilderOperation {
   declare upsertOptions: Record<string, unknown>;
-  declare upsert: GraphUpsertInstance | null;
+  declare upsert: GraphUpsert | null;
 
   constructor(name: string | null, opt: OperationOptions) {
     super(

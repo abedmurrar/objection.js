@@ -2,9 +2,6 @@ import { QueryBuilderOperation } from '../QueryBuilderOperation';
 import { RelationExpression } from '../../RelationExpression';
 import type { GraphOptions, Modifiers, OperationOptions, QueryBuilder } from '../types';
 
-// `RelationExpression` is still JavaScript, exported as a value only.
-type RelationExpressionInstance = InstanceType<typeof RelationExpression>;
-
 // A modifier added with `modifyGraph(path, modifier)`.
 interface ModifierAtPath {
   path: unknown;
@@ -12,7 +9,7 @@ interface ModifierAtPath {
 }
 
 class EagerOperation extends QueryBuilderOperation {
-  declare expression: RelationExpressionInstance;
+  declare expression: RelationExpression;
   declare modifiersAtPath: ModifierAtPath[];
   declare graphOptions: GraphOptions;
 
@@ -24,7 +21,7 @@ class EagerOperation extends QueryBuilderOperation {
     this.graphOptions = this.opt.defaultGraphOptions as GraphOptions;
   }
 
-  buildFinalExpression(): RelationExpressionInstance {
+  buildFinalExpression(): RelationExpression {
     const expression = this.expression.clone();
 
     this.modifiersAtPath.forEach((modifier, i) => {

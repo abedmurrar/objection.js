@@ -1,11 +1,12 @@
 import type { RelationExpression } from '../RelationExpression';
 import { forEachChildExpression } from './utils';
 import { TableNode } from './TableNode';
-import type { JoinModelClass, JoinOptions } from './RelationJoiner';
+import type { JoinOptions } from './RelationJoiner';
+import type { ModelClass } from '../operations/types';
 
 interface TableTreeArgs {
   expression: RelationExpression;
-  rootModelClass: JoinModelClass;
+  rootModelClass: ModelClass;
   rootTableAlias: string;
   options: JoinOptions;
 }
@@ -13,12 +14,12 @@ interface TableTreeArgs {
 // The arguments of `_createNodes()` and the methods it calls.
 interface NodesArgs {
   expression: RelationExpression;
-  modelClass: JoinModelClass;
+  modelClass: ModelClass;
 }
 
 class TableTree {
   declare options: JoinOptions;
-  declare rootModelClass: JoinModelClass;
+  declare rootModelClass: ModelClass;
   declare rootTableAlias: string;
   declare nodes: TableNode[];
   declare nodesByAlias: Map<string, TableNode>;
@@ -86,7 +87,7 @@ class TableTree {
       // full model classes.
       const node = TableNode.create({
         tableTree: this,
-        modelClass: relation!.relatedModelClass as JoinModelClass,
+        modelClass: relation!.relatedModelClass!,
         expression: childExpr,
 
         parentNode,
@@ -97,7 +98,7 @@ class TableTree {
 
       this._createChildNodes({
         expression: childExpr,
-        modelClass: relation!.relatedModelClass as JoinModelClass,
+        modelClass: relation!.relatedModelClass!,
         parentNode: node,
       });
     });

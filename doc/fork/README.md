@@ -25,7 +25,7 @@ Releases are published under npm's `latest` dist-tag. Prereleases, when there ar
 | MySQL      | 8.0.17 or newer (tested on 8.4 with the `mysql2` driver). MySQL 5.7 and older aren't supported       |
 | MariaDB    | 10.6 or newer (tested on 10.6 and 11.4 with the `mariadb` driver). See [MariaDB](./mysql.md#mariadb) |
 | SQLite     | 3.35 or newer for batch inserts, 3.25 or newer for window functions                                  |
-| Node.js    | 24 or newer (24 and 26 are tested)                                                                   |
+| Node.js    | 22 or newer (22, 24 and 26 are tested)                                                               |
 
 ## What the fork adds
 

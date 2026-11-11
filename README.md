@@ -19,7 +19,7 @@ npm install @abedmurrar/objection knex
 - **MySQL and MariaDB as first-class databases**, not only postgres: JSON field expressions, the `whereJson*` methods, batch inserts and an `fn.*` helper for every MySQL 8.4 function. MariaDB 10.6 and 11.4 are tested in CI. See [MySQL and MariaDB](https://abedmurrar.github.io/objection.js/fork/mysql).
 - **Expressions without raw SQL**, like `Pet.ref('age').gte(3)`, `fn.count().filter(...)`, `fn.case()` and window functions. See [Expressions](https://abedmurrar.github.io/objection.js/fork/expressions).
 - **Safer.** JSON field keys are escaped (in objection.js 3.1.5 they allowed SQL injection), an `orWhere()` can no longer match the rows of other relation owners, `for()` is no longer silently ignored, many-to-many `unrelate()` and patches only touch the join rows that match their filters, and with [`useAfterFindInGraphs`](https://abedmurrar.github.io/objection.js/api/model/static-properties#static-useafterfindingraphs) the `afterFind()` filters of related models apply to eager loading too. See [Breaking changes](https://abedmurrar.github.io/objection.js/fork/breaking-changes).
-- **Modern.** Node.js 24+, ES modules and CommonJS from one package, knex 3.3, the knex methods objection didn't have, no lodash and no bluebird, and `npm audit` reports nothing. The source is written in strict TypeScript and compiled with TypeScript 7.
+- **Modern.** Node.js 22+, ES modules and CommonJS from one package, knex 3.3, the knex methods objection didn't have, no lodash and no bluebird, and `npm audit` reports nothing. The source is written in strict TypeScript and compiled with TypeScript 7.
 
 ## A quick look
 
@@ -68,7 +68,7 @@ await Person.query().insertGraph({
 
 | Dependency | Version                                                |
 | ---------- | ------------------------------------------------------ |
-| Node.js    | 24 or newer (24 and 26 are tested)                     |
+| Node.js    | 22 or newer (22, 24 and 26 are tested)                 |
 | knex       | 3.3 or newer                                           |
 | MySQL      | 8.0.17 or newer (tested on 8.4 with `mysql2`)          |
 | MariaDB    | 10.6 or newer (tested on 10.6 and 11.4 with `mariadb`) |
