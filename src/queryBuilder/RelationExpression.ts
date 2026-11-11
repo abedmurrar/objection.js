@@ -262,7 +262,9 @@ function parse(str: string): RelationNode {
   if (cachedNode) {
     return cloneNode(cachedNode);
   } else {
-    const node: RelationNode = parseRelationExpression(str);
+    // Normalized like the object form, which removes duplicate modifiers and
+    // relations.
+    const node = normalizeNode(parseRelationExpression(str));
     parseCache.set(str, cloneNode(node));
     return node;
   }
@@ -417,7 +419,7 @@ function normalizeModify(node: RelationNodeInput | null): string[] {
     return [];
   }
 
-  return Array.isArray(node.$modify) ? node.$modify.slice() : [node.$modify];
+  return Array.isArray(node.$modify) ? union(node.$modify, []) : [node.$modify];
 }
 
 function normalizeRecursive(node: RelationNodeInput | null): boolean | number {
@@ -429,7 +431,7 @@ function normalizeAllRecursive(node: RelationNodeInput | null, allRecusive: bool
 }
 
 function normalizeChildNames(node: RelationNodeInput | null): string[] {
-  return (node && node.$childNames && node.$childNames.slice()) || getChildNames(node);
+  return (node && node.$childNames && union(node.$childNames, [])) || getChildNames(node);
 }
 
 function findExpressionsAtPath(

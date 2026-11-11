@@ -10,7 +10,7 @@ const {
 
 const { compose, mixin } = require('../../lib/utils/mixin');
 const { map } = require('../../lib/utils/promiseUtils');
-const { jsonEquals, uniqBy } = require('../../lib/utils/objectUtils');
+const { jsonEquals, uniqBy, union } = require('../../lib/utils/objectUtils');
 
 const range = (n) => Array.from({ length: n }, (v, i) => i);
 
@@ -463,6 +463,45 @@ describe('utils', () => {
           item.map((x) => (Buffer.isBuffer(x) ? x.toString('hex') : x)).join(','),
         ),
       ).to.eql(items);
+    });
+  });
+  describe('union', () => {
+    // The same results as lodash's `_.union`: the unique values of both arrays,
+    // in the order they are first seen. Arrays of 10 or more items take another
+    // code path, so each case is checked with short and long arrays.
+    const long = range(12).map((i) => `x${i}`);
+
+    it('should remove duplicates of the first array', () => {
+      expect(union(['m', 'm'], ['n'])).to.eql(['m', 'n']);
+      expect(union(['m', 'm'], long)).to.eql(['m', ...long]);
+    });
+
+    it('should remove duplicates of the second array', () => {
+      expect(union(['m'], ['n', 'n'])).to.eql(['m', 'n']);
+      expect(union(long, ['n', 'n'])).to.eql([...long, 'n']);
+    });
+
+    it('should remove values of the second array that are in the first one', () => {
+      expect(union(['a', 'b'], ['b', 'c'])).to.eql(['a', 'b', 'c']);
+      expect(union([...long, 'b'], ['b', 'c'])).to.eql([...long, 'b', 'c']);
+    });
+
+    it('should keep the order in which values are first seen', () => {
+      expect(union(['b', 'a', 'b'], ['c', 'a'])).to.eql(['b', 'a', 'c']);
+    });
+
+    it('should treat NaN like any other value', () => {
+      // `eql` treats NaN as unequal to NaN, so compare as strings.
+      expect(union([NaN, NaN], [NaN]).map(String)).to.eql(['NaN']);
+      expect(union([NaN, ...long], [NaN]).map(String)).to.eql(['NaN', ...long]);
+    });
+
+    it('should not modify its arguments', () => {
+      const arr1 = ['m', 'm'];
+      const arr2 = ['n'];
+      union(arr1, arr2);
+      expect(arr1).to.eql(['m', 'm']);
+      expect(arr2).to.eql(['n']);
     });
   });
 });

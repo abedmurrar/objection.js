@@ -1149,6 +1149,45 @@ describe('RelationExpression', () => {
     testMerge('a.a', 'a.^', 'a.^');
     testMerge('a(f)', 'a(g)', 'a(f, g)');
     testMerge('a.b(f)', 'a.b(g)', 'a.b(f, g)');
+    testMerge('a(f, f)', 'a(g)', 'a(f, g)');
+    testMerge('a(f)', 'a(g, g)', 'a(f, g)');
+    testMerge('a(f, g)', 'a(g, f)', 'a(f, g)');
+    // With 10 or more modifiers, `union()` takes another code path.
+    testMerge(
+      'a(f, f)',
+      'a(g0, g1, g2, g3, g4, g5, g6, g7, g8, g9)',
+      'a(f, g0, g1, g2, g3, g4, g5, g6, g7, g8, g9)',
+    );
+  });
+
+  describe('duplicate modifiers', () => {
+    it('are applied once when the expression is a string', () => {
+      expect(RelationExpression.create('a(f, f).b(g, h, g)').toString()).to.equal('a(f).b(g, h)');
+    });
+
+    it('are applied once when the expression is an object', () => {
+      expect(
+        RelationExpression.create({
+          a: { $modify: ['f', 'f'], b: { $modify: ['g', 'g'] } },
+        }).toString(),
+      ).to.equal('a(f).b(g)');
+    });
+
+    it('duplicate relations are loaded once', () => {
+      const warn = console.warn;
+      console.warn = () => {};
+
+      try {
+        expect(RelationExpression.create('[a, a]').toString()).to.equal('a');
+      } finally {
+        console.warn = warn;
+      }
+    });
+
+    it('are applied once when the same string is parsed again', () => {
+      RelationExpression.create('c(f, f)');
+      expect(RelationExpression.create('c(f, f)').toString()).to.equal('c(f)');
+    });
   });
 
   describe('#toString', () => {
