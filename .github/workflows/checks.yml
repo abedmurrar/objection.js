@@ -56,9 +56,21 @@ jobs:
 
       - name: Install valgrind
         # GitHub's runners don't expose the hardware counters that perf needs.
+        # Cachegrind doesn't need valgrind's recommended packages (gdb, the libc
+        # debug symbols). The runners' apt mirror sometimes doesn't resolve for
+        # hours, so this retries, then uses archive.ubuntu.com directly.
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq valgrind
+          install() {
+            sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends valgrind
+          }
+          for attempt in 1 2 3; do
+            install && exit 0
+            echo "apt-get failed (attempt $attempt), retrying"
+            sleep 20
+          done
+          echo "Using archive.ubuntu.com instead of the runner's mirror"
+          sudo sed -i 's|mirror+file:/etc/apt/apt-mirrors.txt|http://archive.ubuntu.com/ubuntu/|' /etc/apt/sources.list.d/ubuntu.sources
+          install
 
       - name: Compare the CPU instructions per operation with main
         # Only the scenarios on the mocked knex: their counts repeat within 0.2%.
