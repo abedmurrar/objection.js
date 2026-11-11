@@ -57,7 +57,7 @@ You can run the tests on a subset of databases by setting the `DATABASES` env va
 DATABASES=sqlite3 npm test
 ```
 
-The code runs on Node.js 24 and newer, so it can use everything Node.js 24 supports.
+The code runs on Node.js 22 and newer, so it can only use what Node.js 22 supports. `@types/node` is kept at 22, so `tsc` rejects newer APIs, and CI runs the tests on 22, 24 and 26.
 
 Two rules keep the compiled code as fast as the JavaScript it replaced:
 

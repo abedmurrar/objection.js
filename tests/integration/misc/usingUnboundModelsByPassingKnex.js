@@ -401,73 +401,73 @@ module.exports = (session) => {
 
     it('should fail with a descriptive error message if knex is not provided', () => {
       return Promise.all([
-        Promise.try(() => {
+        (async () => {
           return Model1.query()
             .findById(1)
             .withGraphFetched(
               '[model1Relation1, model1Relation2.model2Relation1.[model1Relation1, model1Relation2]]',
             );
-        }).catch((err) => createRejectionReflection(err)),
+        })().catch((err) => createRejectionReflection(err)),
 
-        Promise.try(() => {
+        (async () => {
           return Model1.query()
             .findById(1)
             .withGraphJoined(
               '[model1Relation1, model1Relation2.model2Relation1.[model1Relation1, model1Relation2]]',
             );
-        }).catch((err) => createRejectionReflection(err)),
+        })().catch((err) => createRejectionReflection(err)),
 
-        Promise.try(() => {
+        (async () => {
           return Model1.query();
-        }).catch((err) => createRejectionReflection(err)),
+        })().catch((err) => createRejectionReflection(err)),
 
-        Promise.try(() => {
+        (async () => {
           return Model1.query().where('id', 1);
-        }).catch((err) => createRejectionReflection(err)),
+        })().catch((err) => createRejectionReflection(err)),
 
-        Promise.try(() => {
+        (async () => {
           return Model1.query().joinRelated('model1Relation1');
-        }).catch((err) => createRejectionReflection(err)),
+        })().catch((err) => createRejectionReflection(err)),
 
-        Promise.try(() => {
+        (async () => {
           return Model1.query(session.knex)
             .findById(1)
             .then((model) => {
               return model.$relatedQuery('model1Relation1');
             });
-        }).catch((err) => createRejectionReflection(err)),
+        })().catch((err) => createRejectionReflection(err)),
 
-        Promise.try(() => {
+        (async () => {
           return Model1.query(session.knex)
             .findById(2)
             .then((model) => {
               return model.$relatedQuery('model1Relation1Inverse');
             });
-        }).catch((err) => createRejectionReflection(err)),
+        })().catch((err) => createRejectionReflection(err)),
 
-        Promise.try(() => {
+        (async () => {
           return Model1.query(session.knex)
             .findById(1)
             .then((model) => {
               return model.$relatedQuery('model1Relation2');
             });
-        }).catch((err) => createRejectionReflection(err)),
+        })().catch((err) => createRejectionReflection(err)),
 
-        Promise.try(() => {
+        (async () => {
           return Model2.query(session.knex)
             .findById(2)
             .then((model) => {
               return model.$relatedQuery('model2Relation1');
             });
-        }).catch((err) => createRejectionReflection(err)),
+        })().catch((err) => createRejectionReflection(err)),
 
-        Promise.try(() => {
+        (async () => {
           return Model1.query(session.knex)
             .findById(1)
             .then((model) => {
               return model.$query();
             });
-        }).catch((err) => createRejectionReflection(err)),
+        })().catch((err) => createRejectionReflection(err)),
       ]).then((results) => {
         results.forEach((result) => {
           expect(result.isRejected()).to.equal(true);

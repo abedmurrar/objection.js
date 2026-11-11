@@ -6,7 +6,7 @@ This section covers the upgrade from objection.js 3.1.5 to `@abedmurrar/objectio
 
 These change what existing code does at runtime. Each one is explained, with examples, in [Breaking changes](/fork/breaking-changes.md):
 
-- Node.js 24, [knex 3.3](/fork/breaking-changes.md#knex-3-3-or-newer-is-required) and, on MySQL, [MySQL 8.0.17](/fork/breaking-changes.md#mysql-8-0-17-or-newer-is-required) or newer are required. With knex 3.3, `page()` and `range()` on a delete query throw on postgres and SQLite.
+- [Node.js 22](/fork/breaking-changes.md#node-js-22-or-newer-is-required), [knex 3.3](/fork/breaking-changes.md#knex-3-3-or-newer-is-required) and, on MySQL, [MySQL 8.0.17](/fork/breaking-changes.md#mysql-8-0-17-or-newer-is-required) or newer are required. With knex 3.3, `page()` and `range()` on a delete query throw on postgres and SQLite.
 - [Only the package entry can be imported](/fork/breaking-changes.md#only-the-package-entry-can-be-imported). Imports of files inside the package throw `ERR_PACKAGE_PATH_NOT_EXPORTED`.
 - [The exported classes are real classes](/fork/breaking-changes.md#the-exported-classes-are-real-classes). ES5-style subclasses (`Model.call(this)`) and code compiled with TypeScript's `target: "es5"` or Babel 6 throw.
 - [The keys of JSON field expressions are escaped](/fork/breaking-changes.md#security-json-field-expression-keys-are-escaped). Keys with `,`, `{`, `}`, `"`, whitespace or `NULL` refer to the actual key instead of being split.
