@@ -56,21 +56,21 @@ jobs:
 
       - name: Install valgrind
         # GitHub's runners don't expose the hardware counters that perf needs.
-        # Cachegrind doesn't need valgrind's recommended packages (gdb, the libc
-        # debug symbols). The runners' apt mirror sometimes doesn't resolve for
-        # hours, so this retries, then uses archive.ubuntu.com directly.
+        # valgrind comes from Debian's archive, pinned to one package and
+        # checked against its SHA-256 from Debian's package index. On 2026-11-11
+        # the runners couldn't resolve any ubuntu.com host for hours, so apt
+        # couldn't install it. The baseline and the pull request are counted
+        # by the same valgrind, so which version it is doesn't matter.
+        env:
+          VALGRIND_DEB: https://deb.debian.org/debian/pool/main/v/valgrind/valgrind_3.19.0-1_amd64.deb
+          VALGRIND_SHA256: 324842f2308a1e42abf2d81ff5eb19a9475fc9db95647f4d9da71444eda4087f
         run: |
-          install() {
-            sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends valgrind
-          }
-          for attempt in 1 2 3; do
-            install && exit 0
-            echo "apt-get failed (attempt $attempt), retrying"
-            sleep 20
-          done
-          echo "Using archive.ubuntu.com instead of the runner's mirror"
-          sudo sed -i 's|mirror+file:/etc/apt/apt-mirrors.txt|http://archive.ubuntu.com/ubuntu/|' /etc/apt/sources.list.d/ubuntu.sources
-          install
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/valgrind.deb" "$VALGRIND_DEB"
+          echo "$VALGRIND_SHA256  $RUNNER_TEMP/valgrind.deb" | sha256sum -c -
+          dpkg -x "$RUNNER_TEMP/valgrind.deb" "$RUNNER_TEMP/valgrind"
+          echo "$RUNNER_TEMP/valgrind/usr/bin" >> "$GITHUB_PATH"
+          echo "VALGRIND_LIB=$RUNNER_TEMP/valgrind/usr/libexec/valgrind" >> "$GITHUB_ENV"
+          "$RUNNER_TEMP/valgrind/usr/bin/valgrind" --version
 
       - name: Compare the CPU instructions per operation with main
         # Only the scenarios on the mocked knex: their counts repeat within 0.2%.
