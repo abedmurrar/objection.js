@@ -4,6 +4,8 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+## 4.4.3 (2026-11-11)
+
 ### Fixes
 
 - On MySQL and MariaDB, an `upsertGraph()` without a transaction could deadlock with itself when it unrelated the many-to-many rows of several parents, for example a tag removed from two posts. It ran one unrelate per parent, 4 at a time, and each locked a range of the join table's key. On MariaDB 10.6, 109 of 300 such calls failed with `ER_LOCK_DEADLOCK`, with no other query running. The unrelates of a relation are now one query for all parents, which deletes the join rows by their (owner, related) pairs: 0 of 300, and faster, since it's one round trip (one tag unrelated from each of 20 owners, median of 30 calls in three runs: 31.7–35.2 → 5.8–5.9 ms on MySQL 8.4, 11.1–11.8 → 3.5–3.6 ms on MariaDB 10.6). An unrelate of one parent's rows keeps its query. Where one query wouldn't be the same as the queries it replaces (relations with a `modify` filter, join models with static `beforeDelete` or `afterDelete` hooks), the queries of a relation run one at a time instead, like its many-to-many deletes. Found by the new random graph tests.
