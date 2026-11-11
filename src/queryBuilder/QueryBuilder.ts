@@ -1071,12 +1071,14 @@ class QueryBuilder extends QueryBuilderBase {
   }
 
   deleteById(id: unknown): this {
+    // `findById()`, so that a custom query builder's `findById()` applies.
+    // The id is checked before any hook, like a static `beforeDelete`, runs.
+    // Also with `skipUndefined()`: the id is the only condition, so leaving it
+    // out would delete every row.
     return withWhereScope(this, () => this.findById(id))
       .delete()
-      .runBefore((_: unknown, builder: QueryBuilder) => {
-        if (!builder.internalOptions().skipUndefined) {
-          assertIdNotUndefined(id, `undefined was passed to deleteById`);
-        }
+      .runBefore(() => {
+        assertIdNotUndefined(id, `undefined was passed to deleteById`);
       });
   }
 

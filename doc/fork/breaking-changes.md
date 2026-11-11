@@ -25,6 +25,20 @@ This affected `ref('col:key')`, `patch({ 'col:key': value })`, `update()`, `onCo
 
 The fork also requires ajv 8.20, which fixes the advisories of ajv and fast-uri.
 
+## An undefined id is an error with `skipUndefined()` too
+
+With `skipUndefined()`, the `...ById` methods left out their id condition when the id was `undefined`, which is their only condition:
+
+```js
+// Before: `delete from "persons"`, which deleted every row.
+await Person.query().skipUndefined().deleteById(req.params.id);
+
+// Before: `update "persons" set "name" = ?`, which changed every row.
+await Person.query().skipUndefined().patchAndFetchById(undefined, { name: 'x' });
+```
+
+`findById()`, `deleteById()`, `patchAndFetchById()` and `updateAndFetchById()` now throw "undefined was passed to ..." for an undefined id, or an undefined part of a composite id, with or without `skipUndefined()`. `skipUndefined()` still leaves out the other `where` methods' conditions.
+
 ## `orWhere` no longer escapes the conditions objection adds
 
 Objection adds where clauses of its own: relation owner conditions, relation `filter`/`modify`, id conditions. Before, these were flattened into the same list as your own clauses. Since `and` binds tighter than `or`, an `orWhere` could match the rows of other owners ([#2191](https://github.com/Vincit/objection.js/issues/2191), [#1909](https://github.com/Vincit/objection.js/issues/1909)):

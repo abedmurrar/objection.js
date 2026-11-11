@@ -1705,9 +1705,13 @@ describe('QueryBuilder', () => {
       QueryBuilder.forClass(TestModel).skipUndefined().orWhere('id', undefined, 10).toKnexQuery();
     }).to.not.throwException();
 
+    // The id is the only condition of deleteById(), so skipUndefined() doesn't
+    // leave it out: that would delete every row.
     expect(() => {
       QueryBuilder.forClass(TestModel).skipUndefined().deleteById(undefined).toKnexQuery();
-    }).to.not.throwException();
+    }).to.throwException((err) => {
+      expect(err.message).to.equal('undefined was passed to findById');
+    });
 
     expect(() => {
       QueryBuilder.forClass(TestModel)
