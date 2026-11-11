@@ -25,8 +25,8 @@ interface ManyToManyModifyOperation {
 // A mixin's base class must have a constructor that takes `...args: any[]`.
 export type ManyToManyModifyOperationClass = new (...args: any[]) => ManyToManyModifyOperation;
 
-// This mixin contains the shared code for all modify operations (update, delete, relate, unrelate)
-// for ManyToManyRelation operations.
+// This mixin contains the shared code of the update, patch, delete and unrelate
+// operations of ManyToManyRelation. Relate only inserts join rows, and doesn't use it.
 //
 // The most important thing this mixin does is that it moves the filters from the main query
 // into a subquery and then adds a single where clause that uses the subquery. This is done so

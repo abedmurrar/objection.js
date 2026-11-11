@@ -4,8 +4,8 @@ import { createModifier } from '../../utils/createModifier';
 import { map as mapPromise } from '../../utils/promiseUtils';
 import { ValidationErrorType } from '../../model/ValidationError';
 import type { RelationExpression } from '../RelationExpression';
-import type { Relation, RelationModelClass } from '../../relations/Relation';
-import type { GraphOptions, Model, ModelClass, QueryBuilder } from '../operations/types';
+import type { Relation } from '../../relations/Relation';
+import type { GraphOptions, Model, ModelClass, Modifiers, QueryBuilder } from '../operations/types';
 
 import { TableTree } from './TableTree';
 import { JoinResultParser } from './JoinResultParser';
@@ -21,27 +21,6 @@ type JoinModel = Model;
 // `ManyToManyRelation` sets `isObjectionManyToManyRelation` on its prototype.
 type JoinRelation = Relation & { readonly isObjectionManyToManyRelation?: boolean };
 
-// The model classes and query builders are still JavaScript. `ModelClass` and
-// `QueryBuilder` of the operations have the parts that the operations use, and
-// these are the other parts that the joins use. They come first, so that
-// `query()` and the one argument `aliasFor()` resolve to them.
-
-type JoinModelClass = {
-  getRelationNames(): string[];
-  getRelationUnsafe(relationName: string | null): JoinRelation | null;
-  fromDatabaseJson(row: FlatRow): JoinModel;
-  fetchTableMetadata(opt: { parentBuilder: QueryBuilder }): Promise<unknown>;
-  tableMetadata(opt: { table: string }): { columns: string[] } | null | undefined;
-  query(): JoinQueryBuilder;
-} & ModelClass;
-
-type JoinQueryBuilder = {
-  aliasFor(modelClass: RelationModelClass | null): string | null | undefined;
-  tableNameFor(modelClass: RelationModelClass): string;
-  findAllSelections(): Selection[];
-  modify(modifier: Relation['modify']): JoinQueryBuilder;
-} & QueryBuilder;
-
 // The options of `RelationJoiner`, the `withGraphJoined()` options.
 interface JoinOptions {
   joinOperation: string;
@@ -50,17 +29,14 @@ interface JoinOptions {
   aliases: Record<string, string>;
 }
 
-// The modifiers of `withGraphJoined()`, by name.
-type Modifiers = Record<string, unknown>;
-
 // The query of each table node that has the selects of the user.
-type UserSelectQueries = Map<TableNode, JoinQueryBuilder>;
+type UserSelectQueries = Map<TableNode, QueryBuilder>;
 
 /**
  * Given a relation expression, builds a query using joins to fetch it.
  */
 class RelationJoiner {
-  declare rootModelClass: JoinModelClass;
+  declare rootModelClass: ModelClass;
   declare expression: RelationExpression | null;
   declare modifiers: Modifiers | null;
   declare options: JoinOptions;
@@ -68,7 +44,7 @@ class RelationJoiner {
   declare internalSelections: Selection[] | null;
 
   constructor({ modelClass }: { modelClass: ModelClass }) {
-    this.rootModelClass = modelClass as JoinModelClass;
+    this.rootModelClass = modelClass;
 
     // The relation expression to join.
     this.expression = null;
@@ -114,17 +90,14 @@ class RelationJoiner {
 
     return mapPromise(
       Array.from(allModelClasses),
-      (modelClass: JoinModelClass) => modelClass.fetchTableMetadata({ parentBuilder: builder }),
+      (modelClass: ModelClass) => modelClass.fetchTableMetadata({ parentBuilder: builder }),
       {
         concurrency: this.rootModelClass.getConcurrency(builder.unsafeKnex()),
       },
     );
   }
 
-  // The callers have the operations' `QueryBuilder`. The overload takes it as
-  // the `JoinQueryBuilder` it is.
-  build(builder: QueryBuilder, buildSelects?: boolean): void;
-  build(builder: JoinQueryBuilder, buildSelects = true): void {
+  build(builder: QueryBuilder, buildSelects = true): void {
     const rootTableNode = this._getTableTree(builder).rootNode;
     const userSelectQueries: UserSelectQueries = new Map([[rootTableNode, builder]]);
 
@@ -165,7 +138,7 @@ class RelationJoiner {
     tableNode,
     userSelectQueries,
   }: {
-    builder: JoinQueryBuilder;
+    builder: QueryBuilder;
     tableNode: TableNode;
     userSelectQueries: UserSelectQueries;
   }): void {
@@ -208,7 +181,7 @@ class RelationJoiner {
     tableNode,
     userSelectQueries,
   }: {
-    builder: JoinQueryBuilder;
+    builder: QueryBuilder;
     tableNode: TableNode;
     userSelectQueries: UserSelectQueries;
   }): void {
@@ -246,10 +219,10 @@ function createSubqueryToJoin({
   tableNode,
   modifiers,
 }: {
-  builder: JoinQueryBuilder;
+  builder: QueryBuilder;
   tableNode: TableNode;
   modifiers: Modifiers | null;
-}): JoinQueryBuilder {
+}): QueryBuilder {
   const { relation, expression, modelClass } = tableNode;
   const modifierQuery = modelClass.query().childQueryOf(builder);
 
@@ -281,9 +254,9 @@ function ensureIdAndRelationPropsAreSelected({
   builder,
   tableNode,
 }: {
-  builder: JoinQueryBuilder;
+  builder: QueryBuilder;
   tableNode: TableNode;
-}): JoinQueryBuilder {
+}): QueryBuilder {
   const tableRef = builder.tableRef();
 
   const cols = [
@@ -307,7 +280,7 @@ function getSelectionsForNode({
   tableNode,
   userSelectQueries,
 }: {
-  builder: JoinQueryBuilder;
+  builder: QueryBuilder;
   tableNode: TableNode;
   userSelectQueries: UserSelectQueries;
 }): { selections: Selection[]; internalSelections: Selection[] } {
@@ -377,7 +350,7 @@ function getJoinTableExtraSelectionsForNode({
   builder,
   tableNode,
 }: {
-  builder: JoinQueryBuilder;
+  builder: QueryBuilder;
   tableNode: TableNode;
 }): Selection[] {
   return tableNode.relation!.joinTableExtras.map((extra) => {
@@ -394,7 +367,7 @@ function getAllColumnSelectionsForNode({
   builder,
   tableNode,
 }: {
-  builder: JoinQueryBuilder;
+  builder: QueryBuilder;
   tableNode: TableNode;
 }): Selection[] {
   const table = builder.tableNameFor(tableNode.modelClass);
@@ -444,7 +417,7 @@ function isSelectAllSelectionSet(selections: Selection[]): boolean {
   return selections.length === 0 || selections.some(isSelectAll);
 }
 
-function checkAliasLength(modelClass: JoinModelClass, alias: string): void {
+function checkAliasLength(modelClass: ModelClass, alias: string): void {
   if (alias.length > ID_LENGTH_LIMIT) {
     throw modelClass.createValidationError({
       type: ValidationErrorType.RelationExpression,
@@ -453,12 +426,4 @@ function checkAliasLength(modelClass: JoinModelClass, alias: string): void {
   }
 }
 
-export {
-  RelationJoiner,
-  type FlatRow,
-  type JoinModel,
-  type JoinModelClass,
-  type JoinOptions,
-  type JoinQueryBuilder,
-  type JoinRelation,
-};
+export { RelationJoiner, type FlatRow, type JoinModel, type JoinOptions, type JoinRelation };

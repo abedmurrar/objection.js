@@ -38,3 +38,9 @@ jobs:
 
       - name: Run tests
         run: npm test
+
+      - name: Stress graph writes on MySQL and MariaDB
+        # Concurrent upsertGraph() calls must not deadlock. 5 of the 20 rounds
+        # of `npm run stress:graph`, on one Node.js version.
+        if: matrix.node-version == '24.x'
+        run: node bench/stress-graph-writes.js --rounds 5

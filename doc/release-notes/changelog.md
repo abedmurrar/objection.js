@@ -4,6 +4,12 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+## 4.4.1 (2026-11-11)
+
+### Internal
+
+- Removed the type stand-ins left from the move to TypeScript. The operations, the joins and the relation properties use the classes' own types (`GraphUpsert`, `RelationJoiner`, `RelationExpression`, `ReferenceBuilder`, `Model` and `QueryBuilder`) instead of `InstanceType<typeof X>` aliases and interfaces that copied parts of them, and the joins share the `Modifiers` type of the operations. Comments that described removed code are fixed. The compiled JavaScript is the same apart from comments.
+
 ## 4.4.0 (2026-11-11)
 
 ### What's new

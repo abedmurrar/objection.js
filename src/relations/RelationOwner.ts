@@ -1,7 +1,8 @@
 import { isObject, asArray, uniqBy } from '../utils/objectUtils';
 import { normalizeIds } from '../utils/normalizeIds';
 import type { Relation, RelationModel, RelationQueryBuilder } from './Relation';
-import type { ReferenceBuilder, RelationProperty } from './RelationProperty';
+import type { ReferenceBuilder } from '../queryBuilder/ReferenceBuilder';
+import type { RelationProperty } from './RelationProperty';
 
 const Type = {
   Models: 'Models',

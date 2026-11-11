@@ -3,9 +3,6 @@ import { InsertOperation } from './InsertOperation';
 import { GraphUpsert } from '../graph/GraphUpsert';
 import type { KnexBuilder, Model, OperationOptions, QueryBuilder, Relation } from './types';
 
-// `GraphUpsert` is still JavaScript, exported as a value only.
-type GraphUpsertInstance = InstanceType<typeof GraphUpsert>;
-
 // The insert operation this delegates to. `RelationInsertOperation`s have a
 // `relation`.
 type InsertDelegate = InsertOperation & { relation?: Relation };
@@ -13,7 +10,7 @@ type InsertDelegate = InsertOperation & { relation?: Relation };
 class InsertGraphOperation extends DelegateOperation {
   declare delegate: InsertDelegate;
   declare upsertOptions: Record<string, unknown>;
-  declare upsert: GraphUpsertInstance | null;
+  declare upsert: GraphUpsert | null;
 
   constructor(name: string | null, opt: OperationOptions | null = null) {
     super(name, opt as OperationOptions);

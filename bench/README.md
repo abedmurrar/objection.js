@@ -31,6 +31,19 @@ npm run bench:compare -- --baseline ../objection-baseline
 
 A new difference is either a change to document, in the changelog and `upstream-differences.json`, or a bug.
 
+## Concurrent graph writes
+
+`npm run stress:graph` runs 20 `upsertGraph()` calls at the same time, without a transaction, on MySQL 8.4 and MariaDB 10.6 and 11.4 of `docker-compose.yml`. It runs every combination of foreign keys on the join table, an item that every owner shares, and graph write concurrency 1 and 4, for 20 rounds each: 9,600 calls. Each call patches, inserts, deletes and unrelates many-to-many rows and patches and inserts has-many rows. After every round it checks that each owner has exactly the graph it asked for. It fails on any wrong result or other error, and on deadlocks and lock wait timeouts between calls that write different rows, and prints the failing statements. With the shared item, the calls write the same rows (even owners delete it while odd owners unrelate it), which can deadlock with any queries, so those deadlocks are counted but don't fail it: CI saw 1 in 2,400 such calls on MariaDB 10.6.
+
+```sh
+docker compose up -d mysql mariadb10 mariadb11
+npm run stress:graph
+node bench/stress-graph-writes.js --rounds 3 --databases mysql   # fewer rounds, one database
+node bench/stress-graph-writes.js --lib ../objection-old         # another checkout
+```
+
+It tests the 4.2.2 fix, which deletes the many-to-many rows of `upsertGraph()` by id. On 4.2.1, the release before it, 68 and 94 of the 3,200 calls on MariaDB 10.6 deadlocked in two runs, all between calls that write different rows. On 4.4.1, none of the 9,600 calls did locally. It takes about 3.5 minutes. CI runs 5 rounds of it. Run all 20 before releasing a change to graph writes.
+
 ## On a busy machine
 
 Times depend on what else runs on the machine. Two more tools compare checkouts in ways that depend on it much less:
@@ -41,6 +54,14 @@ node bench/count.js --baseline ../other                  # CPU instructions per 
 ```
 
 `count.js` runs each scenario under `perf stat` in single-threaded Node processes, so that V8's background compiler and GC threads don't add to the counts. The counts repeat within about ±1%. It needs `perf` and `sudo sysctl kernel.perf_event_paranoid=1` (until the next reboot).
+
+With `--max-change 1`, `count.js` exits with 1 when a scenario takes more than 1% more instructions than the baseline. The mock `withGraphJoined` scenario, whose count moves with unrelated changes, has its own limit of 6% in the script.
+
+## In CI
+
+`.github/workflows/checks.yml` runs on every pull request. It builds the pull request and `main` in two checkouts whose paths have the same length, and runs `sql-check.js`, `scripts/typings-bench.js --check` and `count.js --max-change 1` against `main`, and `sql-check.js` against objection.js 3.1.5 with `upstream-differences.json`. A pull request with the `sql-change` label reports SQL differences without failing.
+
+GitHub's runners don't have the hardware counters `perf` needs, so CI counts with valgrind (`--counter valgrind`). Its counts of the same code repeat within 0.2%, but every process takes about 20 seconds longer, so CI runs one count per checkout (`--runs 1`), fewer iterations (`--target 3e8`) and a scenario per CPU (`--jobs`). It only checks the scenarios on the mocked knex: under valgrind, the SQLite scenarios (SQLite's threads) and the "1 ms per query" ones (timers) vary by several percent between runs of the same code. See [checks on pull requests](../doc/guide/contributing.md#checks-on-pull-requests).
 
 `node bench/profile.js "<scenario>"` runs one scenario under the CPU profiler and prints the functions with the most self time. With `--orm`, it runs an ORM scenario on MySQL instead (see below).
 
