@@ -24,6 +24,19 @@ ln -s "$PWD/node_modules" ../objection-baseline/node_modules
 npm run bench:compare -- --baseline ../objection-baseline
 ```
 
+## Concurrent graph writes
+
+`npm run stress:graph` runs 20 `upsertGraph()` calls at the same time, without a transaction, on MySQL 8.4 and MariaDB 10.6 and 11.4 of `docker-compose.yml`. It runs every combination of foreign keys on the join table, an item that every owner shares, and graph write concurrency 1 and 4, for 20 rounds each: 9,600 calls. Each call patches, inserts, deletes and unrelates many-to-many rows and patches and inserts has-many rows. After every round it checks that each owner has exactly the graph it asked for. It fails on any wrong result or other error, and on deadlocks and lock wait timeouts between calls that write different rows, and prints the failing statements. With the shared item, the calls write the same rows (even owners delete it while odd owners unrelate it), which can deadlock with any queries, so those deadlocks are counted but don't fail it: CI saw 1 in 2,400 such calls on MariaDB 10.6.
+
+```sh
+docker compose up -d mysql mariadb10 mariadb11
+npm run stress:graph
+node bench/stress-graph-writes.js --rounds 3 --databases mysql   # fewer rounds, one database
+node bench/stress-graph-writes.js --lib ../objection-old         # another checkout
+```
+
+It tests the 4.2.2 fix, which deletes the many-to-many rows of `upsertGraph()` by id. On 4.2.1, the release before it, 68 and 94 of the 3,200 calls on MariaDB 10.6 deadlocked in two runs, all between calls that write different rows. On 4.4.1, none of the 9,600 calls did locally. It takes about 3.5 minutes. CI runs 5 rounds of it. Run all 20 before releasing a change to graph writes.
+
 ## On a busy machine
 
 Times depend on what else runs on the machine. Two more tools compare checkouts in ways that depend on it much less:
