@@ -19,6 +19,11 @@ describe('integration tests', () => {
       },
       pool: {
         afterCreate: (conn, cb) => {
+          // node-sqlite3 doesn't keep the order of the statements of a
+          // connection by default: a statement sent just before ROLLBACK can
+          // run after it, outside the transaction. Remove when knex does this
+          // itself: https://github.com/knex/knex/pull/6569
+          conn.serialize();
           conn.run('PRAGMA foreign_keys = ON', cb);
         },
       },
