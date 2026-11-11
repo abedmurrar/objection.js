@@ -237,7 +237,16 @@ describe('operations summary', () => {
       }
 
       expect(error.message).to.equal('undefined was passed to deleteById');
-      expect(await Person.query(mockKnex).skipUndefined().deleteById(undefined)).to.be(undefined);
+
+      error = null;
+
+      try {
+        await Person.query(mockKnex).skipUndefined().deleteById(undefined);
+      } catch (err) {
+        error = err;
+      }
+
+      expect(error.message).to.equal('undefined was passed to deleteById');
 
       error = null;
 

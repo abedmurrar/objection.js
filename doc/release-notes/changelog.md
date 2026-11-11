@@ -4,6 +4,10 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+### Fixes
+
+- With `skipUndefined()`, an undefined id made `deleteById()` delete every row of the table, and `patchAndFetchById()` and `updateAndFetchById()` update every row: the methods left out their only condition, the id. `findById()` returned an arbitrary row. An undefined id now throws "undefined was passed to ..." with or without `skipUndefined()`, as it already did without it. Inherited from objection.js (3.1.5 does the same).
+
 ## 4.4.4 (2026-11-11)
 
 ### Fixes

@@ -775,6 +775,8 @@ queryBuilder = queryBuilder.skipUndefined();
 
 If this method is called for a builder then undefined values passed to the query builder methods don't cause an exception but are ignored instead.
 
+An undefined id passed to [findById](/api/query-builder/find-methods.html#findbyid), [deleteById](/api/query-builder/mutate-methods.html#deletebyid), [patchAndFetchById](/api/query-builder/mutate-methods.html#patchandfetchbyid) or [updateAndFetchById](/api/query-builder/mutate-methods.html#updateandfetchbyid) is still an error: the id is the only condition of these methods, and leaving it out would find, update or delete every row.
+
 For example the following query will return all `Person` rows if `req.query.firstName` is `undefined`.
 
 ##### Return value

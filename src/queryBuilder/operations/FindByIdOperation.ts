@@ -19,10 +19,9 @@ class FindByIdOperation extends QueryBuilderOperation {
   }
 
   onBuild(builder: QueryBuilder): void {
-    if (!builder.internalOptions().skipUndefined) {
-      assertIdNotUndefined(this.id, `undefined was passed to ${this.name}`);
-    }
-
+    // Also with `skipUndefined()`: the id is the only condition, so leaving it
+    // out would find, update or delete every row of the table.
+    assertIdNotUndefined(this.id, `undefined was passed to ${this.name}`);
     builder.whereComposite(builder.fullIdColumn(), this.id);
   }
 
