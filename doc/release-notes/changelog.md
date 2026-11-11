@@ -4,6 +4,11 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+### Docs
+
+- The validation guide explains that `insertGraph()` and `upsertGraph()` validate each model without its relation properties, while `insert()` and `patch()` validate with them. This changes in 5.0.
+- The custom query builder recipe uses a `static get QueryBuilder()` getter, and links to the TypeScript notes on builders in their own files, `WithGraphQueryBuilder` and `select()`.
+
 ## 4.4.3 (2026-11-11)
 
 ### Fixes
