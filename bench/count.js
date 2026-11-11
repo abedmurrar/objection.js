@@ -11,8 +11,9 @@
 // many percent more instructions than in the baseline.
 //
 // `--counter valgrind` counts with valgrind's cachegrind instead of perf, for
-// machines without hardware counters, like GitHub's runners. The counts repeat
-// exactly, so one run is enough, but each process takes about 20 seconds more.
+// machines without hardware counters, like GitHub's runners. Counts of the
+// same code repeat within 0.2%, so one run is enough, but each process takes
+// about 20 seconds more. Scenarios with threads or timers vary more.
 // `--jobs` runs that many scenarios at once, which doesn't change the counts:
 //
 //   node bench/count.js --baseline ../main --counter valgrind --runs 1 --target 3e8 --jobs 4
