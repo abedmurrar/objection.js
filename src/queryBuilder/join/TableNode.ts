@@ -1,10 +1,11 @@
 import type { RelationExpression } from '../RelationExpression';
-import type { FlatRow, JoinModelClass, JoinQueryBuilder, JoinRelation } from './RelationJoiner';
+import type { FlatRow, JoinRelation } from './RelationJoiner';
+import type { ModelClass, QueryBuilder } from '../operations/types';
 import type { TableTree } from './TableTree';
 
 interface TableNodeArgs {
   tableTree: TableTree;
-  modelClass: JoinModelClass;
+  modelClass: ModelClass;
   expression: RelationExpression;
   parentNode?: TableNode | null;
   relation?: JoinRelation | null;
@@ -14,7 +15,7 @@ type IdGetter = (flatRow: FlatRow) => string | null;
 
 class TableNode {
   declare tableTree: TableTree;
-  declare modelClass: JoinModelClass;
+  declare modelClass: ModelClass;
   declare parentNode: TableNode | null;
   // Null for the root node only.
   declare relation: JoinRelation | null;
@@ -82,10 +83,10 @@ class TableNode {
     return this.idGetter(flatRow);
   }
 
-  getJoinTableAlias(builder: JoinQueryBuilder): string | undefined {
+  getJoinTableAlias(builder: QueryBuilder): string | undefined {
     if (this.relation!.isObjectionManyToManyRelation) {
       return (
-        builder.aliasFor(this.relation!.joinTableModelClass) ||
+        builder.aliasFor(this.relation!.joinTableModelClass!) ||
         this.modelClass.joinTableAlias(this.alias)
       );
     } else {

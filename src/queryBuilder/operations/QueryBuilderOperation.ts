@@ -89,7 +89,7 @@ class QueryBuilderOperation {
     // Operations this operation added in any of its hooks.
     this.childOperations = [];
 
-    // The where scope (see `whereScopes.js`) this operation was added in.
+    // The where scope (see `whereScopes.ts`) this operation was added in.
     this.whereScope = null;
   }
 

@@ -49,7 +49,7 @@ function fetchTableMetadata(
     return Promise.resolve(metadata);
   }
 
-  // Memoize metadata but only for modelClass. The hasOwnProperty check
+  // Memoize metadata but only for modelClass. The `Object.hasOwn` check
   // will fail for subclasses and the value gets recreated.
   if (!Object.hasOwn(modelClass, TABLE_METADATA)) {
     defineNonEnumerableProperty(modelClass, TABLE_METADATA, new Map());

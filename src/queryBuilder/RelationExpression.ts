@@ -46,8 +46,7 @@ interface GraphModel {
   [property: string]: unknown;
 }
 
-// The class of a `GraphModel`. The model classes are still JavaScript, and the
-// types of the operations don't list `getRelationNames()`.
+// The part of a `GraphModel`'s class that `modelToNode()` uses.
 interface GraphModelClass extends Function {
   getRelationNames(): string[];
 }
