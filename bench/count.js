@@ -5,6 +5,10 @@
 // `kernel.perf_event_paranoid` <= 2 (`sudo sysctl kernel.perf_event_paranoid=1`).
 //
 //   node bench/count.js --baseline ../objection-main [--filter execute] [--runs 3]
+//   node bench/count.js --baseline ../objection-main --max-change 1
+//
+// With `--max-change`, it exits with 1 when a scenario executes more than that
+// many percent more instructions than in the baseline. CI runs it that way.
 //
 // Each scenario runs `warmup` times, and `warmup + iterations` times, in new
 // processes. The difference divided by `iterations` is the count per operation,
@@ -23,7 +27,16 @@ const opt = parseArgs(process.argv.slice(2), {
   filter: '',
   runs: 2,
   target: 2e9,
+  maxChange: '',
 });
+
+// The scenarios whose counts vary more than the others, with their own limit.
+// The mock withGraphJoined count moves 3–6% with unrelated changes to the code,
+// while its wall time and CPU profile stay the same, probably because of V8's
+// decisions about the join result parser. Lower this once that's understood.
+const MAX_CHANGE_OVERRIDES = {
+  'graph: withGraphJoined [pets.toys] x100': 6,
+};
 
 if (!opt.baseline) {
   console.error('Usage: node bench/count.js --baseline <path to an objection checkout>');
@@ -86,6 +99,7 @@ function format(n) {
 
 const cases = listCases(opt.filter ? new RegExp(opt.filter) : null);
 const rows = [];
+const tooSlow = [];
 
 for (const testCase of cases) {
   // The same number of iterations for both, so that they do the same work.
@@ -93,6 +107,12 @@ for (const testCase of cases) {
   const before = perOp(testCase, opt.baseline, iterations);
   const after = perOp(testCase, opt.lib, iterations);
   const change = ((after - before) / before) * 100;
+  const limit = MAX_CHANGE_OVERRIDES[testCase.name] ?? Number(opt.maxChange);
+
+  if (opt.maxChange !== '' && change > limit) {
+    tooSlow.push(`${testCase.name}: +${change.toFixed(1)}% (limit ${limit}%)`);
+  }
+
   rows.push([
     testCase.name,
     format(before),
@@ -106,3 +126,8 @@ console.log(`\n${table([['scenario', 'before', 'after', 'change'], ...rows])}`);
 console.log(
   '\nInstructions per operation (user space). Changes under about 1% are run to run variation.',
 );
+
+if (tooSlow.length) {
+  console.log(`\nMore instructions than allowed:\n${tooSlow.map((l) => `  ${l}`).join('\n')}`);
+  process.exitCode = 1;
+}
