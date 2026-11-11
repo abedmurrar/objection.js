@@ -105,7 +105,9 @@ class BaseModel extends Model {
   // class at runtime and the types of the static query methods like `query()`
   // are based on it. `QueryBuilderType` is used for the instance methods like
   // `$query()` and `$relatedQuery()`.
-  static QueryBuilder = MyQueryBuilder;
+  static get QueryBuilder() {
+    return MyQueryBuilder;
+  }
   declare QueryBuilderType: MyQueryBuilder<this>;
 }
 ```
@@ -125,6 +127,12 @@ const numDeleted = await Person.query().where('id', 1).softDelete(); // number
 ```
 
 Set the custom query builder in a base class like this, not in a mixin. See the [plugins recipe](/recipes/plugins.md).
+
+Use a getter, not `static QueryBuilder = MyQueryBuilder`, when the builder is in its own file and imports the model: if the builder's file is loaded first, the class field is `undefined`. See [builders in their own files](/fork/typescript.md#builders-in-their-own-files).
+
+A builder method that loads relations can declare what it adds to the result with `WithGraphQueryBuilder<this, 'relation'>`. See [builder methods that load relations](/fork/typescript.md#builder-methods-that-load-relations).
+
+`select()` doesn't narrow the row type, in builder methods or elsewhere: the columns that weren't selected are still in the type, but `undefined` at runtime. Use [`castTo<T>()`](/fork/typescript.md#runafter-and-castto-t-set-the-result-type) to type rows with only some columns.
 
 ## Typing functions that take query builders
 

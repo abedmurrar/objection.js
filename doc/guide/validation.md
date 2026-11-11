@@ -75,3 +75,17 @@ try {
   }
 }
 ```
+
+## Validation in graph writes
+
+[insertGraph](/api/query-builder/mutate-methods.html#insertgraph) and [upsertGraph](/api/query-builder/mutate-methods.html#upsertgraph) validate each model in the graph on its own, without its relation properties. [insert](/api/query-builder/mutate-methods.html#insert) and [patch](/api/query-builder/mutate-methods.html#patch) validate the input with the relation properties in it. So a schema rule or a [\$beforeValidate](/api/model/instance-methods.html#beforevalidate) check on a relation property gives different results:
+
+| `Person` has                       | `insert()`, `patch()`              | `insertGraph()`, `upsertGraph()`                                                                |
+| ---------------------------------- | ---------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `required: ['pets']`               | passes when `pets` is given        | fails, `pets` is never there (patches in `upsertGraph()` skip `required` and pass)              |
+| `properties.pets: { minItems: 2 }` | checked                            | not checked                                                                                     |
+| `$beforeValidate(schema, json)`    | `json.pets` is the input array     | `json.pets` is `undefined`                                                                      |
+
+Put rules about the related rows in the related model's schema: graph writes check it for every row they insert or update. A rule about how many related rows there are can't be checked by the validator in a graph write: check it before the query, or in a [transaction](/guide/transactions.html) after it.
+
+This is how objection.js has always worked. It will change in 5.0, so that graph writes validate with the relations like `insert()` does.

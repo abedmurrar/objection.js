@@ -988,6 +988,8 @@ You can add any additional validation to this method. If validation fails, simpl
 
 `opt.old` object contains the old values while `json` contains the new values if validation is being done for an existing object.
 
+In [insertGraph](/api/query-builder/mutate-methods.html#insertgraph) and [upsertGraph](/api/query-builder/mutate-methods.html#upsertgraph), `json` doesn't contain the relation properties. See [validation in graph writes](/guide/validation.html#validation-in-graph-writes).
+
 ##### Arguments
 
 | Argument   | Type                                          | Description                             |
@@ -1033,6 +1035,8 @@ Validates the model instance.
 
 Calls [\$beforeValidate](/api/model/instance-methods.html#beforevalidate) and [\$afterValidate](/api/model/instance-methods.html#aftervalidate) methods. This method is called automatically from [fromJson](/api/model/static-methods.html#static-fromjson) and [\$setJson](/api/model/instance-methods.html#setjson) methods. This method can also be
 called explicitly when needed.
+
+Without the `json` argument, the model is validated without its relation properties. This is how [insertGraph](/api/query-builder/mutate-methods.html#insertgraph) and [upsertGraph](/api/query-builder/mutate-methods.html#upsertgraph) validate each model. See [validation in graph writes](/guide/validation.html#validation-in-graph-writes).
 
 ##### Arguments
 
