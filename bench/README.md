@@ -48,7 +48,7 @@ node bench/count.js --baseline ../other                  # CPU instructions per 
 
 `count.js` runs each scenario under `perf stat` in single-threaded Node processes, so that V8's background compiler and GC threads don't add to the counts. The counts repeat within about ±1%. It needs `perf` and `sudo sysctl kernel.perf_event_paranoid=1` (until the next reboot).
 
-With `--max-change 1`, `count.js` exits with 1 when a scenario takes more than 1% more instructions than the baseline. A scenario over the limit is measured twice more, and only fails if the median of the three is still over: in CI, `transaction: bindKnex + validated insert`, which allocates a new bound class per operation, measured +1.1% once on a branch that didn't change `src/`. The mock `withGraphJoined` scenario, whose count moves with unrelated changes, has its own limit of 6% in the script.
+With `--max-change 1`, `count.js` exits with 1 when a scenario takes more than 1% more instructions than the baseline. A scenario over the limit is measured twice more, and only fails if the median of the three is still over: in CI, `transaction: bindKnex + validated insert`, which allocates a new bound class per operation, measured +1.1% once on a branch that didn't change `src/`. The mock `withGraphFetched` and `withGraphJoined` scenarios, whose counts jump between two levels about 7–9% apart with unrelated changes, have their own limit of 10% in the script.
 
 ## In CI
 

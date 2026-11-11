@@ -44,11 +44,15 @@ const opt = parseArgs(process.argv.slice(2), {
 });
 
 // The scenarios whose counts vary more than the others, with their own limit.
-// The mock withGraphJoined count moves 3–6% with unrelated changes to the code,
-// while its wall time and CPU profile stay the same, probably because of V8's
-// decisions about the join result parser. Lower this once that's understood.
+// The counts of the two mock eager loading scenarios jump between two levels
+// with unrelated changes to the code, while their CPU time stays the same,
+// probably because of V8's decisions about the result parsers. In CI, a change
+// to graph upserts only moved withGraphJoined +8.6% and withGraphFetched -6.5%
+// (7.99M and 9.02M instructions on main, 8.67M and 8.44M on the branch).
+// Lower these once that's understood.
 const MAX_CHANGE_OVERRIDES = {
-  'graph: withGraphJoined [pets.toys] x100': 6,
+  'graph: withGraphFetched [pets.toys, movies] x100': 10,
+  'graph: withGraphJoined [pets.toys] x100': 10,
 };
 
 if (!opt.baseline) {
