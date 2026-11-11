@@ -7,6 +7,7 @@ npm run bench                                   # all scenarios
 npm run bench -- --filter rows                  # scenarios whose name matches a regex
 npm run bench:compare -- --baseline ../other    # compare against another checkout
 node bench/sql-check.js --baseline ../other     # check that both generate the same SQL
+npm run sql-check:upstream                      # compare with objection.js 3.1.5
 ```
 
 - `scenarios/mock.js` runs against a mocked knex (`testUtils/mockKnex.js`) that answers queries with canned rows. These scenarios measure only objection: building queries, running them through the operation pipeline, turning rows into models, eager loading, graph inserts and validation.
@@ -23,6 +24,12 @@ ln -s "$PWD/node_modules" ../objection-baseline/node_modules
 (cd ../objection-baseline && [ -d src ] && npm run build)
 npm run bench:compare -- --baseline ../objection-baseline
 ```
+
+## Compared with objection.js 3.1.5
+
+`npm run sql-check:upstream` installs objection.js 3.1.5 into `.upstream/` and runs `sql-check.js` against it, with the known differences in `upstream-differences.json`. Each entry names a scenario, optionally a client, the reason, and the docs that describe the change. The check fails on a difference that isn't listed, and on an entry that no longer differs. Of the 22 mocked scenarios, 15 generate the same SQL and results as 3.1.5 on postgres, MySQL and SQLite. The others differ on purpose: the expression methods the fork adds, `orWhere()` that no longer escapes a relation's conditions, and batch inserts on MySQL and SQLite.
+
+A new difference is either a change to document, in the changelog and `upstream-differences.json`, or a bug.
 
 ## On a busy machine
 
