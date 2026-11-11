@@ -4,6 +4,8 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+## 4.4.4 (2026-11-11)
+
 ### Fixes
 
 - A modifier or relation listed twice in a relation expression, like `withGraphFetched('pets(onlyDogs, onlyDogs)')` or `'[pets, pets]'`, is applied once. It was applied twice: the modifier's `where` clause was repeated, and the relation was loaded with two identical queries, unless the expression was merged with one of 10 or more modifiers or relations. In that case it was applied once: `union()`, which merges them, kept the duplicates of its first array only when both arrays were shorter than 10 items. It now always returns the unique values of both, like lodash's `union()`, and string expressions go through the same normalization as object ones. Inherited from objection.js.
