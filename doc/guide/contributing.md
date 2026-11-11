@@ -29,6 +29,8 @@ For a pull request to get merged it needs to have the following things:
 
 3. **For features you also need to write documentation.** See the [development setup](/guide/contributing.html#development-setup) section for instructions on how to write documentation.
 
+4. **The checks have to pass.** Besides the tests, CI compares every pull request with `main`. See [checks on pull requests](#checks-on-pull-requests).
+
 ## Development setup
 
 1. **Fork objection in github**
@@ -65,3 +67,13 @@ Two rules keep the compiled code as fast as the JavaScript it replaced:
 - **Import JavaScript modules by name** (`import { parse } from './parser'`), not with `import * as`, which wraps them in an object of getters.
 
 [Biome](https://biomejs.dev/) lints and formats the code. `npm run lint` checks both, and `npm run format` fixes what can be fixed automatically. Run it before committing; CI runs `biome ci`.
+
+## Checks on pull requests
+
+Besides the tests on every database and Node.js version, the `checks` workflow (`.github/workflows/checks.yml`) builds the pull request and `main`, and compares them:
+
+- **The SQL.** `bench/sql-check.js` runs every mocked benchmark scenario on postgres, MySQL and SQLite, and compares the SQL, the bindings and the returned models. Any difference fails. If the pull request changes SQL on purpose, for example to fix a bug, add the `sql-change` label: the check then still shows the difference, but doesn't fail.
+- **The size of the types.** `scripts/typings-bench.js --check` fails when compiling `tests/ts` takes more than 10% more types or instantiations than `tests/ts-bench-baseline.json`. If the growth is worth it, update the baseline with `npm run bench:typings -- --update`.
+- **The speed.** `bench/count.js --max-change 1` counts the CPU instructions per operation of every benchmark scenario, and fails when one takes more than 1% more than on `main`. Counts repeat within about 1%, unlike times. The mock `withGraphJoined` scenario, whose count varies more, is allowed 6%.
+
+To run them locally, see the [benchmarks](https://github.com/abedmurrar/objection.js/tree/main/bench) README.

@@ -46,12 +46,14 @@ jobs:
       - name: Compare the size of the types with the baseline
         run: node scripts/typings-bench.js --check
 
-      - name: Allow perf to count instructions
+      - name: Install valgrind
+        # GitHub's runners don't expose the hardware counters that perf needs.
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq linux-tools-common "linux-tools-$(uname -r)"
-          sudo sysctl kernel.perf_event_paranoid=1
-          perf stat -e instructions:u true
+          sudo apt-get install -y -qq valgrind
 
       - name: Compare the CPU instructions per operation with main
-        run: node bench/count.js --baseline "$BASELINE" --max-change 1
+        run: >
+          /usr/bin/time -f "%es"
+          node bench/count.js --baseline "$BASELINE" --max-change 1
+          --counter valgrind --runs 1 --target 3e8 --jobs "$(nproc)"

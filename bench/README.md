@@ -35,6 +35,12 @@ node bench/count.js --baseline ../other                  # CPU instructions per 
 
 `count.js` runs each scenario under `perf stat` in single-threaded Node processes, so that V8's background compiler and GC threads don't add to the counts. The counts repeat within about ±1%. It needs `perf` and `sudo sysctl kernel.perf_event_paranoid=1` (until the next reboot).
 
+With `--max-change 1`, `count.js` exits with 1 when a scenario takes more than 1% more instructions than the baseline. The mock `withGraphJoined` scenario, whose count moves with unrelated changes, has its own limit of 6% in the script.
+
+## In CI
+
+`.github/workflows/checks.yml` runs on every pull request. It builds the pull request and `main` in two checkouts whose paths have the same length, and runs `sql-check.js`, `scripts/typings-bench.js --check` and `count.js --max-change 1` against `main`. A pull request with the `sql-change` label reports SQL differences without failing. See [checks on pull requests](../doc/guide/contributing.md#checks-on-pull-requests).
+
 `node bench/profile.js "<scenario>"` runs one scenario under the CPU profiler and prints the functions with the most self time. With `--orm`, it runs an ORM scenario on MySQL instead (see below).
 
 ## Against other ORMs on MySQL
