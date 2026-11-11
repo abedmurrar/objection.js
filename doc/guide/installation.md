@@ -1,6 +1,6 @@
 # Installation
 
-`@abedmurrar/objection` can be installed using `npm` or `yarn`. It uses [knex](https://knexjs.org/) as its database access layer, so you also need to install it. It needs Node.js 24 or newer and knex 3.3 or newer. The [requirements](/fork/#requirements) list the supported database versions.
+`@abedmurrar/objection` can be installed using `npm` or `yarn`. It uses [knex](https://knexjs.org/) as its database access layer, so you also need to install it. It needs Node.js 22 or newer and knex 3.3 or newer. The [requirements](/fork/#requirements) list the supported database versions.
 
 ```bash
 npm install @abedmurrar/objection knex
