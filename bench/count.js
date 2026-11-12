@@ -43,18 +43,6 @@ const opt = parseArgs(process.argv.slice(2), {
   jobs: 1,
 });
 
-// The scenarios whose counts vary more than the others, with their own limit.
-// The counts of the two mock eager loading scenarios jump between two levels
-// with unrelated changes to the code, while their CPU time stays the same,
-// probably because of V8's decisions about the result parsers. In CI, a change
-// to graph upserts only moved withGraphJoined +8.6% and withGraphFetched -6.5%
-// (7.99M and 9.02M instructions on main, 8.67M and 8.44M on the branch).
-// Lower these once that's understood.
-const MAX_CHANGE_OVERRIDES = {
-  'graph: withGraphFetched [pets.toys, movies] x100': 10,
-  'graph: withGraphJoined [pets.toys] x100': 10,
-};
-
 if (!opt.baseline) {
   console.error('Usage: node bench/count.js --baseline <path to an objection checkout>');
   process.exit(1);
@@ -97,6 +85,19 @@ function count(testCase, lib, iterations) {
     // build the same hash tables.
     '--hash-seed=1',
     '--random-seed=1',
+    // The same full collections in both checkouts. Without these flags,
+    // a little more heap or code, from the machine or an unrelated
+    // change, moved the eager loading scenarios by 7-15%: V8 runs a full
+    // collection when the old generation reaches a limit, and one fell inside
+    // the measured iterations of one checkout and not the other; and V8
+    // starts allocating the objects of an allocation site in the old
+    // generation (pretenuring) when enough of them survive the scavenges it
+    // happens to run. An old generation larger than any scenario needs leaves
+    // no full collection, and no pretenuring the same allocations. Neither
+    // changes the counts of small queries. A fixed young generation of 16 MB
+    // made them count 28-43% more instructions, so it is left to V8.
+    '--initial-old-space-size=512',
+    '--no-allocation-site-pretenuring',
     path.join(__dirname, 'count-worker.js'),
     testCase.scenarioFile,
     testCase.name,
@@ -164,10 +165,6 @@ function changeOf({ before, after }) {
   return ((after - before) / before) * 100;
 }
 
-function limitOf({ name }) {
-  return MAX_CHANGE_OVERRIDES[name] ?? Number(opt.maxChange);
-}
-
 // Runs `fn` for every item, at most `limit` at a time, keeping the order.
 async function mapLimit(items, limit, fn) {
   const results = new Array(items.length);
@@ -189,7 +186,7 @@ async function main() {
   const results = await mapLimit(cases, Math.max(1, opt.jobs), measure);
 
   if (opt.maxChange !== '') {
-    const overLimit = results.filter((result) => changeOf(result) > limitOf(result));
+    const overLimit = results.filter((result) => changeOf(result) > Number(opt.maxChange));
 
     await mapLimit(overLimit, Math.max(1, opt.jobs), async (result) => {
       console.error(`${result.name}: over the limit, measuring twice more`);
@@ -205,7 +202,7 @@ async function main() {
   for (const result of results) {
     const { name, before, after } = result;
     const change = changeOf(result);
-    const limit = limitOf(result);
+    const limit = Number(opt.maxChange);
 
     if (opt.maxChange !== '' && change > limit) {
       tooSlow.push(`${name}: +${change.toFixed(1)}% (limit ${limit}%)`);
