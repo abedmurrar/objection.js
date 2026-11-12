@@ -4,6 +4,8 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+## 4.4.6 (2026-11-12)
+
 ### Fixes
 
 - `fn.now()` works on SQLite. It was always `CURRENT_TIMESTAMP(6)`, or `CURRENT_TIMESTAMP(precision)`, which SQLite rejects with a syntax error. On SQLite it's now `CURRENT_TIMESTAMP`, like knex's `knex.fn.now()`: SQLite has no precision, so the time is to the second. Inherited from objection.js.
