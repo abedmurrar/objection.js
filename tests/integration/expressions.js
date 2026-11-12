@@ -39,6 +39,7 @@ module.exports = (session) => {
         table.integer('id').primary();
         table.string('name');
         table.string('bio');
+        table.datetime('seenAt', { precision: 6 });
       });
 
       await session.knex.schema.createTable('ExpressionsPet', (table) => {
@@ -258,6 +259,29 @@ module.exports = (session) => {
       const pets = await BoundPet.query().whereIn('id', [1, 2]).orderBy('id');
       expect(pets.map((it) => it.species)).to.eql(['wolf', 'lion']);
       expect(pets.map((it) => it.age)).to.eql([4, 7]);
+    });
+
+    // SQLite has no precision: fn.now() is CURRENT_TIMESTAMP there, to the
+    // second, as text. It was CURRENT_TIMESTAMP(6), which SQLite rejects.
+    it('fn.now() in select and patch', async () => {
+      const [owner] = await BoundOwner.query()
+        .select('id', fn.now().as('now'), fn.now(0).as('now0'))
+        .where('id', 1);
+
+      if (session.isSqlite()) {
+        expect(owner.now).to.match(/^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/);
+        expect(owner.now0).to.match(/^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/);
+      } else {
+        expect(owner.now).to.be.a(Date);
+        expect(owner.now0).to.be.a(Date);
+        expect(owner.now0.getMilliseconds()).to.equal(0);
+      }
+
+      await BoundOwner.query().patch({ seenAt: fn.now() }).where('id', 1);
+
+      const rows = await session.knex('ExpressionsOwner').select('id', 'seenAt').orderBy('id');
+      expect(rows[0].seenAt).to.be.ok();
+      expect(rows[1].seenAt).to.equal(null);
     });
 
     it('casts and comparisons should compose', async () => {

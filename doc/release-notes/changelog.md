@@ -4,9 +4,13 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+### Fixes
+
+- `fn.now()` works on SQLite. It was always `CURRENT_TIMESTAMP(6)`, or `CURRENT_TIMESTAMP(precision)`, which SQLite rejects with a syntax error. On SQLite it's now `CURRENT_TIMESTAMP`, like knex's `knex.fn.now()`: SQLite has no precision, so the time is to the second. Inherited from objection.js.
+
 ### Docs
 
-- The objection module API page has examples for `transaction()` and `transaction.start()`, `ref()` and `Model.ref()`, `val()`, `fn()`, `RelationExpression`, `has()` and `clear()`, `mixin()` and `compose()` with two real plugins, the `format()` and `parse()` of `snakeCaseMappers()`, `AjvValidator`, `ValidationError`, `NotFoundError` and the database errors, with a table of which error properties each database sets. Every example was run on SQLite, MySQL 8.4, MariaDB 11.4 and postgres. It also notes that `fn.now()` doesn't work on SQLite, which doesn't accept a precision.
+- The objection module API page has examples for `transaction()` and `transaction.start()`, `ref()` and `Model.ref()`, `val()`, `fn()`, `RelationExpression`, `has()` and `clear()`, `mixin()` and `compose()` with two real plugins, the `format()` and `parse()` of `snakeCaseMappers()`, `AjvValidator`, `ValidationError`, `NotFoundError` and the database errors, with a table of which error properties each database sets. Every example was run on SQLite, MySQL 8.4, MariaDB 11.4 and postgres.
 
 ## 4.4.5 (2026-11-11)
 

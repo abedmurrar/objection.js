@@ -3,7 +3,7 @@ import { RawBuilder, normalizeRawArgs } from './RawBuilder';
 import { ref, type ReferenceBuilder } from './ReferenceBuilder';
 import { expression, type ExpressionQueryBuilder } from './expressions';
 import { asArray, asSingle, isNumber, isObject, isPlainObject } from '../utils/objectUtils';
-import { getDialect, isMySql, isMariaDb } from '../utils/knexUtils';
+import { getDialect, isMySql, isMariaDb, isSqlite } from '../utils/knexUtils';
 import { jsonCastsForDialect, JSON_CAST } from '../utils/mysqlJsonPath';
 import {
   FUNCTIONS,
@@ -232,6 +232,29 @@ class ExcludedBuilder extends FunctionBuilder {
   }
 }
 
+// `CURRENT_TIMESTAMP(precision)`, or `CURRENT_TIMESTAMP` on SQLite, which has
+// no precision and rejects one.
+class NowBuilder extends FunctionBuilder {
+  declare _precision: number;
+
+  constructor(precision: number) {
+    super('', []);
+    this._precision = precision;
+  }
+
+  toKnexRaw(builder: ExpressionQueryBuilder): Knex.Raw {
+    // We need to use a literal precision instead of a binding here
+    // for the CURRENT_TIMESTAMP to work. This is okay here since `fn.now()`
+    // makes sure `precision` is a number. There's no chance of SQL
+    // injection here.
+    this._sql = isSqlite(builder.unsafeKnex())
+      ? 'CURRENT_TIMESTAMP'
+      : `CURRENT_TIMESTAMP(${this._precision})`;
+
+    return super.toKnexRaw(builder);
+  }
+}
+
 function buildOver({ partitionBy, orderBy }: OverOptions): [string, unknown[]] {
   const parts: string[] = [];
   const args: unknown[] = [];
@@ -288,11 +311,7 @@ fn.now = (precision: unknown): FunctionBuilder => {
     precision = 6;
   }
 
-  // We need to use a literal precision instead of a binding here
-  // for the CURRENT_TIMESTAMP to work. This is okay here since we
-  // make sure `precision` is a number. There's no chance of SQL
-  // injection here.
-  return new FunctionBuilder(`CURRENT_TIMESTAMP(${precision})`, []);
+  return new NowBuilder(precision as number);
 };
 
 fn.case = (...args: unknown[]): CaseBuilder => new CaseBuilder(args.length !== 0, args[0]);
