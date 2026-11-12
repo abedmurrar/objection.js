@@ -491,7 +491,7 @@ await Person.query()
   .groupBy('persons.id');
 ```
 
-`fn.now()` is `CURRENT_TIMESTAMP(6)`, and `fn.now(precision)` sets the number of fractional digits. It works on postgres, MySQL and MariaDB. SQLite doesn't accept a precision, so use `raw('CURRENT_TIMESTAMP')` there.
+`fn.now()` is `CURRENT_TIMESTAMP(6)`, and `fn.now(precision)` sets the number of fractional digits. SQLite has no precision: there `fn.now()` is `CURRENT_TIMESTAMP`, to the second, and a select returns it as text like `'2026-11-12 09:30:00'`.
 
 ```js
 await Person.query().patch({ updatedAt: fn.now() }).where('id', 1);

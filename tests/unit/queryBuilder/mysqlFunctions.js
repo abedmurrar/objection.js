@@ -44,6 +44,18 @@ describe('MySQL fn helpers', () => {
     expect(expr(fn.count(ref('id')))).to.equal('COUNT(`id`)');
   });
 
+  it('fn.now() should leave out the precision on SQLite, which has none', () => {
+    const sqlite = Knex({ client: 'sqlite3', useNullAsDefault: true });
+    const now = fn.now(3);
+
+    expect(sql(fn.now(), sqlite)).to.equal('select CURRENT_TIMESTAMP as `v` from `persons`');
+    expect(sql(now, sqlite)).to.equal('select CURRENT_TIMESTAMP as `v` from `persons`');
+    // The same builder on another database.
+    expect(expr(now)).to.equal('CURRENT_TIMESTAMP(3)');
+    expect(sql(fn.now(), pg)).to.equal('select CURRENT_TIMESTAMP(6) as "v" from "persons"');
+    expect(sql(fn.now('2'), pg)).to.equal('select CURRENT_TIMESTAMP(2) as "v" from "persons"');
+  });
+
   it('plain functions should bind their arguments', () => {
     expect(fn.length).to.not.equal(1);
     expect(expr(fn.length(ref('name')))).to.equal('LENGTH(`name`)');

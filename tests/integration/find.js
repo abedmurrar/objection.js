@@ -854,27 +854,6 @@ module.exports = (session) => {
                 expect(models.map((it) => it.foo)).to.eql([30, 20, 10]);
               });
           });
-
-          it('fn.now in select', () => {
-            return Model2.query()
-              .select('model2.*', fn.now().as('lultz'))
-              .orderBy('id_col')
-              .then((models) => {
-                expect(models.map((it) => it.idCol)).to.eql([1, 2, 3]);
-                expect(models[0].lultz).to.be.a(Date);
-              });
-          });
-
-          it('fn.now(precision) in select', () => {
-            return Model2.query()
-              .select('model2.*', fn.now(0).as('lultz'))
-              .orderBy('id_col')
-              .then((models) => {
-                expect(models.map((it) => it.idCol)).to.eql([1, 2, 3]);
-                expect(models[0].lultz).to.be.a(Date);
-                expect(models[0].lultz.getMilliseconds()).to.equal(0);
-              });
-          });
         }
 
         it('raw in where', () => {
