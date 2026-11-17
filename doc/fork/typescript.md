@@ -135,7 +135,7 @@ Inferred relations are added to the models objection creates: the results of `qu
 interface Person extends RelationsOf<typeof Person> {}
 ```
 
-This only works when no relation leads back to the model. `Person` above has two that do: `mom` refers to `Person` itself, and `pets` leads to `Animal`, whose `owner` refers to `Person`. For models like these, TypeScript reports a circularity error, like `Type 'Person' recursively references itself as a base type`. Use `ModelInstance<typeof Person>` instead, or declare the relation properties in the class.
+It also works when relations lead back to the model, like `mom`, which refers to `Person` itself, and `pets`, which leads to `Animal`, whose `owner` refers to `Person`. That's with `relationMappings` written as an object, a function, a getter or with `defineRelations()`, and with `modelClass` written as a class or a function that returns one. Before 4.4.10, models like these got a circularity error, like `Type of property 'mom' circularly references itself in mapped type` or `Type 'Person' recursively references itself as a base type`.
 
 `ModelInstance<typeof Person>` is the instance type with the inferred relations:
 

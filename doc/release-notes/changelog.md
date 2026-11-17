@@ -4,6 +4,10 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+### Fixes
+
+- TypeScript: `interface Person extends RelationsOf<typeof Person> {}` works when a relation leads back to the model, like a `mom` relation to `Person` itself, or `Person.pets` to an `Animal` whose `owner` is a `Person`. It reported `Type of property 'mom' circularly references itself in mapped type`, or with `defineRelations()` `Type 'Person' recursively references itself as a base type`. The relation types checked that `modelClass` is a `Model` by comparing every member, which include the relations being inferred. They now check one member, and `defineRelations()` takes any class: the mappings are still checked against `RelationMappings` where they're assigned to `relationMappings`, so a class that isn't a model is still an error.
+
 ## 4.4.7 (2026-11-17)
 
 ### Fixes
