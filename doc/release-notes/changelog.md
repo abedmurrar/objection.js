@@ -4,6 +4,10 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+### Docs
+
+- The comparison with other ORMs in [Performance](/fork/performance.html#compared-with-other-orms) is rerun on 4.7.0, with the same versions of the other contenders as the run of 4.2.5. The fork found a row by id 8% faster than in that run, deleted one 7% faster, and ran the nested insert 8% faster; it's still the fastest of the ORMs at finding rows and eager loading, and drizzle-orm, typeorm and sequelize still delete a row by id faster. The numbers for mysql2's own pool are updated too.
+
 ## 4.7.0 (2026-11-17)
 
 ### What's new
