@@ -4,6 +4,8 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+## 4.6.0 (2026-11-17)
+
 ### What's new
 
 - `cursorPage(limit, after)` pages by the values of the sort columns instead of an offset: `const { results, next } = await Person.query().orderBy('lastName').cursorPage(20, after)`. It runs one query and no count, and a page deep in the result is as fast as the first one: on 100,000 rows with an index on the sort columns, the page at row 50,000 took 0.6 to 1 ms, where `page()` took 31 to 69 ms on MySQL 8.4, MariaDB 10.6 and 11.4. The order is the query's `orderBy()` columns followed by the id columns, so no row is skipped or repeated between pages, also with composite ids. The condition is written so that MySQL and MariaDB use an index range for it, where a row value comparison scanned the table. The cursor's values are always bound, and a cursor that `cursorPage()` didn't make for the query's sort columns is rejected with a `ValidationError` of the new type `InvalidCursor`, status code 400, before the query runs. See [Paging](/recipes/paging.html#cursor-pagination).
