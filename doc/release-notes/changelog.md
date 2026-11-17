@@ -4,6 +4,10 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+### Fixes
+
+- TypeScript: the static `modifierNotFound(builder, modifier)` hook of models is declared. It's documented and called for unknown modifiers, but overriding it with `static override` was an error, and `super.modifierNotFound()` didn't exist in the types. Found by comparing the typings with the implementation.
+
 ## 4.4.10 (2026-11-17)
 
 ### Fixes
