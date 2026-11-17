@@ -4,6 +4,10 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+### Internal
+
+- `upsertGraph()` and `insertGraph()` run their steps as plain `await`s instead of a chain of curried `.then()` callbacks. The order is the same: fetch the current graph, check which rows exist, check for errors, prune, create every action, then delete, insert, patch and upsert recursively.
+
 ## 4.4.8 (2026-11-17)
 
 ### Fixes
