@@ -250,6 +250,7 @@ export import ModelClassMethod = objection.ModelClassMethod;
 export import ReturningMethod = objection.ReturningMethod;
 export import TimeoutOptions = objection.TimeoutOptions;
 export import TimeoutMethod = objection.TimeoutMethod;
+export import CursorPage = objection.CursorPage;
 export import Page = objection.Page;
 export import RunBeforeCallback = objection.RunBeforeCallback;
 export import RunBeforeMethod = objection.RunBeforeMethod;

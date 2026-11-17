@@ -127,6 +127,7 @@ describe('integration tests', () => {
       require('./misc')(session);
       require('./find')(session);
       require('./stream')(session);
+      require('./cursorPage')(session);
       require('./insert')(session);
       require('./batchInsert')(session);
       require('./insertGraph')(session);

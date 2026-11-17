@@ -45,6 +45,7 @@ import { OnErrorOperation } from './operations/OnErrorOperation';
 import { SelectOperation } from './operations/select/SelectOperation';
 import { EagerOperation } from './operations/eager/EagerOperation';
 import { RangeOperation } from './operations/RangeOperation';
+import { CursorPageOperation } from './operations/CursorPageOperation';
 import { FirstOperation } from './operations/FirstOperation';
 import { FromOperation } from './operations/FromOperation';
 import { KnexOperation } from './operations/KnexOperation';
@@ -772,6 +773,13 @@ class QueryBuilder extends QueryBuilderBase {
 
   page(page: number, pageSize: number): this {
     return this.range(+page * +pageSize, (+page + 1) * +pageSize - 1);
+  }
+
+  cursorPage(limit: number, after?: string | null): this {
+    return this.clear(CursorPageOperation).addOperation(new CursorPageOperation('cursorPage'), [
+      limit,
+      after,
+    ]);
   }
 
   columnInfo({ table = null }: { table?: string | null } = {}): KnexLike {

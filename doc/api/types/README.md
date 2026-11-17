@@ -426,7 +426,7 @@ See the [error handling recipe](/recipes/error-handling.html) for more info.
 | Property   | Type   | Description                                                                                                                                                                                    |
 | ---------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | statusCode | number | HTTP status code for interop with express error handlers and other libraries that search for status code from errors.                                                                          |
-| type       | string | One of "ModelValidation", "RelationExpression", "UnallowedRelation" and "InvalidGraph". This can be any string for your own custom errors. The listed values are used internally by objection. |
+| type       | string | One of "ModelValidation", "RelationExpression", "UnallowedRelation", "InvalidGraph" and "InvalidCursor" (a cursor that [cursorPage()](/api/query-builder/other-methods.html#cursorpage) didn't make). This can be any string for your own custom errors. The listed values are used internally by objection. |
 | data       | object | The content of this property is documented below for "ModelValidation" errors. For other types, this can be any data.                                                                          |
 
 If `type` is `"ModelValidation"` then `data` object should follow this pattern:

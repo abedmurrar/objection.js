@@ -29,6 +29,9 @@ features:
   - title: Large results without the memory
     details: for await (const person of Person.query().stream()) yields the models one at a time as the database sends the rows, so memory stays flat however many rows a query finds.
     link: /recipes/streaming
+  - title: Cursor pagination
+    details: cursorPage(20, after) pages by the sort columns instead of an offset, with no count query. The page at row 50,000 took under 1 ms where page() took 31 to 69 ms on MySQL and MariaDB.
+    link: /recipes/paging#cursor-pagination
   - title: Expressions without raw SQL
     details: Pet.ref('age').gte(3), fn.count().filter(...), fn.case(), window functions and more, all typed.
     link: /fork/expressions
@@ -54,7 +57,7 @@ What you get:
 
 - **A declarative way of [defining models](/guide/models.html) and the relations between them**
 - **[Fetching, inserting, updating and deleting](/guide/query-examples.html) objects with the full power of SQL**
-- **[Streaming](/recipes/streaming.html) large results as models, one at a time**
+- **[Streaming](/recipes/streaming.html) large results as models, one at a time, and [cursor pagination](/recipes/paging.html#cursor-pagination)**
 - **[Eager loading](/guide/query-examples.html#eager-loading), [inserting](/guide/query-examples.html#graph-inserts) and [upserting](/guide/query-examples.html#graph-upserts) object graphs**
 - **Easy [transactions](/guide/transactions.html)**
 - **[Strict TypeScript types](/fork/typescript)**
