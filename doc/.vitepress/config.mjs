@@ -178,6 +178,7 @@ export default defineConfig({
         'snake-case-to-camel-case-conversion': 'Snake case to camel case conversion',
         paging: 'Paging',
         streaming: 'Streaming',
+        tracing: 'Tracing',
         'returning-tricks': 'PostgreSQL "returning" tricks',
         timestamps: 'Timestamps',
         'custom-query-builder': 'Custom query builder',
