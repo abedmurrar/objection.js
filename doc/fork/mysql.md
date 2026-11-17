@@ -354,10 +354,10 @@ await knex.destroy();
 await pool.end();
 ```
 
-What we measured with `bench/orms` (the `fork-native-pool` contender, 4 connections, MySQL 8.4 in Docker, 3 runs):
+What we measured with `bench/orms` (the `fork-native-pool` contender, 4 connections, MySQL 8.4 in Docker):
 
-- Finds of one row by id were 2% to 17% faster.
-- Finds of 100 rows were 3% to 5% faster.
+- Finds of one row by id were 2% to 17% faster in 3 runs on 4.2.5, and 10% faster on 4.7.0 (133.6 µs against 148.6 µs).
+- Finds of 100 rows were 3% to 5% faster on 4.2.5, and the same on 4.7.0 (247.3 µs against 246.4 µs).
 - Everything else, from finds of 1000 rows to eager loading, writes and transactions, changed by less than the runs differed from each other.
 
 What breaks or changes, checked with knex 3.3.0 and mysql2 3.24:
