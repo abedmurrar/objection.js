@@ -1,6 +1,7 @@
 {
   // Compiles src/ into lib/, which is what the package ships and the tests
-  // run. The public types are still the hand-written typings/ for now.
+  // run. The public types are the hand-written typings/, which
+  // tests/ts-drift/drift.ts compares with src/.
   "compilerOptions": {
     "rootDir": "src",
     "outDir": "lib",

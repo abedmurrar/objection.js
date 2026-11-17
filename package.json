@@ -26,7 +26,7 @@
     "test": "npm run lint && mocha --slow 10 --timeout 15000 --reporter spec --recursive tests --exclude \"tests/unit/relations/files/**\" && npm run test:typings",
     "pretest:fast": "npm run build",
     "test:fast": "mocha --slow 10 --timeout 15000 --reporter spec --recursive tests --bail --exclude \"tests/unit/relations/files/**\"",
-    "test:typings": "npm run build && node scripts/generate-fn-typings.js --check && node scripts/generate-esm-typings.js --check && tsc && tsc -p tests/ts/tsconfig.loose.json && node scripts/typings-errors.js && attw --pack .",
+    "test:typings": "npm run build && node scripts/generate-fn-typings.js --check && node scripts/generate-esm-typings.js --check && tsc && tsc -p tests/ts/tsconfig.loose.json && tsc -p tests/ts-drift/tsconfig.json && node scripts/typings-errors.js && attw --pack .",
     "bench:typings": "node scripts/typings-bench.js",
     "prebench": "npm run build",
     "bench": "node bench/run.js",

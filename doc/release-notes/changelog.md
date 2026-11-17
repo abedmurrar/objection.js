@@ -4,6 +4,10 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+### Internal
+
+- `npm run test:typings` compares the public types in `typings/` with the implementation in `src/` (`tests/ts-drift/drift.ts`): every exported value, `Model` member and static, and `QueryBuilder` method that one of them has, the other must have too, and be a function in both where the typings say so. Members of the implementation that aren't public are listed there. It found the missing `modifierNotFound()` above. The typings stay hand-written: `src/` is typed loosely on purpose, and generating the public types from it would mean typing the whole implementation with the generics of the public API.
+
 ### Fixes
 
 - TypeScript: the static `modifierNotFound(builder, modifier)` hook of models is declared. It's documented and called for unknown modifiers, but overriding it with `static override` was an error, and `super.modifierNotFound()` didn't exist in the types. Found by comparing the typings with the implementation.
