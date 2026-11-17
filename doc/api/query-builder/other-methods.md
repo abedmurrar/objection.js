@@ -1005,6 +1005,47 @@ Postgresql has window functions that can be used to get the total count like thi
 | ----------------------------------- | --------------------------------- |
 | [QueryBuilder](/api/query-builder/) | `this` query builder for chaining |
 
+## cursorPage()
+
+```js
+queryBuilder = queryBuilder.cursorPage(limit, after);
+```
+
+```js
+const first = await Person.query().where('age', '>', 20).orderBy('lastName').cursorPage(100);
+
+console.log(first.results.length); // --> 100
+console.log(first.next); // --> 'WyJCcm93biIsMzQ1XQ' or null on the last page
+
+const second = await Person.query()
+  .where('age', '>', 20)
+  .orderBy('lastName')
+  .cursorPage(100, first.next);
+```
+
+Fetches the `limit` rows after the cursor `after`, and a cursor for the next page. This is keyset pagination: instead of skipping rows with an offset, the query asks for the rows that sort after the last row of the previous page. It runs one query, without a count, and a page deep in the result is as fast as the first one, where [page()](#page) reads and skips every row before the page. On a table of 100,000 rows with an index on the sort columns, the page at row 50,000 took 0.6 to 1 ms with `cursorPage()` and 31 to 69 ms with `page()` on MySQL 8.4, MariaDB 10.6 and 11.4.
+
+The order is the order of the query's `orderBy()` calls, followed by the id columns that aren't among them, so that every row has its own place in the order and no row is skipped or repeated between pages. Without `orderBy()`, the pages are in the order of the ids. Index the sort columns, followed by the id, for the speed.
+
+The cursor is the values of the sort columns of the last row of the page, encoded as base64url JSON. Pass it back with the same query to get the next page. `next` is `null` on the last page. The values of a cursor are always bound as values, never put in the SQL, and a cursor that `cursorPage()` didn't make for the query's sort columns is rejected with a [ValidationError](/api/types/#class-validationerror) of type `InvalidCursor` and status code 400, before the query runs. A cursor isn't signed: it only tells where a page starts, so the query must still filter the rows the user may see.
+
+Only plain column names can be sort columns, with `'asc'` or `'desc'`, also as an array like `orderBy([{ column: 'lastName', order: 'desc' }, 'firstName'])`. The sort columns must be selected and can't be `null`. `cursorPage()` sets the limit itself, so it can't be combined with `limit()`, `offset()`, `page()`, `range()` or `first()`. It can't be used with `withGraphJoined()`, whose rows aren't one per model; [withGraphFetched()](/api/query-builder/eager-methods.html#withgraphfetched) works, and loads the relations of the page only.
+
+See also [Paging](/recipes/paging.html#cursor-pagination).
+
+##### Arguments
+
+| Argument | Type                   | Description                                                              |
+| -------- | ---------------------- | ------------------------------------------------------------------------ |
+| limit    | number                 | The number of rows of a page, a positive integer.                        |
+| after    | string \| null         | The `next` cursor of the previous page. Leave it out for the first page. |
+
+##### Return value
+
+| Type                                | Description                                                                            |
+| ----------------------------------- | -------------------------------------------------------------------------------------- |
+| [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. Resolves to `{ results, next }` instead of an array. |
+
 ## range()
 
 ```js

@@ -6,6 +6,7 @@ const ValidationErrorType = {
   RelationExpression: 'RelationExpression',
   UnallowedRelation: 'UnallowedRelation',
   InvalidGraph: 'InvalidGraph',
+  InvalidCursor: 'InvalidCursor',
 };
 
 // An error message, or an object with one, like the errors of Ajv.

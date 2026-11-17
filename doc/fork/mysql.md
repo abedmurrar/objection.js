@@ -236,6 +236,18 @@ A transaction is faster either way: without one, MySQL commits each update to di
 
 Graph patches and deletes of many-to-many rows filter the rows by their ids only, without a subquery that reads the join table. Such subqueries lock the join rows they read, and they deadlocked with concurrent writes of the join table, also between separate `upsertGraph()` calls at concurrency 1. Two calls that write the same rows at the same time can still deadlock, as with any other queries: run them in a transaction and retry on `ER_LOCK_DEADLOCK`.
 
+## Cursor pagination uses the index
+
+[cursorPage()](/api/query-builder/other-methods.html#cursorpage) writes the condition for the rows after the cursor as `a >= ? and (a > ? or (a = ? and id > ?))` rather than as a row value comparison `(a, id) > (?, ?)`. On a table of 100,000 rows with an index on `(score, id)`, `EXPLAIN` showed:
+
+| Condition                       | MySQL 8.4                  | MariaDB 10.6               | MariaDB 11.4             |
+| ------------------------------- | -------------------------- | -------------------------- | ------------------------ |
+| `cursorPage()`'s condition      | index range                | index range                | index range              |
+| `(score, id) > (?, ?)`          | full table scan and a sort | full table scan and a sort | index                    |
+| `limit 20 offset 50000` (`page()`) | full table scan and a sort | full table scan and a sort | index, 50,020 rows read |
+
+The page at row 50,000 took 0.99 ms with `cursorPage()` and 31 ms with `page()` on MySQL 8.4, 0.60 ms and 69 ms on MariaDB 10.6, and 0.68 ms and 45 ms on MariaDB 11.4. For the speed, index the sort columns followed by the id columns, in the order of `orderBy()`.
+
 ## `fn` helpers for MySQL functions
 
 `fn` has a helper for every MySQL 8.4 built-in function (about 230 of them), with camel-case names. For example, `fn.dateFormat()` calls `DATE_FORMAT()` and `fn.jsonArrayAgg()` calls `JSON_ARRAYAGG()`. Arguments are bindings, so strings are values. Pass columns with `ref()` or `Model.ref()`.

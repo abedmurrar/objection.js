@@ -1706,7 +1706,9 @@ declare namespace Objection {
           ? I
           : [R] extends [Page<infer I>]
             ? I
-            : Exclude<R, undefined>;
+            : [R] extends [CursorPage<infer I>]
+              ? I
+              : Exclude<R, undefined>;
 
   type IsSingleResult<R> =
     IsAnyType<R> extends true
@@ -1717,7 +1719,9 @@ declare namespace Objection {
           ? false
           : [R] extends [Page<any>]
             ? false
-            : true;
+            : [R] extends [CursorPage<any>]
+              ? false
+              : true;
 
   /**
    * The type-level state of a query builder. It's kept when the result kind
@@ -1872,9 +1876,11 @@ declare namespace Objection {
       ? I[]
       : R extends Page<any>
         ? Page<I>
-        : R extends undefined | null
-          ? R
-          : I;
+        : R extends CursorPage<any>
+          ? CursorPage<I>
+          : R extends undefined | null
+            ? R
+            : I;
 
   /**
    * The query builder type of the static `query()` method of model class `MC`.
@@ -2443,6 +2449,15 @@ declare namespace Objection {
     (ms: number, options?: TimeoutOptions): QB;
   }
 
+  /**
+   * The result of `cursorPage()`: the models of the page, and the cursor of the
+   * next page, which is `null` on the last page.
+   */
+  export interface CursorPage<T> {
+    results: T[];
+    next: string | null;
+  }
+
   export interface Page<T> {
     total: number;
     results: T[];
@@ -2802,6 +2817,12 @@ declare namespace Objection {
       Page<this['~state']['item']>,
       this['~state']
     >;
+    '~cursorPage': RebindQueryBuilder<
+      this,
+      this['ModelType'],
+      CursorPage<this['~state']['item']>,
+      this['~state']
+    >;
 
     select: SelectMethod<this>;
     columns: SelectMethod<this>;
@@ -3145,6 +3166,21 @@ declare namespace Objection {
     clone(): this;
 
     page(page: number, pageSize: number): this['~page'];
+    /**
+     * Fetches `limit` models after the cursor `after`, in the order of the
+     * query's `orderBy()` columns and then the id columns, and the cursor of the
+     * next page. Unlike `page()`, it doesn't count the rows, and a page deep in
+     * the result is as fast as the first one:
+     *
+     * ```ts
+     * const { results, next } = await Person.query()
+     *   .orderBy('lastName')
+     *   .cursorPage(20, req.query.after);
+     * ```
+     *
+     * An invalid cursor throws a `ValidationError` of type `InvalidCursor`.
+     */
+    cursorPage(limit: number, after?: string | null): this['~cursorPage'];
     range(): this['~page'];
     range(start: number, end: number): this['~page'];
     offset(offset: number): this;
@@ -3632,7 +3668,8 @@ declare namespace Objection {
     | 'ModelValidation'
     | 'RelationExpression'
     | 'UnallowedRelation'
-    | 'InvalidGraph';
+    | 'InvalidGraph'
+    | 'InvalidCursor';
 
   export class ValidationError extends Error {
     constructor(args: CreateValidationErrorArgs & { modelClass?: ModelClass<Model> });

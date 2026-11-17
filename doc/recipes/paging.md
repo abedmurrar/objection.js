@@ -50,3 +50,25 @@ await Person.query().delete().page(2, 10);
 // "Aborted query compilation: `limit` has no effect on a `delete` statement".
 await Person.query().delete().page(0, 10);
 ```
+
+## Cursor pagination
+
+[cursorPage](/api/query-builder/other-methods.html#cursorpage) pages by the values of the sort columns instead of an offset. It runs one query and no count, and a page far into the result is as fast as the first one. Use it for infinite scrolling, APIs and exports, where the user goes to the next page rather than to page 2500:
+
+```js
+router.get('/persons', async (req, res) => {
+  const page = await Person.query()
+    .where('age', '>', 20)
+    .orderBy('lastName')
+    .cursorPage(50, req.query.after);
+
+  res.send({ persons: page.results, next: page.next });
+});
+```
+
+The client passes `next` back as `after` until it is `null`. An invalid `after` throws a `ValidationError` with status code 400, so it becomes a 400 response like any other invalid input.
+
+Rows that are inserted or deleted between two requests don't shift the pages, as they do with an offset: no row is shown twice or skipped because another row was added before it.
+
+`cursorPage()` has no total and can't jump to a page. Use `page()` when you need either, or count the rows once with [resultSize](/api/query-builder/other-methods.html#resultsize).
+
