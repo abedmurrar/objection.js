@@ -13,7 +13,6 @@ import { GraphNodeDbExistence } from './GraphNodeDbExistence';
 import { GraphData } from './GraphData';
 import { uniqBy, asArray, isObject } from '../../utils/objectUtils';
 import type { Graph, GraphEdge, GraphModel, GraphNode } from './GraphData';
-import type { GraphAction } from './GraphAction';
 import type { GraphOptionsInput } from './GraphOptions';
 import type { QueryBuilder } from '../QueryBuilder';
 import type { ModelClass } from '../QueryBuilderOperationSupport';
@@ -47,18 +46,22 @@ class GraphUpsert {
     return { skipValidation: true };
   }
 
-  run(builder: QueryBuilder): Promise<GraphModel | GraphModel[]> {
+  async run(builder: QueryBuilder): Promise<GraphModel | GraphModel[]> {
     const modelClass = builder.modelClass();
     const graphOptions = new GraphOptions(this.upsertOpt, this.insertOnly);
 
     const graph = ModelGraph.create(modelClass, this.objects) as Graph;
     assignDbRefsAsRelateProps(graph);
 
-    return createGraphData(builder, graphOptions, graph)
-      .then(checkForErrors(builder))
-      .then(pruneGraphs())
-      .then(executeOperations(builder))
-      .then(returnResult(this.objects, this.isArray));
+    const graphData = await createGraphData(builder, graphOptions, graph);
+
+    // The checks look at the whole graph, so they run before it's pruned.
+    checkForErrors(graphData, builder);
+    pruneGraphs(graphData);
+
+    await executeOperations(graphData, builder);
+
+    return this.isArray ? this.objects : this.objects[0];
   }
 }
 
@@ -112,17 +115,13 @@ function fetchCurrentGraph(
 // Remove branches from the graph that require no operations. For example
 // we never want to do anything for descendant nodes of a node that is
 // deleted or unrelated. We never delete recursively.
-function pruneGraphs(): (graphData: GraphData) => GraphData {
-  return (graphData) => {
-    pruneRelatedBranches(graphData);
-    pruneSkippedBranches(graphData);
+function pruneGraphs(graphData: GraphData): void {
+  pruneRelatedBranches(graphData);
+  pruneSkippedBranches(graphData);
 
-    if (!graphData.graphOptions.isInsertOnly()) {
-      pruneDeletedBranches(graphData);
-    }
-
-    return graphData;
-  };
+  if (!graphData.graphOptions.isInsertOnly()) {
+    pruneDeletedBranches(graphData);
+  }
 }
 
 function pruneRelatedBranches(graphData: GraphData): void {
@@ -271,18 +270,14 @@ function removeNodesFromGraph(nodesToRemove: Set<GraphNode>, graph: Graph): Grap
   return graph;
 }
 
-function checkForErrors(builder: QueryBuilder): (graphData: GraphData) => GraphData {
-  return (graphData) => {
-    checkForNotFoundErrors(graphData, builder);
-    checkForUnallowedRelationErrors(graphData, builder);
-    checkForUnallowedReferenceErrors(graphData, builder);
+function checkForErrors(graphData: GraphData, builder: QueryBuilder): void {
+  checkForNotFoundErrors(graphData, builder);
+  checkForUnallowedRelationErrors(graphData, builder);
+  checkForUnallowedReferenceErrors(graphData, builder);
 
-    if (graphData.graphOptions.isInsertOnly()) {
-      checkForHasManyRelateErrors(graphData);
-    }
-
-    return graphData;
-  };
+  if (graphData.graphOptions.isInsertOnly()) {
+    checkForHasManyRelateErrors(graphData);
+  }
 }
 
 function checkForNotFoundErrors(graphData: GraphData, builder: QueryBuilder): void {
@@ -358,34 +353,21 @@ function checkForHasManyRelateErrors(graphData: GraphData): void {
   }
 }
 
-function executeOperations(builder: QueryBuilder): (graphData: GraphData) => Promise<unknown> {
-  return (graphData) => {
-    const operations = graphData.graphOptions.isInsertOnly()
-      ? [GraphInsert]
-      : [GraphDelete, GraphInsert, GraphPatch, GraphRecursiveUpsert];
+// Deletes, then inserts, then patches, then upserts recursively, one action
+// at a time. The actions of every operation are created before the first one
+// runs, so an error in creating them, e.g. for a cycle, writes nothing.
+async function executeOperations(graphData: GraphData, builder: QueryBuilder): Promise<void> {
+  const operations = graphData.graphOptions.isInsertOnly()
+    ? [GraphInsert]
+    : [GraphDelete, GraphInsert, GraphPatch, GraphRecursiveUpsert];
 
-    // Create all actions before chaining the first ones, which would run even
-    // if creating the actions of a later operation throws, e.g. for a cycle.
-    const operationActions = operations.map((Operation) =>
-      new Operation(graphData).createActions(),
-    );
+  const operationActions = operations.map((Operation) => new Operation(graphData).createActions());
 
-    return operationActions.reduce<Promise<unknown>>(
-      (promise, actions) => promise.then(() => executeActions(builder, actions)),
-      Promise.resolve(),
-    );
-  };
-}
-
-function executeActions(builder: QueryBuilder, actions: GraphAction[]): Promise<unknown> {
-  return actions.reduce<Promise<unknown>>(
-    (promise, action) => promise.then(() => action.run(builder)),
-    Promise.resolve(),
-  );
-}
-
-function returnResult(objects: GraphModel[], isArray: boolean): () => GraphModel | GraphModel[] {
-  return () => (isArray ? objects : objects[0]);
+  for (const actions of operationActions) {
+    for (const action of actions) {
+      await action.run(builder);
+    }
+  }
 }
 
 export { GraphUpsert };

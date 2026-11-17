@@ -330,6 +330,7 @@ export import UnknownRelationName = objection.UnknownRelationName;
 export import SetRelatedValue = objection.SetRelatedValue;
 export import UncheckedRelationName = objection.UncheckedRelationName;
 export import UncheckedRelatedValue = objection.UncheckedRelatedValue;
+export import DefinedModelClass = objection.DefinedModelClass;
 export import RelationMappingsDefinition = objection.RelationMappingsDefinition;
 export import DefineRelationsFunction = objection.DefineRelationsFunction;
 export import RelationProperty = objection.RelationProperty;

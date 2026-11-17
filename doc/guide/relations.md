@@ -202,13 +202,14 @@ const person: PersonModel = new Person();
 person.pets; // Animal[] | undefined
 ```
 
-For a model whose relations never lead back to it, there's also a shortcut that adds the relations to the class itself, so they're there for `new Person()` and for `this` in the model's methods:
+There's also a shortcut that adds the relations to the class itself, so they're there for `new Person()` and for `this` in the model's methods:
 
 ```ts
-interface Pet extends RelationsOf<typeof Pet> {}
+interface Person extends RelationsOf<typeof Person> {}
+interface Animal extends RelationsOf<typeof Animal> {}
 ```
 
-It doesn't work for `Person` above: `mom` refers to `Person` itself, and `pets` leads to `Animal`, whose owner is a `Person`. TypeScript reports a circularity error for models like that (`Type 'Person' recursively references itself as a base type`). Use `ModelInstance<typeof Person>` instead, or declare the relation properties in the class. See [TypeScript](/fork/typescript) for more.
+It works when a relation leads back to the model, like `mom` above, which refers to `Person` itself, and `pets`, which leads to `Animal`, whose owner is a `Person`. Before 4.4.10, TypeScript reported a circularity error for models like these. See [TypeScript](/fork/typescript) for more.
 
 ### Loaded relations
 
