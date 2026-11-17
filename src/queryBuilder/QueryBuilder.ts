@@ -18,6 +18,8 @@ import { QueryBuilderBase } from './QueryBuilderBase';
 import { FindOperation, callInstanceAfterFind } from './operations/FindOperation';
 import { RelationFindOperation } from '../relations/RelationFindOperation';
 import { hasStaticHook } from './StaticHookArguments';
+import { isTracing, traceQuery, startStreamTrace, finishStreamTrace } from './tracing';
+import type { StreamTrace } from './tracing';
 import { DeleteOperation } from './operations/DeleteOperation';
 import { UpdateOperation } from './operations/UpdateOperation';
 import { InsertOperation } from './operations/InsertOperation';
@@ -606,7 +608,9 @@ class QueryBuilder extends QueryBuilderBase {
       countQuery.debug();
     }
 
-    const result = await countQuery;
+    const result = isTracing()
+      ? await traceQuery(this, 'count', countQuery, () => countQuery.then())
+      : await countQuery;
     return result[0] && result[0].count ? parseInt(result[0].count, 10) : 0;
   }
 
@@ -1399,7 +1403,10 @@ class StreamRowsOperation extends QueryBuilderOperation {
   // Checks the operations that `onBuild()` added, too.
   queryExecutor(builder: QueryBuilder): StreamedRows {
     assertStreamable(builder, this);
-    return new StreamedRows(builder, buildKnexQuery(builder).stream());
+
+    const knexQuery = buildKnexQuery(builder);
+    const trace = isTracing() ? startStreamTrace(builder, knexQuery) : null;
+    return new StreamedRows(builder, knexQuery.stream(), trace);
   }
 
   clone(): this {
@@ -1415,10 +1422,12 @@ class StreamRowsOperation extends QueryBuilderOperation {
 class StreamedRows {
   declare builder: QueryBuilder;
   declare rows: Readable;
+  declare trace: StreamTrace | null;
 
-  constructor(builder: QueryBuilder, rows: Readable) {
+  constructor(builder: QueryBuilder, rows: Readable, trace: StreamTrace | null) {
     this.builder = builder;
     this.rows = rows;
+    this.trace = trace;
   }
 }
 
@@ -1588,6 +1597,13 @@ class ModelStream implements AsyncIterableIterator<unknown> {
     // The copy of the query that ran, with its context and hooks.
     this.builder = result.builder;
     const rows = result.rows;
+    const trace = result.trace;
+
+    if (trace !== null) {
+      // `error` comes before `close`.
+      rows.on('error', (error) => finishStreamTrace(trace, error));
+      rows.on('close', () => finishStreamTrace(trace, null));
+    }
 
     if (this.ended) {
       // `return()` was called while the query started.
@@ -1683,8 +1699,12 @@ function doExecute(builder: QueryBuilder): unknown {
 }
 
 async function runKnexQuery(builder: QueryBuilder): Promise<unknown> {
+  const knexQuery = buildKnexQuery(builder);
+
   // The knex query builder is a thenable: awaiting it runs the query.
-  let result: unknown = await buildKnexQuery(builder);
+  let result: unknown = isTracing()
+    ? await traceQuery(builder, null, knexQuery, () => knexQuery.then())
+    : await knexQuery;
 
   result = runOperationHooks(builder, 'onRawResult', result);
   if (isPromise(result)) result = await result;

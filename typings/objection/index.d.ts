@@ -2450,6 +2450,41 @@ declare namespace Objection {
   }
 
   /**
+   * The message of the events that objection publishes for each query on the
+   * tracing channel `objection:query` of `node:diagnostics_channel`:
+   *
+   * ```ts
+   * import diagnosticsChannel from 'node:diagnostics_channel';
+   *
+   * diagnosticsChannel.tracingChannel<unknown, QueryTraceContext>('objection:query').subscribe({
+   *   start(query) { console.log(query.operation, query.tableName, query.sql); },
+   *   end() {},
+   *   asyncStart() {},
+   *   asyncEnd(query) {},
+   *   error(query) {},
+   * });
+   * ```
+   *
+   * The SQL has placeholders: the values of the query and the rows it returns
+   * aren't in the message.
+   */
+  export interface QueryTraceContext {
+    modelClass: ModelClass<any>;
+    tableName: string;
+    operation: 'find' | 'insert' | 'update' | 'patch' | 'delete' | 'relate' | 'unrelate' | 'count';
+    /** The relation of `$relatedQuery()`, `relatedQuery()` and eager loading. */
+    relation: { name: string; ownerModelClass: ModelClass<any> } | null;
+    /** `true` for the queries of `withGraphFetched()`. */
+    eager: boolean;
+    sql: string;
+    /**
+     * The error of the database driver, on the `error` event. knex writes the
+     * values of the query into its messages.
+     */
+    error?: unknown;
+  }
+
+  /**
    * The result of `cursorPage()`: the models of the page, and the cursor of the
    * next page, which is `null` on the last page.
    */

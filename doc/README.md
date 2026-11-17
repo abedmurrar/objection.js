@@ -32,6 +32,9 @@ features:
   - title: Cursor pagination
     details: cursorPage(20, after) pages by the sort columns instead of an offset, with no count query. The page at row 50,000 took under 1 ms where page() took 31 to 69 ms on MySQL and MariaDB.
     link: /recipes/paging#cursor-pagination
+  - title: Tracing built in
+    details: Every query is published on Node's diagnostics_channel with its model, relation and SQL, never its values, for OpenTelemetry and APM tools. Nothing to install or configure.
+    link: /recipes/tracing
   - title: Expressions without raw SQL
     details: Pet.ref('age').gte(3), fn.count().filter(...), fn.case(), window functions and more, all typed.
     link: /fork/expressions
@@ -61,6 +64,7 @@ What you get:
 - **[Eager loading](/guide/query-examples.html#eager-loading), [inserting](/guide/query-examples.html#graph-inserts) and [upserting](/guide/query-examples.html#graph-upserts) object graphs**
 - **Easy [transactions](/guide/transactions.html)**
 - **[Strict TypeScript types](/fork/typescript)**
+- **[Tracing](/recipes/tracing.html) of every query through Node's `diagnostics_channel`**
 - **Optional [JSON schema](/guide/validation.html) validation**
 - **A way to [store complex documents](/guide/documents.html) as single rows**
 

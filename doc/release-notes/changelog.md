@@ -4,6 +4,10 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+### What's new
+
+- Every query is published on the tracing channel `objection:query` of Node's built-in `diagnostics_channel`, so tracing and monitoring tools like OpenTelemetry can see each query with its model class, table, operation (`find`, `insert`, `patch`, ...), relation, whether it's eager loading, and its SQL. The SQL has placeholders: the values and the returned rows are never in the message. `stream()` and the count query of `page()` are published too. Without a subscriber a query only checks `hasSubscribers`; with one, a `findById()` on MySQL took 122 to 127 µs instead of 119 to 121 µs, for compiling the SQL of the message. The message has the type `QueryTraceContext`. See [Tracing](/recipes/tracing.html).
+
 ## 4.6.0 (2026-11-17)
 
 ### What's new
