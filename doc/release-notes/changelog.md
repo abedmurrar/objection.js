@@ -6,11 +6,35 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ### Internal
 
-- `npm run test:typings` compares the public types in `typings/` with the implementation in `src/` (`tests/ts-drift/drift.ts`): every exported value, `Model` member and static, and `QueryBuilder` method that one of them has, the other must have too, and be a function in both where the typings say so. Members of the implementation that aren't public are listed there. It found the missing `modifierNotFound()` above. The typings stay hand-written: `src/` is typed loosely on purpose, and generating the public types from it would mean typing the whole implementation with the generics of the public API.
+- `npm run test:typings` compares the public types in `typings/` with the implementation in `src/` (`tests/ts-drift/drift.ts`): every exported value, `Model` member and static, and `QueryBuilder` method that one of them has, the other must have too, and be a function in both where the typings say so. Members of the implementation that aren't public are listed there. It found the missing `modifierNotFound()` typing, fixed in 4.4.11. The typings stay hand-written: `src/` is typed loosely on purpose, and generating the public types from it would mean typing the whole implementation with the generics of the public API.
+
+## 4.4.11 (2026-11-17)
 
 ### Fixes
 
 - TypeScript: the static `modifierNotFound(builder, modifier)` hook of models is declared. It's documented and called for unknown modifiers, but overriding it with `static override` was an error, and `super.modifierNotFound()` didn't exist in the types. Found by comparing the typings with the implementation.
+
+## 4.4.10 (2026-11-17)
+
+### Fixes
+
+- TypeScript: `interface Person extends RelationsOf<typeof Person> {}` works when a relation leads back to the model, like a `mom` relation to `Person` itself, or `Person.pets` to an `Animal` whose `owner` is a `Person`. It reported `Type of property 'mom' circularly references itself in mapped type`, or with `defineRelations()` `Type 'Person' recursively references itself as a base type`. The relation types checked that `modelClass` is a `Model` by comparing every member, which include the relations being inferred. They now check one member, and `defineRelations()` takes any class: the mappings are still checked against `RelationMappings` where they're assigned to `relationMappings`, so a class that isn't a model is still an error.
+
+## 4.4.9 (2026-11-17)
+
+### Internal
+
+- `upsertGraph()` and `insertGraph()` run their steps as plain `await`s instead of a chain of curried `.then()` callbacks. The order is the same: fetch the current graph, check which rows exist, check for errors, prune, create every action, then delete, insert, patch and upsert recursively.
+
+## 4.4.8 (2026-11-17)
+
+### Fixes
+
+- `$relatedQuery()` of a one-to-one relation threw "Cannot read properties of undefined (reading 'length')" when a context `runAfter()` returned `undefined`. It now returns what `runAfter()` returned. Inherited from objection.js.
+
+### Internal
+
+- `omitImplicitJoinProps()` of relation queries returns nothing; its return value was never used.
 
 ## 4.4.7 (2026-11-17)
 

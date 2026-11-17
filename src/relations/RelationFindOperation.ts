@@ -4,7 +4,6 @@ import { asArray } from '../utils/objectUtils';
 import type {
   Relation,
   RelationModel,
-  RelationModelClass,
   RelationOperationOptions,
   RelationQueryBuilder,
 } from './Relation';
@@ -134,7 +133,9 @@ class RelationFindOperation extends FindOperation {
       this.omitImplicitJoinProps(related);
     }
 
-    if (!this.alwaysReturnArray && isOneToOne && related.length <= 1) {
+    // A context `runAfter()` can have returned anything, so `related` isn't
+    // always an array here.
+    if (!this.alwaysReturnArray && isOneToOne && Array.isArray(related) && related.length <= 1) {
       related = related[0] || undefined;
     }
 
@@ -167,39 +168,21 @@ class RelationFindOperation extends FindOperation {
     }
   }
 
-  omitImplicitJoinProps(
-    related: RelationModel[] | RelationModel | undefined,
-  ): RelationModel[] | RelationModel | undefined {
+  // Removes the join columns that `selectMissingJoinColumns()` added from the
+  // found models, which is one model or none when a context `runAfter()`
+  // returned one.
+  omitImplicitJoinProps(related: RelationModel[] | RelationModel | undefined): void {
+    if (!this.omitProps.length || !related) {
+      return;
+    }
+
     const relatedModelClass = this.relation.relatedModelClass;
 
-    if (!this.omitProps.length || !related) {
-      return related;
+    for (const model of asArray(related)) {
+      for (const prop of this.omitProps) {
+        relatedModelClass.omitImpl(model, prop);
+      }
     }
-
-    if (!Array.isArray(related)) {
-      return this.omitImplicitJoinPropsFromOne(relatedModelClass, related);
-    }
-
-    if (!related.length) {
-      return related;
-    }
-
-    for (let i = 0, l = related.length; i < l; ++i) {
-      this.omitImplicitJoinPropsFromOne(relatedModelClass, related[i]);
-    }
-
-    return related;
-  }
-
-  omitImplicitJoinPropsFromOne(
-    relatedModelClass: RelationModelClass,
-    model: RelationModel,
-  ): RelationModel {
-    for (let c = 0, lc = this.omitProps.length; c < lc; ++c) {
-      relatedModelClass.omitImpl(model, this.omitProps[c]);
-    }
-
-    return model;
   }
 
   clone(): this {
