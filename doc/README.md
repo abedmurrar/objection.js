@@ -26,6 +26,9 @@ features:
   - title: MySQL and MariaDB, not just postgres
     details: JSON field expressions, the whereJson* methods, batch inserts and an fn.* helper for every MySQL 8.4 function. MariaDB 10.6 and 11.4 are tested in CI.
     link: /fork/mysql
+  - title: Large results without the memory
+    details: for await (const person of Person.query().stream()) yields the models one at a time as the database sends the rows, so memory stays flat however many rows a query finds.
+    link: /recipes/streaming
   - title: Expressions without raw SQL
     details: Pet.ref('age').gte(3), fn.count().filter(...), fn.case(), window functions and more, all typed.
     link: /fork/expressions
@@ -51,6 +54,7 @@ What you get:
 
 - **A declarative way of [defining models](/guide/models.html) and the relations between them**
 - **[Fetching, inserting, updating and deleting](/guide/query-examples.html) objects with the full power of SQL**
+- **[Streaming](/recipes/streaming.html) large results as models, one at a time**
 - **[Eager loading](/guide/query-examples.html#eager-loading), [inserting](/guide/query-examples.html#graph-inserts) and [upserting](/guide/query-examples.html#graph-upserts) object graphs**
 - **Easy [transactions](/guide/transactions.html)**
 - **[Strict TypeScript types](/fork/typescript)**
