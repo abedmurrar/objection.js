@@ -4,6 +4,8 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+## 4.5.0 (2026-11-17)
+
 ### What's new
 
 - `stream()` runs a query and yields the found models one at a time, as the database sends the rows: `for await (const person of Person.query().stream()) { ... }`. Memory stays flat however many rows the query finds: with 200,000 rows on MySQL 8.4 it used at most 10 MB of heap and 14 MB of RSS, where awaiting the query used 48 MB and 79 MB, and it took 1.5 times as long (226 ms against 146 ms, the median of 5 runs). The rows that have arrived are turned into models together; a model per row took 2.3 times as long as awaiting the query. The query runs through `execute()` and its hooks, so awaiting a query does the same work as before. Models get their `$afterFind()` hooks, and breaking out of the loop releases the connection. Queries that need the whole result throw: writes, `first()`, `page()`, `range()`, `runAfter()`, `withGraphFetched()`, `withGraphJoined()` and a static `afterFind()` hook. On PostgreSQL it needs the `pg-query-stream` package. See the [streaming recipe](/recipes/streaming.html).
