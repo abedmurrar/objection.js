@@ -1,7 +1,7 @@
 import { clone } from './modelClone';
 import { bindKnex } from './modelBindKnex';
 import { validate } from './modelValidate';
-import { isMsSql } from '../utils/knexUtils';
+import { getDialect, isMsSql, isPostgres } from '../utils/knexUtils';
 import { visitModels } from './modelVisitor';
 import { hasId, getSetId } from './modelId';
 import { toJson, toDatabaseJson } from './modelToJson';
@@ -9,7 +9,7 @@ import { values, propKey, hasProps } from './modelValues';
 import { defineNonEnumerableProperty } from './modelUtils';
 import { parseRelationsIntoModelInstances } from './modelParseRelations';
 import { fetchTableMetadata, tableMetadata } from './modelTableMetadata';
-import { asArray, isFunction, isString, asSingle } from '../utils/objectUtils';
+import { asArray, isFunction, isObject, isString, asSingle } from '../utils/objectUtils';
 import { setJson, setFast, setRelated, appendRelated, setDatabaseJson } from './modelSet';
 import {
   getJsonAttributes,
@@ -548,6 +548,22 @@ class Model {
 
   static getConcurrency(knex?: Knex | null): number {
     const DEFAULT_CONCURRENCY = 4;
+
+    // A transaction has one connection. node-postgres runs the queries sent to
+    // a connection one at a time, pg 8 warns when more than one waits for it,
+    // and pg 9 will reject them. So in a Postgres transaction objection sends
+    // them one at a time, even if the model's concurrency is higher, unless the
+    // connection uses pg's pipeline mode (pg 8.23+), which is made for several
+    // queries at a time. The MySQL and MariaDB drivers queue the queries of a
+    // connection themselves, and keep the default.
+    if (
+      knex &&
+      (knex as { isTransaction?: boolean }).isTransaction &&
+      usesPg(knex) &&
+      !usesPipelineMode(knex)
+    ) {
+      return 1;
+    }
 
     if (this.concurrency === null) {
       if (!knex) {
@@ -1162,6 +1178,20 @@ function getTraverseArgs(
     models,
     filterConstructor,
   } as TraverseArgs;
+}
+
+// The clients that use node-postgres: postgres and cockroachdb (whose dialect
+// is also `postgresql`), and redshift.
+function usesPg(knex: Knex): boolean {
+  return isPostgres(knex) || getDialect(knex) === 'redshift';
+}
+
+// Whether the knex config turns on pg's pipeline mode: `connection: { ...,
+// pipeline: true }`. A connection string or function can't be read, and counts
+// as no.
+function usesPipelineMode(knex: Knex): boolean {
+  const connection = (knex.client as { config?: { connection?: unknown } }).config?.connection;
+  return isObject(connection) && (connection as { pipeline?: unknown }).pipeline === true;
 }
 
 function asPropsArray(props: OmitProps): string[] {

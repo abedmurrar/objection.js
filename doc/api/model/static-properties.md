@@ -363,6 +363,15 @@ This doesn't limit the concurrency of the entire server. It only limits the numb
 
 The default concurrency is 4 except for mssql, for which the default is 1. The mssql default is needed because of the buggy driver that only allows one query at a time per connection. From 4.0.0 to 4.2.1, the default was 1 for the graph writes of MySQL too, see [Graph operations run 4 queries at a time](/fork/mysql.html#graph-operations-run-4-queries-at-a-time).
 
+In a Postgres transaction (postgres, cockroachdb and redshift), queries run one at a time, whatever the concurrency. A transaction has one connection, node-postgres runs the queries of a connection one at a time, pg 8 warns when more than one waits for it, and pg 9 will reject them. With pg's pipeline mode (pg 8.23 or later), the concurrency applies again, and graph operations in a transaction are faster than without it, see [Graph operations in a Postgres transaction](/fork/performance.html#graph-operations-in-a-postgres-transaction):
+
+```js
+const knex = Knex({
+  client: 'pg',
+  connection: { host: 'localhost', database: 'app', pipeline: true },
+});
+```
+
 ## `static` jsonAttributes
 
 ```js
