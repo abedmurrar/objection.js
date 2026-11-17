@@ -105,6 +105,18 @@ The source is TypeScript, compiled to CommonJS by `tsc`. The compiled code does 
 
 The number of queries doesn't change: eager loading runs one query per relation in the expression for all the models, not one per model.
 
+## Graph operations in a Postgres transaction
+
+A transaction has one connection. node-postgres runs the queries of a connection one at a time, so the 4 queries that eager loading and graph writes send at once wait in pg's queue. pg 8 prints a deprecation warning when more than one waits, and pg 9 will reject them. Since 4.4.7, objection sends the queries of a Postgres transaction one at a time, which is slower because objection builds the next query only after the last one returns. With pg's pipeline mode (`connection: { ..., pipeline: true }`, pg 8.23 or later), pg sends the queries without waiting, and objection keeps sending 4 at a time.
+
+In one transaction, an `insertGraph()` of 4 persons with 2 pets, a car and a book each, a `withGraphFetched('[pets, cars, books]')` of them, an `upsertGraph()` that deletes the related rows, and a delete of the persons, median of 500 runs on postgres in Docker:
+
+| | Time |
+| --- | --- |
+| 4.4.6, 4 queries at a time (pg warns) | 4.8-5.4 ms |
+| 4.4.7, one query at a time | 5.7-6.0 ms |
+| 4.4.7 with `pipeline: true`, 4 queries at a time | 3.8-4.4 ms |
+
 ## Running the benchmarks
 
 ```sh

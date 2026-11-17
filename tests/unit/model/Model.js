@@ -862,6 +862,50 @@ describe('Model', () => {
       expect(Person.getConcurrency(knexFor('mysql2'))).to.equal(2);
       expect(Pet.getConcurrency(knexFor('mysql2'))).to.equal(1);
     });
+
+    // What knex's transactor sets on the transaction knex.
+    function inTransaction(knex) {
+      return { client: knex.client, isTransaction: true };
+    }
+
+    it('should run one query at a time in a Postgres transaction', () => {
+      class Person extends Model {}
+
+      expect(Person.getConcurrency(inTransaction(knexFor('pg')))).to.equal(1);
+      expect(Person.getConcurrency(inTransaction(knexFor('cockroachdb')))).to.equal(1);
+      expect(Person.getConcurrency(inTransaction(knexFor('pgnative')))).to.equal(1);
+      expect(Person.getConcurrency(knexFor('pg'))).to.equal(4);
+      expect(Person.getConcurrency(inTransaction(knexFor('mysql2')))).to.equal(4);
+      expect(Person.getConcurrency(inTransaction(knexFor('sqlite3')))).to.equal(4);
+    });
+
+    it("should keep the concurrency in a Postgres transaction in pg's pipeline mode", () => {
+      class Person extends Model {}
+
+      function pgKnex(connection) {
+        const knex = Knex({ client: 'pg', connection });
+        knexes.push(knex);
+        return knex;
+      }
+
+      expect(Person.getConcurrency(inTransaction(pgKnex({ host: 'x', pipeline: true })))).to.equal(
+        4,
+      );
+      expect(Person.getConcurrency(inTransaction(pgKnex({ host: 'x', pipeline: false })))).to.equal(
+        1,
+      );
+      expect(Person.getConcurrency(inTransaction(pgKnex({ host: 'x' })))).to.equal(1);
+      expect(Person.getConcurrency(inTransaction(pgKnex('postgres://x/db')))).to.equal(1);
+    });
+
+    it('should run one query at a time in a Postgres transaction whatever the concurrency of the model', () => {
+      class Person extends Model {
+        static concurrency = 4;
+      }
+
+      expect(Person.getConcurrency(inTransaction(knexFor('pg')))).to.equal(1);
+      expect(Person.getConcurrency(inTransaction(knexFor('mysql2')))).to.equal(4);
+    });
   });
 
   describe('bindKnex', () => {

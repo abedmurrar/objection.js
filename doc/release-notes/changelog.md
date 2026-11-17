@@ -4,6 +4,10 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+### Fixes
+
+- Postgres: in a transaction, eager loading and graph writes send their queries one at a time. They sent up to 4 at a time to the transaction's one connection, where node-postgres queues them: pg 8 prints "Calling client.query() when the client is already executing a query is deprecated", and pg 9 will reject them. This applies even when the model sets a higher `concurrency`, and to cockroachdb and redshift. With pg's pipeline mode (`connection: { ..., pipeline: true }`, pg 8.23 or later), the queries still run 4 at a time. The transaction graph operations measured take 5.7-6.0 ms instead of 4.8-5.4 ms, or 3.8-4.4 ms with pipeline mode, see [Graph operations in a Postgres transaction](/fork/performance.html#graph-operations-in-a-postgres-transaction). Inherited from objection.js.
+
 ## 4.4.6 (2026-11-12)
 
 ### Fixes
