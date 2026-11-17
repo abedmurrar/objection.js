@@ -131,6 +131,7 @@
     "mocha": "^12.0.3",
     "mysql2": "^3.24.6",
     "pg": "^8.15.6",
+    "pg-query-stream": "^4.17.1",
     "sqlite3": "^6.0.1",
     "typescript": "^7.0.2",
     "vitepress": "2.0.0-alpha.21"

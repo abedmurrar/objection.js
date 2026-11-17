@@ -855,6 +855,32 @@ A query can be executed again, e.g. by awaiting it twice, except for the `*AndFe
 | --------- | ----------------------------------------------------------- |
 | `Promise` | Promise that will be resolved with the result of the query. |
 
+## stream()
+
+```js
+for await (const model of queryBuilder.stream()) {
+  // ...
+}
+```
+
+Runs the query and yields the found models one at a time, as the database sends the rows. Memory stays flat however many rows the query finds, so a query can export or process millions of rows:
+
+```js
+for await (const person of Person.query().where('active', true).orderBy('id').stream()) {
+  await csv.write([person.id, person.firstName, person.lastName]);
+}
+```
+
+The query runs on the first iteration. The models are created and their `$afterFind()` hooks run as with `execute()`. Breaking out of the loop, or an error, ends the query and releases the connection.
+
+`stream()` throws for queries that need the whole result: writes, `first()` (and `findById()`, `findOne()`), `page()`, `range()`, `runAfter()` and `throwIfNotFound()`, `withGraphFetched()` and `withGraphJoined()`, a model class with a static `afterFind()` hook, and `$relatedQuery()` of a model class with [relatedFindQueryMutates](/api/model/static-properties.html#static-relatedfindquerymutates). See the [streaming recipe](/recipes/streaming.html) for the drivers and for streaming in a transaction.
+
+##### Return value
+
+| Type                    | Description                                    |
+| ----------------------- | ---------------------------------------------- |
+| `AsyncIterableIterator` | Yields the found models, one at a time.        |
+
 ## then()
 
 ```js

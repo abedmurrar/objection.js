@@ -1,3 +1,4 @@
+import type { Readable } from 'node:stream';
 import { withWhereScope, effectiveWhereScope, hasWhereAncestor } from './whereScopes';
 import { wrapError } from 'db-errors';
 
@@ -14,7 +15,9 @@ import { Selection } from './operations/select/Selection';
 import { QueryBuilderContext } from './QueryBuilderContext';
 import { QueryBuilderBase } from './QueryBuilderBase';
 
-import { FindOperation } from './operations/FindOperation';
+import { FindOperation, callInstanceAfterFind } from './operations/FindOperation';
+import { RelationFindOperation } from '../relations/RelationFindOperation';
+import { hasStaticHook } from './StaticHookArguments';
 import { DeleteOperation } from './operations/DeleteOperation';
 import { UpdateOperation } from './operations/UpdateOperation';
 import { InsertOperation } from './operations/InsertOperation';
@@ -667,6 +670,11 @@ class QueryBuilder extends QueryBuilderBase {
     } catch (error) {
       return await handleExecuteError(builder, error);
     }
+  }
+
+  // Yields the found models one at a time, as the database sends the rows.
+  stream(): AsyncIterableIterator<any> {
+    return new ModelStream(this.clone());
   }
 
   throwIfNotFound(data: object = {}): this {
@@ -1350,6 +1358,296 @@ function findQueryExecutorOperation(builder: QueryBuilder): Operation | null {
   }
 
   return builder.findOperation((op: Operation) => (op.hookMask() & HookBits.queryExecutor) !== 0);
+}
+
+// The hooks that need the whole result, or that run another query. Only the
+// find operations below have them and still work on one model at a time.
+const WHOLE_RESULT_HOOKS =
+  HookBits.onRawResult |
+  HookBits.queryExecutor |
+  HookBits.onAfter1 |
+  HookBits.onAfter2 |
+  HookBits.onAfter3;
+
+// Added by `stream()` to its copy of the query. It runs the query through
+// `execute()` with the same hooks, but opens the stream of the rows in place of
+// the query, the way `relate()` runs a query of its own.
+class StreamRowsOperation extends QueryBuilderOperation {
+  // Whether the query calls the `afterFind()` hooks. The stream calls the
+  // `$afterFind()` hooks of the models itself, so the query doesn't.
+  declare callAfterFind: boolean;
+
+  constructor(callAfterFind: boolean) {
+    super('stream');
+    this.callAfterFind = callAfterFind;
+  }
+
+  // Fails before the other hooks run.
+  onBefore1(builder: QueryBuilder, result: unknown): unknown {
+    assertStreamable(builder, this);
+    return result;
+  }
+
+  // Checks the operations that `onBuild()` added, too.
+  queryExecutor(builder: QueryBuilder): StreamedRows {
+    assertStreamable(builder, this);
+    return new StreamedRows(builder, buildKnexQuery(builder).stream());
+  }
+
+  clone(): this {
+    const clone = super.clone();
+    clone.callAfterFind = this.callAfterFind;
+    return clone;
+  }
+}
+
+// What the query of `stream()` resolves to: the stream of the rows, and the
+// copy of the query that `execute()` ran, for the hooks of the models and for
+// the errors.
+class StreamedRows {
+  declare builder: QueryBuilder;
+  declare rows: Readable;
+
+  constructor(builder: QueryBuilder, rows: Readable) {
+    this.builder = builder;
+    this.rows = rows;
+  }
+}
+
+function assertStreamable(builder: QueryBuilder, streamOp: StreamRowsOperation): void {
+  if (!builder.isFind()) {
+    throw streamError('only queries that find rows can be streamed');
+  }
+
+  if (builder._explicitResolveValue !== null) {
+    throw streamError("it can't be used with resolve()");
+  }
+
+  if (hasHooks(builder.context().runAfter) || hasHooks(builder.internalContext().runAfter)) {
+    throw streamError("it can't be used with runAfter(), which gets the whole result");
+  }
+
+  if (streamOp.callAfterFind && hasStaticHook(builder.modelClass(), 'afterFind')) {
+    throw streamError(
+      `${builder.modelClass().name} has a static afterFind() hook, which gets the whole result`,
+    );
+  }
+
+  if ((builder.operationsSummary().hooks & WHOLE_RESULT_HOOKS) === 0) {
+    return;
+  }
+
+  builder.forEachOperation(true, (op) => {
+    if (op === streamOp || (op.hookMask() & WHOLE_RESULT_HOOKS) === 0) {
+      return;
+    }
+
+    if (op instanceof RelationFindOperation) {
+      // `$relatedQuery()` of a model class with `relatedFindQueryMutates`
+      // assigns the found models to the owners.
+      if (op.assignResultToOwner && op.owner.isModels) {
+        throw streamError(
+          '$relatedQuery() with relatedFindQueryMutates assigns the whole result to the owner. Use the static relatedQuery() with for() instead',
+        );
+      }
+    } else if (op instanceof EagerOperation) {
+      // An empty `withGraphFetched()` fetches nothing.
+      if (builder.hasWithGraph() || !(op instanceof WhereInEagerOperation)) {
+        throw streamError("it can't load relations with withGraphFetched() or withGraphJoined()");
+      }
+    } else if (!(op instanceof FindOperation)) {
+      const method = op.name === 'range' ? 'page() or range()' : `${op.name}()`;
+      throw streamError(`it can't be used with ${method}, which needs the whole result`);
+    }
+  });
+}
+
+function hasHooks(func: unknown): boolean {
+  return isFunction(func) || (Array.isArray(func) && func.length > 0);
+}
+
+function streamError(reason: string): Error {
+  return new Error(`stream(): ${reason}.`);
+}
+
+// The iterator of `stream()`. It runs the query on the first `next()`, and
+// turns the rows that have arrived into models together, which is as fast as
+// `execute()`. A `for await` loop over the knex stream itself would cost a
+// promise per row more, and a model per row is slower than a batch of them.
+class ModelStream implements AsyncIterableIterator<unknown> {
+  declare builder: QueryBuilder;
+  declare rows: Readable | null;
+  declare started: Promise<void> | null;
+  declare models: unknown[];
+  declare index: number;
+  declare ended: boolean;
+  declare error: unknown;
+  declare waiting: (() => void)[];
+  declare callAfterFind: boolean;
+  declare callAfterFindDeeply: boolean | undefined;
+
+  constructor(builder: QueryBuilder) {
+    this.builder = builder;
+    this.rows = null;
+    this.started = null;
+    this.models = [];
+    this.index = 0;
+    this.ended = false;
+    this.error = null;
+    this.waiting = [];
+    this.callAfterFind = true;
+    this.callAfterFindDeeply = undefined;
+  }
+
+  [Symbol.asyncIterator](): this {
+    return this;
+  }
+
+  next(): Promise<IteratorResult<unknown>> {
+    // Most calls return a model of the batch that has been turned into models.
+    if (this.index < this.models.length) {
+      return Promise.resolve({ value: this.models[this.index++], done: false });
+    }
+
+    return this.nextBatch();
+  }
+
+  async nextBatch(): Promise<IteratorResult<unknown>> {
+    if (this.started === null) {
+      this.started = this.start();
+    }
+
+    await this.started;
+
+    while (true) {
+      if (this.index < this.models.length) {
+        return { value: this.models[this.index++], done: false };
+      }
+
+      if (this.error !== null) {
+        const error = this.error;
+        this.error = null;
+        this.ended = true;
+        this.close();
+        // Rejects, unless an `onError()` hook handles the error.
+        await handleExecuteError(this.builder, error);
+      }
+
+      if (this.ended || this.rows === null) {
+        return { value: undefined, done: true };
+      }
+
+      const rows = readRows(this.rows);
+
+      if (rows.length > 0) {
+        await this.toModels(rows);
+      } else {
+        await new Promise<void>((resolve) => this.waiting.push(resolve));
+      }
+    }
+  }
+
+  // Ends the query and releases the connection, also when the loop stops early.
+  async return(): Promise<IteratorResult<unknown>> {
+    if (this.started === null) {
+      // Never runs the query.
+      this.started = Promise.resolve();
+    }
+
+    this.ended = true;
+    this.models = [];
+    this.close();
+    return { value: undefined, done: true };
+  }
+
+  async start(): Promise<void> {
+    const query = this.builder;
+    const { dontCallFindHooks, callAfterFindDeeply } = query.findOptions();
+
+    this.callAfterFind = !dontCallFindHooks;
+    this.callAfterFindDeeply = callAfterFindDeeply;
+    query.findOptions({ dontCallFindHooks: true });
+    query.addOperation(new StreamRowsOperation(this.callAfterFind), []);
+
+    const result: unknown = await query.execute();
+
+    if (!(result instanceof StreamedRows)) {
+      // An `onError()` hook handled an error of the hooks before the query.
+      this.ended = true;
+      return;
+    }
+
+    // The copy of the query that ran, with its context and hooks.
+    this.builder = result.builder;
+    const rows = result.rows;
+
+    if (this.ended) {
+      // `return()` was called while the query started.
+      rows.destroy();
+      return;
+    }
+
+    const wake = () => {
+      const waiting = this.waiting;
+      this.waiting = [];
+      waiting.forEach((resolve) => resolve());
+    };
+
+    this.rows = rows;
+    rows.on('readable', wake);
+    rows.on('end', () => {
+      this.ended = true;
+      wake();
+    });
+    rows.on('close', () => {
+      this.ended = true;
+      wake();
+    });
+    rows.on('error', (error) => {
+      this.error = error;
+      wake();
+    });
+  }
+
+  async toModels(rows: unknown[]): Promise<void> {
+    const builder = this.builder;
+
+    try {
+      const models = createModels(rows, builder) as unknown[];
+
+      if (this.callAfterFind) {
+        const maybePromise = callInstanceAfterFind(
+          builder.context(),
+          models,
+          this.callAfterFindDeeply,
+        );
+        if (isPromise(maybePromise)) await maybePromise;
+      }
+
+      this.models = models;
+      this.index = 0;
+    } catch (error) {
+      this.error = error;
+    }
+  }
+
+  close(): void {
+    if (this.rows !== null && !this.rows.destroyed) {
+      this.rows.destroy();
+    }
+  }
+}
+
+// The rows that the stream has buffered.
+function readRows(rows: Readable): unknown[] {
+  const result: unknown[] = [];
+  let row: unknown;
+
+  while (!rows.destroyed && (row = rows.read()) !== null) {
+    result.push(row);
+  }
+
+  return result;
 }
 
 function checkForUsage(builder: QueryBuilder): void {
