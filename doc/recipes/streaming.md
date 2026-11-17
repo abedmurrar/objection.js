@@ -14,7 +14,7 @@ for await (const person of Person.query().where('active', true).orderBy('id').st
 out.end();
 ```
 
-The query reads the next rows only as the loop asks for them, so a slow loop body slows the query down instead of filling up the memory. In a test with 200,000 rows on MySQL 8.4, `stream()` used at most 10 MB of heap where awaiting the query used 48 MB, and the difference grows with the number of rows. `stream()` took 1.6 times as long as awaiting the query, so await the query when the result fits in memory.
+The query reads the next rows only as the loop asks for them, so a slow loop body slows the query down instead of filling up the memory. In a test with 200,000 rows on MySQL 8.4, `stream()` used at most 10 MB of heap where awaiting the query used 48 MB, and the difference grows with the number of rows. `stream()` took 1.5 times as long as awaiting the query, so await the query when the result fits in memory.
 
 The models are created and their `$afterFind()` hooks run as when the query is awaited. Breaking out of the loop, or an error, ends the query and releases the connection. Iterate with `for await`, or call `return()` on the iterator if you stop calling `next()`, so that the connection is released.
 

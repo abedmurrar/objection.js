@@ -61,6 +61,26 @@ module.exports = (session) => {
       }
     });
 
+    it("should leave the query it's called on unchanged", async () => {
+      const query = Model1.query().where('id', '<', 3).orderBy('id');
+      await collect(query);
+
+      const models = await query;
+      expect(models.map((it) => [it.id, it.$afterFindCalled])).to.eql([
+        [1, 1],
+        [2, 1],
+      ]);
+    });
+
+    it('should skip $afterFind() with findOptions({ dontCallFindHooks: true })', async () => {
+      const models = await collect(
+        Model1.query().findOptions({ dontCallFindHooks: true }).orderBy('id'),
+      );
+
+      expect(models).to.have.length(5);
+      expect(models.every((it) => it.$afterFindCalled === undefined)).to.equal(true);
+    });
+
     it('should map the column names of each row', async () => {
       const models = await collect(Model2.query().orderBy('id_col'));
 

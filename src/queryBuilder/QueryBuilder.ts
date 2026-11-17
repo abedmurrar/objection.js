@@ -1,4 +1,4 @@
-import { Readable } from 'node:stream';
+import type { Readable } from 'node:stream';
 import { withWhereScope, effectiveWhereScope, hasWhereAncestor } from './whereScopes';
 import { wrapError } from 'db-errors';
 
@@ -615,9 +615,61 @@ class QueryBuilder extends QueryBuilderBase {
   }
 
   // Resolves to whatever the operations produce: models, rows, counts...
-  execute(): Promise<any> {
+  async execute(): Promise<any> {
     // Take a clone so that we don't modify this instance during execution.
-    return executeQuery(this.clone(), false);
+    const builder = this.clone();
+
+    try {
+      // The phases run one after another in this function, and a phase only
+      // waits when a hook returns a promise. Most queries have no async hook,
+      // so this saves a promise and a microtask per hook and phase, and the
+      // functions that would chain the phases.
+
+      // This needs to be checked before any hooks are called.
+      checkForUsage(builder);
+      addImplicitOperations(builder);
+
+      // The `runBefore` hooks are read before the hooks run.
+      const userRunBefore = builder.context().runBefore;
+      const internalRunBefore = builder.internalContext().runBefore;
+
+      // As before, no hook runs inside the caller's call to `execute()`.
+      await undefined;
+
+      let result: unknown = runOperationHooks(builder, 'onBefore1', undefined);
+      if (isPromise(result)) result = await result;
+      result = runOperationHooks(builder, 'onBefore2', result);
+      if (isPromise(result)) result = await result;
+      result = runHooks(builder, userRunBefore, result);
+      if (isPromise(result)) result = await result;
+      result = runHooks(builder, internalRunBefore, result);
+      if (isPromise(result)) result = await result;
+      result = runOperationHooks(builder, 'onBefore3', result);
+      if (isPromise(result)) result = await result;
+
+      result = doExecute(builder);
+      if (isPromise(result)) result = await result;
+
+      result = runOperationHooks(builder, 'onAfter1', result);
+      if (isPromise(result)) result = await result;
+      result = runOperationHooks(builder, 'onAfter2', result);
+      if (isPromise(result)) result = await result;
+
+      // The `runAfter` hooks are read after `onAfter2`.
+      const userRunAfter = builder.context().runAfter;
+      const internalRunAfter = builder.internalContext().runAfter;
+
+      result = runHooks(builder, userRunAfter, result);
+      if (isPromise(result)) result = await result;
+      result = runHooks(builder, internalRunAfter, result);
+      if (isPromise(result)) result = await result;
+      result = runOperationHooks(builder, 'onAfter3', result);
+      if (isPromise(result)) result = await result;
+
+      return result;
+    } catch (error) {
+      return await handleExecuteError(builder, error);
+    }
   }
 
   // Yields the found models one at a time, as the database sends the rows.
@@ -1308,73 +1360,6 @@ function findQueryExecutorOperation(builder: QueryBuilder): Operation | null {
   return builder.findOperation((op: Operation) => (op.hookMask() & HookBits.queryExecutor) !== 0);
 }
 
-// Runs the query `builder`, which is a clone that the query may change. With
-// `streamRows`, it stops after the hooks that run before the query and returns
-// the stream of the rows instead, for `stream()`.
-async function executeQuery(builder: QueryBuilder, streamRows: boolean): Promise<any> {
-  try {
-    // The phases run one after another in this function, and a phase only
-    // waits when a hook returns a promise. Most queries have no async hook,
-    // so this saves a promise and a microtask per hook and phase, and the
-    // functions that would chain the phases.
-
-    // This needs to be checked before any hooks are called.
-    checkForUsage(builder);
-    addImplicitOperations(builder);
-
-    if (streamRows) {
-      // Fails before the hooks run. The operations that `onBuild()` adds are
-      // checked again before the query runs.
-      assertStreamable(builder);
-    }
-
-    // The `runBefore` hooks are read before the hooks run.
-    const userRunBefore = builder.context().runBefore;
-    const internalRunBefore = builder.internalContext().runBefore;
-
-    // As before, no hook runs inside the caller's call to `execute()`.
-    await undefined;
-
-    let result: unknown = runOperationHooks(builder, 'onBefore1', undefined);
-    if (isPromise(result)) result = await result;
-    result = runOperationHooks(builder, 'onBefore2', result);
-    if (isPromise(result)) result = await result;
-    result = runHooks(builder, userRunBefore, result);
-    if (isPromise(result)) result = await result;
-    result = runHooks(builder, internalRunBefore, result);
-    if (isPromise(result)) result = await result;
-    result = runOperationHooks(builder, 'onBefore3', result);
-    if (isPromise(result)) result = await result;
-
-    if (streamRows) {
-      return openRowStream(builder);
-    }
-
-    result = doExecute(builder);
-    if (isPromise(result)) result = await result;
-
-    result = runOperationHooks(builder, 'onAfter1', result);
-    if (isPromise(result)) result = await result;
-    result = runOperationHooks(builder, 'onAfter2', result);
-    if (isPromise(result)) result = await result;
-
-    // The `runAfter` hooks are read after `onAfter2`.
-    const userRunAfter = builder.context().runAfter;
-    const internalRunAfter = builder.internalContext().runAfter;
-
-    result = runHooks(builder, userRunAfter, result);
-    if (isPromise(result)) result = await result;
-    result = runHooks(builder, internalRunAfter, result);
-    if (isPromise(result)) result = await result;
-    result = runOperationHooks(builder, 'onAfter3', result);
-    if (isPromise(result)) result = await result;
-
-    return result;
-  } catch (error) {
-    return await handleExecuteError(builder, error);
-  }
-}
-
 // The hooks that need the whole result, or that run another query. Only the
 // find operations below have them and still work on one model at a time.
 const WHOLE_RESULT_HOOKS =
@@ -1384,18 +1369,52 @@ const WHOLE_RESULT_HOOKS =
   HookBits.onAfter2 |
   HookBits.onAfter3;
 
-function openRowStream(builder: QueryBuilder): Readable {
-  builder = callOnBuildHooks(builder);
+// Added by `stream()` to its copy of the query. It runs the query through
+// `execute()` with the same hooks, but opens the stream of the rows in place of
+// the query, the way `relate()` runs a query of its own.
+class StreamRowsOperation extends QueryBuilderOperation {
+  // Whether the query calls the `afterFind()` hooks. The stream calls the
+  // `$afterFind()` hooks of the models itself, so the query doesn't.
+  declare callAfterFind: boolean;
 
-  if (builder._explicitRejectValue !== null) {
-    throw builder._explicitRejectValue;
+  constructor(callAfterFind: boolean) {
+    super('stream');
+    this.callAfterFind = callAfterFind;
   }
 
-  assertStreamable(builder);
-  return buildKnexQuery(builder).stream();
+  // Fails before the other hooks run.
+  onBefore1(builder: QueryBuilder, result: unknown): unknown {
+    assertStreamable(builder, this);
+    return result;
+  }
+
+  // Checks the operations that `onBuild()` added, too.
+  queryExecutor(builder: QueryBuilder): StreamedRows {
+    assertStreamable(builder, this);
+    return new StreamedRows(builder, buildKnexQuery(builder).stream());
+  }
+
+  clone(): this {
+    const clone = super.clone();
+    clone.callAfterFind = this.callAfterFind;
+    return clone;
+  }
 }
 
-function assertStreamable(builder: QueryBuilder): void {
+// What the query of `stream()` resolves to: the stream of the rows, and the
+// copy of the query that `execute()` ran, for the hooks of the models and for
+// the errors.
+class StreamedRows {
+  declare builder: QueryBuilder;
+  declare rows: Readable;
+
+  constructor(builder: QueryBuilder, rows: Readable) {
+    this.builder = builder;
+    this.rows = rows;
+  }
+}
+
+function assertStreamable(builder: QueryBuilder, streamOp: StreamRowsOperation): void {
   if (!builder.isFind()) {
     throw streamError('only queries that find rows can be streamed');
   }
@@ -1408,10 +1427,7 @@ function assertStreamable(builder: QueryBuilder): void {
     throw streamError("it can't be used with runAfter(), which gets the whole result");
   }
 
-  if (
-    !builder.findOptions().dontCallFindHooks &&
-    hasStaticHook(builder.modelClass(), 'afterFind')
-  ) {
+  if (streamOp.callAfterFind && hasStaticHook(builder.modelClass(), 'afterFind')) {
     throw streamError(
       `${builder.modelClass().name} has a static afterFind() hook, which gets the whole result`,
     );
@@ -1422,7 +1438,7 @@ function assertStreamable(builder: QueryBuilder): void {
   }
 
   builder.forEachOperation(true, (op) => {
-    if ((op.hookMask() & WHOLE_RESULT_HOOKS) === 0) {
+    if (op === streamOp || (op.hookMask() & WHOLE_RESULT_HOOKS) === 0) {
       return;
     }
 
@@ -1467,6 +1483,8 @@ class ModelStream implements AsyncIterableIterator<unknown> {
   declare ended: boolean;
   declare error: unknown;
   declare waiting: (() => void)[];
+  declare callAfterFind: boolean;
+  declare callAfterFindDeeply: boolean | undefined;
 
   constructor(builder: QueryBuilder) {
     this.builder = builder;
@@ -1477,6 +1495,8 @@ class ModelStream implements AsyncIterableIterator<unknown> {
     this.ended = false;
     this.error = null;
     this.waiting = [];
+    this.callAfterFind = true;
+    this.callAfterFindDeeply = undefined;
   }
 
   [Symbol.asyncIterator](): this {
@@ -1541,13 +1561,25 @@ class ModelStream implements AsyncIterableIterator<unknown> {
   }
 
   async start(): Promise<void> {
-    const rows: unknown = await executeQuery(this.builder, true);
+    const query = this.builder;
+    const { dontCallFindHooks, callAfterFindDeeply } = query.findOptions();
 
-    if (!(rows instanceof Readable)) {
+    this.callAfterFind = !dontCallFindHooks;
+    this.callAfterFindDeeply = callAfterFindDeeply;
+    query.findOptions({ dontCallFindHooks: true });
+    query.addOperation(new StreamRowsOperation(this.callAfterFind), []);
+
+    const result: unknown = await query.execute();
+
+    if (!(result instanceof StreamedRows)) {
       // An `onError()` hook handled an error of the hooks before the query.
       this.ended = true;
       return;
     }
+
+    // The copy of the query that ran, with its context and hooks.
+    this.builder = result.builder;
+    const rows = result.rows;
 
     if (this.ended) {
       // `return()` was called while the query started.
@@ -1579,13 +1611,16 @@ class ModelStream implements AsyncIterableIterator<unknown> {
 
   async toModels(rows: unknown[]): Promise<void> {
     const builder = this.builder;
-    const { dontCallFindHooks, callAfterFindDeeply } = builder.findOptions();
 
     try {
       const models = createModels(rows, builder) as unknown[];
 
-      if (!dontCallFindHooks) {
-        const maybePromise = callInstanceAfterFind(builder.context(), models, callAfterFindDeeply);
+      if (this.callAfterFind) {
+        const maybePromise = callInstanceAfterFind(
+          builder.context(),
+          models,
+          this.callAfterFindDeeply,
+        );
         if (isPromise(maybePromise)) await maybePromise;
       }
 
