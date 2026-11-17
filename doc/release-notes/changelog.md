@@ -8,6 +8,16 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 - `upsertGraph()` and `insertGraph()` run their steps as plain `await`s instead of a chain of curried `.then()` callbacks. The order is the same: fetch the current graph, check which rows exist, check for errors, prune, create every action, then delete, insert, patch and upsert recursively.
 
+## 4.4.8 (2026-11-17)
+
+### Fixes
+
+- `$relatedQuery()` of a one-to-one relation threw "Cannot read properties of undefined (reading 'length')" when a context `runAfter()` returned `undefined`. It now returns what `runAfter()` returned. Inherited from objection.js.
+
+### Internal
+
+- `omitImplicitJoinProps()` of relation queries returns nothing; its return value was never used.
+
 ## 4.4.7 (2026-11-17)
 
 ### Fixes
