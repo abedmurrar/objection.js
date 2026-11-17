@@ -3748,6 +3748,7 @@ declare namespace Objection {
     propertyNameToColumnName(propertyName: string): string;
 
     createValidator(): Validator;
+    modifierNotFound(builder: AnyQueryBuilder, modifier: string): void;
     createValidationError(args: CreateValidationErrorArgs): Error;
     createNotFoundError(queryContext: QueryContext, args: CreateNotFoundErrorArgs): Error;
 
@@ -3911,6 +3912,12 @@ declare namespace Objection {
     static propertyNameToColumnName(propertyName: string): string;
 
     static createValidator(): Validator;
+    /**
+     * Called when a query uses a modifier that the model doesn't have. Throws a
+     * `ModifierNotFoundError` by default. Override it to handle the modifier
+     * through `builder`, and call `super.modifierNotFound()` to still throw.
+     */
+    static modifierNotFound(builder: AnyQueryBuilder, modifier: string): void;
     static createValidationError(args: CreateValidationErrorArgs): Error;
     static createNotFoundError(queryContext: QueryContext, args: CreateNotFoundErrorArgs): Error;
 
