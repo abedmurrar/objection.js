@@ -172,4 +172,4 @@ function getAfterFindHook(model: Model): Model['$afterFind'] | null {
   }
 }
 
-export { FindOperation };
+export { FindOperation, callInstanceAfterFind };

@@ -177,6 +177,7 @@ export default defineConfig({
         'custom-validation': 'Custom validation',
         'snake-case-to-camel-case-conversion': 'Snake case to camel case conversion',
         paging: 'Paging',
+        streaming: 'Streaming',
         'returning-tricks': 'PostgreSQL "returning" tricks',
         timestamps: 'Timestamps',
         'custom-query-builder': 'Custom query builder',

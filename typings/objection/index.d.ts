@@ -3027,6 +3027,21 @@ declare namespace Objection {
     findOne: WhereMethod<this['~maybe']>;
 
     execute(): Promise<R>;
+    /**
+     * Runs the query and yields the found models one at a time, as the database
+     * sends the rows, so that a large result doesn't have to fit in memory:
+     *
+     * ```ts
+     * for await (const person of Person.query().where('active', true).stream()) {
+     *   await write(person);
+     * }
+     * ```
+     *
+     * Only queries that find rows can be streamed, without `first()`, `page()`,
+     * `range()`, `runAfter()` or relations to load. On PostgreSQL it needs the
+     * `pg-query-stream` package.
+     */
+    stream(this: QueryBuilder<any, any[], any>): AsyncIterableIterator<this['~state']['item']>;
     // `castTo()` only changes the types. The relations of the graph methods are
     // still the relations of the original model, so they aren't checked after it.
     castTo<MC extends Model>(

@@ -4,6 +4,10 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+### What's new
+
+- `stream()` runs a query and yields the found models one at a time, as the database sends the rows: `for await (const person of Person.query().stream()) { ... }`. Memory stays flat however many rows the query finds: with 200,000 rows on MySQL 8.4 it used at most 10 MB of heap and 14 MB of RSS, where awaiting the query used 48 MB and 79 MB, and it took 1.6 times as long (306 ms against 195 ms). The rows that have arrived are turned into models together; a model per row took 2.3 times as long as awaiting the query. Models get their `$afterFind()` hooks, and breaking out of the loop releases the connection. Queries that need the whole result throw: writes, `first()`, `page()`, `range()`, `runAfter()`, `withGraphFetched()`, `withGraphJoined()` and a static `afterFind()` hook. On PostgreSQL it needs the `pg-query-stream` package. See the [streaming recipe](/recipes/streaming.html).
+
 ### Internal
 
 - `npm run test:typings` compares the public types in `typings/` with the implementation in `src/` (`tests/ts-drift/drift.ts`): every exported value, `Model` member and static, and `QueryBuilder` method that one of them has, the other must have too, and be a function in both where the typings say so. Members of the implementation that aren't public are listed there. It found the missing `modifierNotFound()` typing, fixed in 4.4.11. The typings stay hand-written: `src/` is typed loosely on purpose, and generating the public types from it would mean typing the whole implementation with the generics of the public API.
