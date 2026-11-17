@@ -3295,12 +3295,12 @@ declare namespace Objection {
       ? never
       : C extends abstract new (
             ...args: any[]
-          ) => Model
+          ) => { $modelClass: any }
         ? C
         : C extends () => infer K
           ? K extends abstract new (
               ...args: any[]
-            ) => Model
+            ) => { $modelClass: any }
             ? K
             : never
           : never;
@@ -3477,7 +3477,18 @@ declare namespace Objection {
     ? object | object[] | null | undefined
     : RM | RM[] | null | undefined;
 
-  type RelationMappingsDefinition = { readonly [relationName: string]: RelationMapping<any> };
+  // The constraint of `defineRelations()`. Its `modelClass` accepts any class:
+  // checking that a class extends `Model` compares their members, which for a
+  // model that declares `interface X extends RelationsOf<typeof X> {}` include
+  // the relations being inferred here. The mappings are checked against
+  // `RelationMappings` where they're assigned to `relationMappings`.
+  type DefinedModelClass = abstract new (...args: any[]) => any;
+
+  type RelationMappingsDefinition = {
+    readonly [relationName: string]: Omit<RelationMapping<any>, 'modelClass'> & {
+      modelClass: DefinedModelClass | (() => DefinedModelClass) | string;
+    };
+  };
 
   export interface DefineRelationsFunction {
     /**

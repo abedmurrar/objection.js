@@ -9,7 +9,6 @@ class Toy extends Model {
   petId!: number;
 }
 
-// No relation leads back to Pet, so RelationsOf works.
 class Pet extends Model {
   static override tableName = 'pets';
 
@@ -61,11 +60,20 @@ class Person extends Model {
   }));
 }
 
+// Relations that lead back to the model work too.
+interface Person extends RelationsOf<typeof Person> {}
+interface Animal extends RelationsOf<typeof Animal> {}
+
 type PersonModel = ModelInstance<typeof Person>;
 
 export function relationsGuide() {
   const person: PersonModel = new Person();
   expectType<ModelInstance<typeof Animal>[] | undefined>()(person.pets);
+
+  const newPerson = new Person();
+  expectType<Animal[] | undefined>()(newPerson.pets);
+  expectType<Person | null | undefined>()(newPerson.mom);
+  expectType<Person | null | undefined>()(newPerson.pets?.[0].owner);
 
   const pet = new Pet();
   expectType<Toy[] | undefined>()(pet.toys);
