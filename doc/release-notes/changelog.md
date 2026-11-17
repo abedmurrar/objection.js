@@ -4,6 +4,10 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+### Internal
+
+- `npm run test:typings` compares the public types in `typings/` with the implementation in `src/` (`tests/ts-drift/drift.ts`): every exported value, `Model` member and static, and `QueryBuilder` method that one of them has, the other must have too, and be a function in both where the typings say so. Members of the implementation that aren't public are listed there. It found the missing `modifierNotFound()` typing, fixed in 4.4.11. The typings stay hand-written: `src/` is typed loosely on purpose, and generating the public types from it would mean typing the whole implementation with the generics of the public API.
+
 ## 4.4.11 (2026-11-17)
 
 ### Fixes

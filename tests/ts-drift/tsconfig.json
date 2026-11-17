@@ -1,0 +1,10 @@
+{
+  // Type checks tests/ts-drift/drift.ts, which compares the hand-written
+  // public types in typings/ with the implementation in src/.
+  "extends": "../../tsconfig.build.json",
+  "compilerOptions": {
+    "rootDir": "../..",
+    "noEmit": true
+  },
+  "include": ["./drift.ts"]
+}
