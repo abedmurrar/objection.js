@@ -4,6 +4,14 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+### Fixes
+
+- `$relatedQuery()` of a one-to-one relation threw "Cannot read properties of undefined (reading 'length')" when a context `runAfter()` returned `undefined`. It now returns what `runAfter()` returned. Inherited from objection.js.
+
+### Internal
+
+- `omitImplicitJoinProps()` of relation queries returns nothing; its return value was never used.
+
 ## 4.4.7 (2026-11-17)
 
 ### Fixes
