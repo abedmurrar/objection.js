@@ -156,6 +156,20 @@ module.exports = (session) => {
       });
     });
 
+    if (session.isMySql()) {
+      describe('MySQL: a patch value that is a subquery of the same table', () => {
+        it('should be wrapped like a subquery in a where clause', async () => {
+          await knex('ub2_persons').insert({ id: 2, name: 'Bob', age: 50 });
+
+          await Person.query(knex)
+            .patch({ age: Person.query(knex).max('age') })
+            .where('id', 1);
+
+          expect((await knex('ub2_persons').where('id', 1).first()).age).to.equal(50);
+        });
+      });
+    }
+
     describe('a required property given as a query property (#2199)', () => {
       it('should pass validation with raw() and val()', async () => {
         await Person.query(knex).insert({ id: 2, name: raw('?', ['Raw']) });

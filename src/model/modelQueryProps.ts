@@ -3,6 +3,7 @@ import { defineNonEnumerableProperty } from './modelUtils';
 import { isKnexRaw, isKnexQueryBuilder } from '../utils/knexUtils';
 import type { Model, ModelClass, ModelJson } from './Model';
 import type { QueryBuilder } from '../queryBuilder/QueryBuilder';
+import { transformation } from '../queryBuilder/transformations';
 
 const QUERY_PROPS_PROPERTY = '$$queryProps';
 
@@ -143,6 +144,12 @@ function buildObjectionQueryBuilder(
   builder: QueryBuilder,
   parentBuilder: QueryBuilder | undefined,
 ): unknown {
+  if (parentBuilder) {
+    // Like the subqueries in the arguments of query builder methods, e.g. a
+    // subquery of the updated table, which MySQL rejects unless it's wrapped.
+    builder = transformation.onConvertQueryBuilderBase(builder, parentBuilder) as QueryBuilder;
+  }
+
   return builder.subqueryOf(parentBuilder).toKnexQuery();
 }
 
