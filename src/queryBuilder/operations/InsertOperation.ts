@@ -14,6 +14,10 @@ type InsertedId = number | bigint | string;
 // which transactions share with the knex they were started from.
 const autoIncrementIncrements = new WeakMap<object, number>();
 
+// Whether a column of a table is `AUTO_INCREMENT`, for each MySQL knex instance
+// like `autoIncrementIncrements`, keyed by the table and the column.
+const autoIncrementColumns = new WeakMap<object, Map<string, boolean>>();
+
 // Base class for all insert operations.
 class InsertOperation extends QueryBuilderOperation {
   // `null` until `onAdd()`, which runs before all the other hooks.
@@ -21,6 +25,9 @@ class InsertOperation extends QueryBuilderOperation {
   declare isArray: boolean;
   declare modelOptions: ModelOptions;
   declare autoIncrementIncrement: number | null;
+  // The id column that `merge()` reads the id of an existing row from on MySQL.
+  // See `prepareMySqlMerge()`.
+  declare mergeIdColumn: string | null;
 
   constructor(name: string | null, opt?: OperationOptions) {
     super(name, opt);
@@ -29,6 +36,7 @@ class InsertOperation extends QueryBuilderOperation {
     this.isArray = false;
     this.modelOptions = Object.assign({}, this.opt.modelOptions || {});
     this.autoIncrementIncrement = null;
+    this.mergeIdColumn = null;
   }
 
   onAdd(builder: QueryBuilder, args: unknown[]): boolean {
@@ -46,11 +54,18 @@ class InsertOperation extends QueryBuilderOperation {
   onBefore2(builder: QueryBuilder, result: unknown): unknown {
     const maybePromise = callBeforeInsert(builder, this.models);
 
-    if (this.models.length > 1 && isMySql(builder.knex())) {
-      return after(
-        after(maybePromise, () => this.prepareMySqlBatchInsert(builder)),
-        () => result,
-      );
+    if (isMySql(builder.knex())) {
+      if (this.models.length > 1) {
+        return after(
+          after(maybePromise, () => this.prepareMySqlBatchInsert(builder)),
+          () => result,
+        );
+      } else if (builder.has('merge')) {
+        return after(
+          after(maybePromise, () => this.prepareMySqlMerge(builder)),
+          () => result,
+        );
+      }
     }
 
     return after(maybePromise, () => result);
@@ -92,6 +107,62 @@ class InsertOperation extends QueryBuilderOperation {
       autoIncrementIncrements.set(knex.client.config, increment);
       this.autoIncrementIncrement = increment;
     });
+  }
+
+  // MySQL reports the id of the existing row for `insert().onConflict().merge()`
+  // only when the merge changed it, and `0` when it didn't. With
+  // `id = LAST_INSERT_ID(id)` in the `on duplicate key update` clause, which
+  // `MergeOperation` adds, it always reports the id. The assignment doesn't
+  // change the row. It's only added to an `AUTO_INCREMENT` id column:
+  // `LAST_INSERT_ID()` converts its argument to an integer, so it would
+  // overwrite other ids, like a `uuid()` default. And only for a single model
+  // without an id: the ids of a multi-row merge can't be told apart.
+  // Reads the columns of each table once per knex instance, and returns
+  // synchronously after that.
+  prepareMySqlMerge(builder: QueryBuilder): void | Promise<void> {
+    const idColumn = builder.modelClass().getIdColumn();
+    this.mergeIdColumn = null;
+
+    if (typeof idColumn !== 'string' || this.models[0].$hasId()) {
+      return;
+    }
+
+    const knex = builder.knex();
+    const table = builder.tableName();
+    // The name of the column in the database, after the identifier mapping of
+    // the knex config, like `knexSnakeCaseMappers()`, which `??` applies to the
+    // table name.
+    const wrapIdentifier = knex.client.config.wrapIdentifier;
+    const column =
+      typeof wrapIdentifier === 'function'
+        ? wrapIdentifier(idColumn, (it: string) => it)
+        : idColumn;
+    const key = JSON.stringify([table, column]);
+    let columns = autoIncrementColumns.get(knex.client.config);
+
+    if (columns === undefined) {
+      columns = new Map();
+      autoIncrementColumns.set(knex.client.config, columns);
+    }
+
+    const isAutoIncrement = columns.get(key);
+
+    if (isAutoIncrement !== undefined) {
+      this.mergeIdColumn = isAutoIncrement ? idColumn : null;
+      return;
+    }
+
+    return knex
+      .raw('show columns from ?? where `Field` = ? and `Extra` like ?', [
+        table,
+        column,
+        '%auto_increment%',
+      ])
+      .then(([rows]: any) => {
+        const isAutoIncrement = rows.length === 1;
+        columns.set(key, isAutoIncrement);
+        this.mergeIdColumn = isAutoIncrement ? idColumn : null;
+      });
   }
 
   onBuildKnex(knexBuilder: KnexBuilder, builder: QueryBuilder): KnexBuilder {
@@ -193,6 +264,7 @@ class InsertOperation extends QueryBuilderOperation {
     clone.models = this.models;
     clone.isArray = this.isArray;
     clone.autoIncrementIncrement = this.autoIncrementIncrement;
+    clone.mergeIdColumn = this.mergeIdColumn;
 
     return clone;
   }

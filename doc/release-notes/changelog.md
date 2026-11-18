@@ -4,6 +4,13 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+### Bug fixes
+
+Reported from an app that used the fork, where the id of an upsert was used for a related insert.
+
+- MySQL: `insert().onConflict().merge()` gave the model the id of the existing row only when the merge changed the row. When it didn't, MySQL reports the id `0`, and the model got no id (objection 3.1.5 gave it the id `0`). So the same call returned an id or not depending on the values. The update now ends with `` `id` = LAST_INSERT_ID(`id`) ``, which doesn't change the row and makes MySQL report its id, so the model always gets the id of the inserted or the existing row. It's added for an insert of one model without an id into a table with an `AUTO_INCREMENT` id column. objection reads whether the column is `AUTO_INCREMENT` once per table: `LAST_INSERT_ID()` would overwrite other kinds of ids. Multi-row upserts and `ignore()` still give no id for the existing rows. Checked on MySQL 8.4 and MariaDB 10.6. See [The id of a MySQL upsert](/fork/knex.html#the-id-of-a-mysql-upsert).
+- `$relatedQuery().insert()` and `relate()` on an owner model without the key of the relation threw `TypeError: Cannot read properties of null (reading '0')` for HasMany relations, and failed with a TypeError for ManyToMany relations after the related row was inserted. They now throw an error that names the relation and the missing property, like `Conversation.relationMappings.users: can't insert related rows: the owner model has no value for Conversation.id`, before any query runs. BelongsToOne inserts and relates, which patch the owner by its id, updated no rows for such an owner. They throw the same error now.
+
 ### Docs
 
 - The comparison with other ORMs in [Performance](/fork/performance.html#compared-with-other-orms) is rerun on 4.7.0, with the same versions of the other contenders as the run of 4.2.5. The fork found a row by id 8% faster than in that run, deleted one 7% faster, and ran the nested insert 8% faster; it's still the fastest of the ORMs at finding rows and eager loading, and drizzle-orm, typeorm and sequelize still delete a row by id faster. The numbers for mysql2's own pool are updated too.
@@ -270,7 +277,7 @@ Ported from [ditojs/objection](https://github.com/ditojs/objection): fixes by JÃ
 - MySQL:
   - `patch()` and `delete()` with a subquery of the same table inside a where group (`where(qb => qb.whereIn('id', subquery))`) or a join clause failed with `ER_UPDATE_TABLE_USED`.
   - `delete().orderBy().limit()` warns: knex leaves the order out of MySQL deletes and keeps the limit, so the query deletes any of the matching rows. It will throw in 5.0. See [Deletes with a limit](/fork/knex.md#deletes-with-a-limit).
-  - `insert().onConflict().ignore()` gave ignored models the id `0`. They now keep no id.
+  - `insert().onConflict().ignore()` gave ignored models the id `0`. They now keep no id. This also applied to `merge()` when it didn't change the existing row, until 4.7.1.
 - `insert().onConflict().ignore()` on PostgreSQL and SQLite merged the returned rows into the models by position, so models got the values of other rows when some were ignored. The rows are matched by the conflict columns now. `insertAndFetch()` only fetches the models that have an id.
 - Graph inserts and upserts:
   - With `relate`, HasMany and HasOne children whose composite id contains the foreign key were treated as relates and dropped.

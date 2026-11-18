@@ -902,6 +902,8 @@ See [knex documentation](https://knexjs.org/guide/query-builder.html#merge)
 
 The keys of the merge object can be [field expressions](/api/types/#type-fieldexpression). Use [fn.excluded()](/fork/expressions.md#fn-excluded) for the value the upsert tried to insert. See [Upserts](/fork/knex.md#upserts).
 
+The returned model gets the id of the inserted or the existing row. On MySQL, that's the case when one model is inserted and its table has an `AUTO_INCREMENT` id. A multi-row upsert, or a table with another kind of id, returns models without an id when their rows existed. See [The id of a MySQL upsert](/fork/knex.md#the-id-of-a-mysql-upsert).
+
 ##### Return value
 
 | Type                                | Description                        |

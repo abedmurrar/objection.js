@@ -3148,8 +3148,26 @@ declare namespace Objection {
     insert(insert: PartialModelObject<M>): this['~one'];
 
     onConflict(column?: ColumnRef | ColumnRef[] | true): this;
+    /**
+     * Skips the rows that conflict. The models of the skipped rows are
+     * returned without an id, unless the input had one.
+     */
     ignore(): this;
+    /**
+     * Updates the rows that conflict. The returned models get the id of the
+     * inserted or the existing row. On MySQL only for an insert of one model,
+     * into a table with an `AUTO_INCREMENT` id: the models of a multi-row
+     * upsert, or of a table with another kind of id, have no id when their
+     * rows existed.
+     */
     merge<U extends object>(merge: U & CheckModelUpdate<M, U>): this;
+    /**
+     * Updates the rows that conflict. The returned models get the id of the
+     * inserted or the existing row. On MySQL only for an insert of one model,
+     * into a table with an `AUTO_INCREMENT` id: the models of a multi-row
+     * upsert, or of a table with another kind of id, have no id when their
+     * rows existed.
+     */
     merge(merge?: PartialModelObject<M> | string[]): this;
 
     insertAndFetch(insert: PartialModelObject<M>): this['~one'];

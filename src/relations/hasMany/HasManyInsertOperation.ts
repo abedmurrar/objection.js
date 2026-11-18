@@ -1,11 +1,12 @@
 import { RelationInsertOperation } from '../RelationInsertOperation';
 import type { RelationQueryBuilder } from '../Relation';
-import { assertSingleOwner } from '../RelationOwner';
+import { assertOwnerModelsHaveProps, assertSingleOwner } from '../RelationOwner';
 
 class HasManyInsertOperation extends RelationInsertOperation {
   onAdd(builder: RelationQueryBuilder, args: unknown[]): boolean {
     const retVal = super.onAdd(builder, args);
     assertSingleOwner(this.owner, this.relation, 'insert', 'HasManyRelation', 'insert');
+    assertOwnerModelsHaveProps(this.owner, this.relation, 'insert');
 
     const ownerValues = this.owner.getSplitProps(builder, this.relation);
     const relatedProp = this.relation.relatedProp;

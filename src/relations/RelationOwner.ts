@@ -247,6 +247,31 @@ function isOwnerModelClassQuery(query: RelationQueryBuilder, relation: Relation)
   return query.modelClass().getTableName() === relation.ownerModelClass.getTableName();
 }
 
+// Inserting or relating rows writes the key `prop` of the owner models, like
+// `Person.id`, into the related rows, the join rows or the owner query. An
+// owner model without it, like a model of an insert that didn't return an id,
+// would fail deep in the operation, or write a null key, or update no rows.
+function assertOwnerModelsHaveProps(
+  owner: RelationOwner,
+  relation: Relation,
+  verb: string,
+  prop: RelationProperty = relation.ownerProp,
+): void {
+  if (!owner.isModels) {
+    return;
+  }
+
+  for (const model of owner.modelArray) {
+    if (!prop.hasProps(model)) {
+      const props = prop.props.map((it) => `${prop.modelClass.name}.${it}`).join(', ');
+
+      throw relation.createError(
+        `can't ${verb} related rows: the owner model has no value for ${props}. Insert or fetch the owner first.`,
+      );
+    }
+  }
+}
+
 // Inserting or relating through a has-many or many-to-many relation needs one
 // owner: a single model, a single id, or a query that selects the owner.
 function assertSingleOwner(
@@ -273,4 +298,4 @@ function assertSingleOwner(
   }
 }
 
-export { RelationOwner, assertSingleOwner };
+export { RelationOwner, assertSingleOwner, assertOwnerModelsHaveProps };

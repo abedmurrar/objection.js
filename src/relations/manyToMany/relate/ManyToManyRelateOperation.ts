@@ -2,7 +2,7 @@ import { isPostgres } from '../../../utils/knexUtils';
 import { normalizeIds } from '../../../utils/normalizeIds';
 import { RelateOperation } from '../../../queryBuilder/operations/RelateOperation';
 import type { RelationModel, RelationOperationOptions, RelationQueryBuilder } from '../../Relation';
-import { assertSingleOwner } from '../../RelationOwner';
+import { assertOwnerModelsHaveProps, assertSingleOwner } from '../../RelationOwner';
 import type { RelationOwner } from '../../RelationOwner';
 import type { ManyToManyRelation } from '../ManyToManyRelation';
 
@@ -18,6 +18,7 @@ class ManyToManyRelateOperation extends RelateOperation {
     this.ids = normalizeIds(args[0], this.relation.relatedProp) as object[];
 
     assertOwnerIsSingleItem(builder, this.owner, this.relation);
+    assertOwnerModelsHaveProps(this.owner, this.relation, 'relate');
     return true;
   }
 
