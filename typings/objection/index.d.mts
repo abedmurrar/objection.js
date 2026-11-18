@@ -346,6 +346,7 @@ export import ValidatorArgs = objection.ValidatorArgs;
 export import Validator = objection.Validator;
 export import AjvConfig = objection.AjvConfig;
 export import AjvValidator = objection.AjvValidator;
+export import KnexSnakeCaseMappersOptions = objection.KnexSnakeCaseMappersOptions;
 export import SnakeCaseMappersOptions = objection.SnakeCaseMappersOptions;
 export import ColumnNameMappers = objection.ColumnNameMappers;
 export import SnakeCaseMappersFactory = objection.SnakeCaseMappersFactory;

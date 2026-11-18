@@ -3685,10 +3685,19 @@ declare namespace Objection {
     constructor(config: AjvConfig);
   }
 
-  export interface SnakeCaseMappersOptions {
+  export interface KnexSnakeCaseMappersOptions {
     upperCase?: boolean;
     underscoreBeforeDigits?: boolean;
     underscoreBetweenUppercaseLetters?: boolean;
+  }
+
+  export interface SnakeCaseMappersOptions extends KnexSnakeCaseMappersOptions {
+    /**
+     * Only convert the column part of field expressions used as property
+     * names, like `'jsonColumn:someKey'`, and keep their JSON keys as written.
+     * `false` by default, which converts the JSON keys too.
+     */
+    preserveJsonKeys?: boolean;
   }
 
   export interface ColumnNameMappers {
@@ -3706,7 +3715,7 @@ declare namespace Objection {
   }
 
   export interface KnexSnakeCaseMappersFactory {
-    (options?: SnakeCaseMappersOptions): KnexMappers;
+    (options?: KnexSnakeCaseMappersOptions): KnexMappers;
   }
 
   /**

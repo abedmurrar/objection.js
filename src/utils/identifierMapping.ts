@@ -9,6 +9,11 @@ interface SnakeCaseOptions {
   underscoreBetweenUppercaseLetters?: boolean;
 }
 
+interface SnakeCaseMappersOptions extends SnakeCaseOptions {
+  // Only map the column part of field expressions like `jsonColumn:someKey`.
+  preserveJsonKeys?: boolean;
+}
+
 interface CamelCaseOptions {
   upperCase?: boolean;
 }
@@ -174,7 +179,10 @@ function getKeyMapper(objectMapper: unknown): StringMapper | undefined {
 
 // Returns a function that takes an object as an input and maps the object's keys
 // using `mapper`. If the input is not an object, the input is returned unchanged.
-function keyMapper(mapper: StringMapper): KeyMapper {
+function keyMapper(
+  mapper: StringMapper,
+  fieldExpressionMapper: StringMapper | null = null,
+): KeyMapper {
   const objectMapper: KeyMapper = (obj) => {
     if (!isObject(obj) || Array.isArray(obj)) {
       return obj;
@@ -185,7 +193,12 @@ function keyMapper(mapper: StringMapper): KeyMapper {
 
     for (let i = 0, l = keys.length; i < l; ++i) {
       const key = keys[i];
-      out[mapper(key)] = (obj as Record<string, unknown>)[key];
+      const mapped =
+        fieldExpressionMapper !== null && key.includes(':')
+          ? fieldExpressionMapper(key)
+          : mapper(key);
+
+      out[mapped] = (obj as Record<string, unknown>)[key];
     }
 
     return out;
@@ -195,10 +208,32 @@ function keyMapper(mapper: StringMapper): KeyMapper {
   return objectMapper;
 }
 
-function snakeCaseMappers(opt: SnakeCaseOptions = {}): { parse: KeyMapper; format: KeyMapper } {
+// Maps the part of `str` before the first `separator`, and keeps the rest: the
+// column of a field expression like `jsonColumn:some.path`, but not its path.
+function mapFirstPart(mapper: StringMapper, separator: string): StringMapper {
+  return (str) => {
+    const idx = str.indexOf(separator);
+    return idx === -1 ? mapper(str) : mapper(str.slice(0, idx)) + str.slice(idx);
+  };
+}
+
+// Keys with a `:` in the data of a patch or an update, like `'meta:a.b'`, are
+// field expressions that write into a JSON column. With `preserveJsonKeys`,
+// only the column part of a field expression is converted, `jsonColumn:someKey` to `json_column:someKey`, so that a patch
+// writes the JSON key that reads with `ref('jsonColumn:someKey')` find.
+// Without it, the JSON keys are converted too, as in objection 3.
+function snakeCaseMappers(opt: SnakeCaseMappersOptions = {}): {
+  parse: KeyMapper;
+  format: KeyMapper;
+} {
+  const formatColumn = memoize((str: string) => snakeCase(str, opt));
+
   return {
     parse: keyMapper(memoize((str) => camelCase(str, opt))),
-    format: keyMapper(memoize((str) => snakeCase(str, opt))),
+    format: keyMapper(
+      formatColumn,
+      opt.preserveJsonKeys ? memoize(mapFirstPart(formatColumn, ':')) : null,
+    ),
   };
 }
 
