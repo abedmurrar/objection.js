@@ -60,9 +60,12 @@ class UpdateAndFetchOperation extends DelegateOperation {
       return undefined;
     }
 
+    // The fetch selects what the query selects (#1938). The model has the
+    // values of the patch too, merged with the fetched row.
     const fetched = await builder
       .emptyInstance()
       .childQueryOf(builder)
+      .copyFrom(builder, builder.constructor.SelectSelector)
       .modify((builder) => {
         if (!this.skipIdWhere) {
           builder.findById(this.id);
