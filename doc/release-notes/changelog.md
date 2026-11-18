@@ -4,6 +4,8 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+## 4.7.1 (2026-11-18)
+
 ### Bug fixes
 
 Reported from an app that used the fork, where the id of an upsert was used for a related insert.
