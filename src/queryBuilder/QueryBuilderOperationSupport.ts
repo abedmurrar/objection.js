@@ -816,7 +816,13 @@ function matchesSelector(
 // Visits the operations and their descendants depth first, each operation
 // before its children. Returns false if the callback stopped the walk by
 // returning false. The arrays are read as the walk goes, so operations that
-// the callback adds are visited too, as before.
+// the callback adds after the current one are visited too, as before.
+//
+// A callback, like an `onBuild()` hook calling `clearSelect()`, can also remove
+// operations before the current one or the current one itself. The walk then
+// continues after the current operation's new position, or at the operation
+// that took its place: going on by index would skip an operation, like the
+// one of `findById()`, whose where clause a patch then lost.
 function visitOperations(
   operations: Operation[],
   kind: SelectorKind,
@@ -824,9 +830,22 @@ function visitOperations(
   callback: OperationCallback,
   match: boolean,
 ): boolean {
-  for (const op of operations) {
+  for (let i = 0; i < operations.length; ++i) {
+    const op = operations[i];
+
     if (matchesSelector(op, kind, operationSelector) === match && callback(op) === false) {
       return false;
+    }
+
+    if (operations[i] !== op) {
+      // The current operation moved or was removed. `indexOf()` gives -1 for a
+      // removed one, and the walk continues at the operation at index `i`.
+      const index = operations.indexOf(op);
+      i = index === -1 ? i - 1 : index;
+
+      if (index === -1) {
+        continue;
+      }
     }
 
     if (
