@@ -3,6 +3,7 @@ import { UnrelateOperation } from '../../queryBuilder/operations/UnrelateOperati
 import type { Relation, RelationQueryBuilder } from '../Relation';
 import type { RelationOwner } from '../RelationOwner';
 import { copyRelatedFilters } from './copyRelatedFilters';
+import { unrelateKeyIndexes } from '../unrelateKeys';
 
 class HasManyUnrelateOperation extends UnrelateOperation {
   declare relation: Relation;
@@ -14,9 +15,13 @@ class HasManyUnrelateOperation extends UnrelateOperation {
     const ownerValues = this.owner.getProps(this.relation);
     const relatedRefs = relatedProp.refs(builder);
 
-    relatedProp.forEach((i) => {
+    for (const i of unrelateKeyIndexes(
+      this.relation,
+      relatedProp,
+      this.relation.relatedModelClass,
+    )) {
       relatedProp.patch(patch, i, null);
-    });
+    }
 
     const query = this.relation.relatedModelClass.query().childQueryOf(builder).patch(patch);
 

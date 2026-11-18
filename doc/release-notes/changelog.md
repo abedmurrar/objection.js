@@ -6,7 +6,7 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ### Bug fixes
 
-Found by new tests of combinations that no test covered: composite keys that share a column, joins in relation writes, hooks, timestamps with microseconds, and the fork's newer features.
+Found by new tests of combinations that no test covered: composite keys that share a column, a multi-tenant schema of every relation type, joins in relation writes, hooks, timestamps with microseconds, and the fork's newer features.
 
 - `cursorPage()`:
   - A timestamp with microseconds, like the default precision of PostgreSQL timestamps or a MySQL `datetime(6)`, made the pages repeat without end. The drivers return timestamps as `Date`s, which have milliseconds, so the rows of the same millisecond compared greater than the cursor. The query now selects the sort columns once more as text, the cursor of a date keeps that text, and the next page compares with it at the column's precision. The text columns aren't part of the models.
@@ -24,6 +24,7 @@ Found by new tests of combinations that no test covered: composite keys that sha
   - A graph insert where `$beforeInsert()` set the id of some of the rows threw "batch insert on MySQL can't return ids when only some rows have an id". The rows of a table are split into one insert with ids and one without, and the split now runs after the `$beforeInsert()` hooks. Each hook still runs once.
 - SQLite: `whereInComposite()` with a subquery threw "sqlite doesn't support multi-column where in clauses", so `relatedQuery().for()` through a composite key that isn't the id failed. SQLite compares row values to a subquery since 3.15, and it's compiled like on the other databases now.
 - Tracing: the fetch query of `insertAndFetch().withGraphFetched()`, and other child queries of a query with a graph, were reported with `eager: true`. Only the queries that load the relations are now.
+- `unrelate()` of a has-many or belongs-to-one relation set every column of the key to null, also a column that is part of the id of the updated rows, like a `tenantId` that both the key and the id start with. That failed on a `NOT NULL` column, and in MySQL's non-strict mode changed the column to `0`, moving the row to another tenant. Only the columns of the key that aren't part of the id are set to null now. When the whole key is part of the id, `unrelate()` throws, since only deleting the rows can remove the relation.
 - When the `$beforeInsert()` or `$afterFind()` hook of one model rejected and the hook of a later model threw, the query rejected with the second error, and the first was an unhandled rejection, which ends the process by default. It's handled now.
 
 ## 4.7.1 (2026-11-18)
