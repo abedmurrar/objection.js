@@ -59,8 +59,8 @@ class InsertGraphOperation extends DelegateOperation {
     return retVal;
   }
 
-  onBefore1(_: QueryBuilder, result: unknown): unknown {
-    // Do nothing.
+  onBefore1(builder: QueryBuilder, result: unknown): unknown {
+    assertNoConflictHandling(builder, 'insertGraph');
     return result;
   }
 
@@ -111,4 +111,16 @@ class InsertGraphOperation extends DelegateOperation {
   }
 }
 
-export { InsertGraphOperation };
+
+// The graph's inserts are separate queries, which `onConflict()`, `ignore()`
+// and `merge()` of the graph query don't reach, so they would be silently
+// ignored (#2156).
+function assertNoConflictHandling(builder: QueryBuilder, method: string): void {
+  if (builder.has(/^(onConflict|ignore|merge)$/)) {
+    throw new Error(
+      `${method}() can't be used with onConflict(), ignore() or merge(): the inserts of the graph don't use them. Insert the rows with insert().onConflict() instead.`,
+    );
+  }
+}
+
+export { InsertGraphOperation, assertNoConflictHandling };
