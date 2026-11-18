@@ -1,6 +1,7 @@
 import { ObjectionToKnexConvertingOperation } from '../ObjectionToKnexConvertingOperation';
 import { isKnexQueryBuilder } from '../../../utils/knexUtils';
 import { asSingle } from '../../../utils/objectUtils';
+import { buildCompositeSubqueryArgs } from './WhereInCompositeOperation';
 import type { KnexBuilder, OperationOptions, QueryBuilder } from '../types';
 
 interface WhereArgs {
@@ -17,7 +18,17 @@ class WhereInCompositeSqliteOperation extends ObjectionToKnexConvertingOperation
   }
 
   onBuildKnex(knexBuilder: KnexBuilder, builder: QueryBuilder): KnexBuilder {
-    const { method, args } = buildWhereArgs(...(this.getKnexArgs(builder) as [unknown, unknown]));
+    const [columns, values] = this.getKnexArgs(builder) as [unknown, unknown];
+
+    // A subquery of several columns uses row values, `(a, b) in (select ...)`,
+    // like on the other databases. SQLite has them since 3.15.
+    if (isCompositeKey(columns) && !Array.isArray(values)) {
+      const args = buildCompositeSubqueryArgs(builder.knex(), columns as unknown[], values);
+
+      return this.prefix === 'not' ? knexBuilder.whereNotIn(...args) : knexBuilder.whereIn(...args);
+    }
+
+    const { method, args } = buildWhereArgs(columns, values);
 
     if (method === 'where') {
       if (this.prefix === 'not') {
@@ -37,7 +48,7 @@ class WhereInCompositeSqliteOperation extends ObjectionToKnexConvertingOperation
 
 function buildWhereArgs(columns: unknown, values: unknown): WhereArgs {
   if (isCompositeKey(columns)) {
-    return buildCompositeArgs(columns as unknown[], values);
+    return buildCompositeArgs(columns as unknown[], values as unknown[]);
   } else {
     return buildNonCompositeArgs(columns, values);
   }
@@ -47,13 +58,7 @@ function isCompositeKey(columns: unknown): boolean {
   return Array.isArray(columns) && columns.length > 1;
 }
 
-function buildCompositeArgs(columns: unknown[], values: unknown): WhereArgs {
-  if (!Array.isArray(values)) {
-    // If the `values` is not an array of values but a function or a subquery
-    // we have no way to implement this method.
-    throw new Error(`sqlite doesn't support multi-column where in clauses`);
-  }
-
+function buildCompositeArgs(columns: unknown[], values: unknown[]): WhereArgs {
   if (values.length === 0) {
     // knex turns an empty `whereIn` into `1 = 0` and an empty `whereNotIn`
     // into `1 = 1` (#1914).
@@ -72,7 +77,7 @@ function buildCompositeArgs(columns: unknown[], values: unknown): WhereArgs {
         values.forEach((val) => {
           builder.orWhere((builder: KnexBuilder) => {
             columns.forEach((col, idx) => {
-              builder.andWhere(col, val[idx]);
+              builder.andWhere(col, (val as unknown[])[idx]);
             });
           });
         });

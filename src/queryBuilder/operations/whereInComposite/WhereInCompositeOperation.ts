@@ -108,4 +108,4 @@ function pickNonNull(values: unknown[], output: unknown[]): unknown[] {
   return output;
 }
 
-export { WhereInCompositeOperation };
+export { WhereInCompositeOperation, buildCompositeSubqueryArgs };
