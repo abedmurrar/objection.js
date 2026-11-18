@@ -4,6 +4,8 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+## 4.8.1 (2026-11-18)
+
 ### Bug fixes
 
 - An `onBuild()` hook that removed operations, like one calling `clearSelect()` or `clearWhere()`, made the query skip building the operation after them. When that was the operation of `findById()`, its `where` was lost, so `query().select('id').onBuild((qb) => qb.clearSelect()).findById(2).patch({ ... })` updated every row of the table, and a `delete()` deleted every row. The walk over the operations continues at the right one now. Ported from [ditojs/objection](/fork/dito.md), with a different implementation [#2269](https://github.com/Vincit/objection.js/issues/2269).
