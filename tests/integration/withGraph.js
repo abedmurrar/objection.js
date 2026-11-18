@@ -1744,6 +1744,33 @@ module.exports = (session) => {
           });
       });
 
+      // From ditojs/objection 093992a8.
+      it('resultSize should count the root models with withGraphJoined (#2329)', () => {
+        // Model1 1 has two model1Relation2 children and Model1 6 has one,
+        // so the join returns three rows.
+        return Model1.query()
+          .whereIn('Model1.id', [1, 6])
+          .withGraphJoined('model1Relation2')
+          .resultSize()
+          .then((size) => {
+            expect(size).to.equal(2);
+          });
+      });
+
+      it('page should count the root models with withGraphJoined (#2329)', () => {
+        return Model1.query()
+          .whereIn('Model1.id', [1, 6])
+          .withGraphJoined('model1Relation2')
+          .orderBy('Model1.id')
+          .page(0, 10)
+          .then((res) => {
+            expect(res.total).to.equal(2);
+            expect(res.results.map((it) => it.id)).to.eql([1, 6]);
+            expect(res.results[0].model1Relation2).to.have.length(2);
+            expect(res.results[1].model1Relation2).to.have.length(1);
+          });
+      });
+
       it('should join the relations whether withGraphJoined comes before or after withGraphFetched (#2269)', () => {
         const summarize = (models) =>
           models.map((model) => ({

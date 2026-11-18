@@ -950,6 +950,8 @@ const promise = queryBuilder.resultSize();
 
 Returns the amount of rows the current query would produce without [limit](/api/query-builder/find-methods.html#limit) and [offset](/api/query-builder/find-methods.html#offset) applied. Note that this executes a copy of the query and returns a Promise.
 
+With [withGraphJoined](/api/query-builder/eager-methods.html#withgraphjoined) it counts the root models, not the joined rows, and so does the `total` of [page](/api/query-builder/other-methods.html#page). The count leaves out the orders of the query, also those of a relation's `modify`.
+
 This method is often more convenient than `count` which returns an array of objects instead a single number.
 
 ##### Return value

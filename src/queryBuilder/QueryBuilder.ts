@@ -629,12 +629,30 @@ class QueryBuilder extends QueryBuilderBase {
   async resultSize(): Promise<number> {
     const knex = this.knex();
     const builder = this.clone().clear(/orderBy|offset|limit/);
+    const joinEagerOp = builder.findOperation(JoinEagerOperation) as JoinEagerOperation | null;
+
+    if (joinEagerOp !== null) {
+      // `withGraphJoined()` needs the columns of the tables for its selects.
+      await joinEagerOp.onBefore3(builder);
+    }
 
     // knex's types don't accept this `from()` callback or `debug()` without an argument.
     const countQuery: KnexLike = (knex as KnexLike)
       .count('* as count')
       .from((knexBuilder: KnexLike) => {
-        builder.toKnexQuery(knexBuilder).as('temp');
+        // The orders that the query adds when it's built, like those of a
+        // relation's `modify`, are removed too.
+        knexBuilder = builder.toKnexQuery(knexBuilder).clearOrder();
+
+        if (joinEagerOp !== null) {
+          // The joins of `withGraphJoined()` give a row per joined child.
+          // Count the distinct root models instead (#2329).
+          const tableRef = builder.tableRef();
+          const idColumns = builder.modelClass().getIdColumnArray();
+          knexBuilder.clearSelect().distinct(idColumns.map((col) => `${tableRef}.${col}`));
+        }
+
+        knexBuilder.as('temp');
       });
 
     if (this.internalOptions().debug) {
