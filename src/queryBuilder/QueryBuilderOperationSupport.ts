@@ -837,15 +837,10 @@ function visitOperations(
       return false;
     }
 
-    if (operations[i] !== op) {
-      // The current operation moved or was removed. `indexOf()` gives -1 for a
-      // removed one, and the walk continues at the operation at index `i`.
-      const index = operations.indexOf(op);
-      i = index === -1 ? i - 1 : index;
-
-      if (index === -1) {
-        continue;
-      }
+    // The current operation moved, or was removed: continue from its new
+    // index, or before the operation that took its place, without its children.
+    if (operations[i] !== op && operations[(i = indexAfterChange(operations, op, i))] !== op) {
+      continue;
     }
 
     if (
@@ -857,6 +852,14 @@ function visitOperations(
   }
 
   return true;
+}
+
+// The index of `op` in `operations` after a callback changed them, or the
+// index before `i` if `op` was removed, so that the walk visits the operation
+// that took its place next.
+function indexAfterChange(operations: Operation[], op: Operation, i: number): number {
+  const index = operations.indexOf(op);
+  return index === -1 ? i - 1 : index;
 }
 
 function getTableName(modelClassOrTableName: TableSource): string {
