@@ -5,7 +5,7 @@ import { wrapError } from 'db-errors';
 import { raw } from './RawBuilder';
 import { createModifier } from '../utils/createModifier';
 import { ValidationErrorType } from '../model/ValidationError';
-import { isObject, isFunction } from '../utils/objectUtils';
+import { isObject, isFunction, asArray } from '../utils/objectUtils';
 import { isPromise } from '../utils/promiseUtils/isPromise';
 import { RelationExpression, DuplicateRelationError } from './RelationExpression';
 import { assertIdNotUndefined } from '../utils/assert';
@@ -1409,6 +1409,13 @@ class StreamRowsOperation extends QueryBuilderOperation {
     return new StreamedRows(builder, knexQuery.stream(), trace);
   }
 
+  // A `beforeFind()` hook that calls `cancelQuery(value)` resolves the query
+  // with `value` instead of running it. The stream yields its models then, like
+  // awaiting the query gives them.
+  onAfter3(builder: QueryBuilder, result: unknown): unknown {
+    return result instanceof StreamedRows ? result : new ResolvedRows(builder, result);
+  }
+
   clone(): this {
     const clone = super.clone();
     clone.callAfterFind = this.callAfterFind;
@@ -1428,6 +1435,18 @@ class StreamedRows {
     this.builder = builder;
     this.rows = rows;
     this.trace = trace;
+  }
+}
+
+// What the query of `stream()` resolves to when it was resolved without
+// running, see `StreamRowsOperation.onAfter3()`.
+class ResolvedRows {
+  declare builder: QueryBuilder;
+  declare result: unknown;
+
+  constructor(builder: QueryBuilder, result: unknown) {
+    this.builder = builder;
+    this.result = result;
   }
 }
 
@@ -1588,9 +1607,23 @@ class ModelStream implements AsyncIterableIterator<unknown> {
 
     const result: unknown = await query.execute();
 
-    if (!(result instanceof StreamedRows)) {
-      // An `onError()` hook handled an error of the hooks before the query.
+    if (result instanceof ResolvedRows) {
+      // A `beforeFind()` hook cancelled the query. Its models get their
+      // `$afterFind()` hooks, as when the query is awaited.
+      this.builder = result.builder;
       this.ended = true;
+      await this.useModels(
+        result.result === null || result.result === undefined ? [] : asArray(result.result),
+        this.callAfterFind,
+      );
+      return;
+    }
+
+    if (!(result instanceof StreamedRows)) {
+      // An `onError()` hook handled an error of the hooks before the query,
+      // and its result is the result of the query, as when it's awaited.
+      this.ended = true;
+      await this.useModels(result === null || result === undefined ? [] : asArray(result), false);
       return;
     }
 
@@ -1634,14 +1667,25 @@ class ModelStream implements AsyncIterableIterator<unknown> {
   }
 
   async toModels(rows: unknown[]): Promise<void> {
-    const builder = this.builder;
+    let models: unknown[];
 
     try {
-      const models = createModels(rows, builder) as unknown[];
+      models = createModels(rows, this.builder) as unknown[];
+    } catch (error) {
+      this.error = error;
+      return;
+    }
 
-      if (this.callAfterFind) {
+    await this.useModels(models, this.callAfterFind);
+  }
+
+  // Makes `models` the next ones to yield, after their `$afterFind()` hooks if
+  // `callAfterFind` is set.
+  async useModels(models: unknown[], callAfterFind: boolean): Promise<void> {
+    try {
+      if (callAfterFind) {
         const maybePromise = callInstanceAfterFind(
-          builder.context(),
+          this.builder.context(),
           models,
           this.callAfterFindDeeply,
         );
