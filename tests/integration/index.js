@@ -144,6 +144,7 @@ describe('integration tests', () => {
       require('./queryContext')(session);
       require('./compositeKeys')(session);
       require('./compositeKeysMatrix')(session);
+      require('./customQueryBuilder')(session);
       require('./crossDb')(session);
       require('./viewsAndAliases')(session);
       require('./schema')(session);
