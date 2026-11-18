@@ -20,7 +20,7 @@ This property defines the relations (relationships, associations) to other model
 
 `relationMappings` is an object (or a function/getter that returns an object) whose keys are relation names and values are [RelationMapping](/api/types/#type-relationmapping) instances. The `join` property in addition to the relation type define how the models are related to one another.
 
-The `from` and `to` properties of the `join` object define the database columns through which the models are associated. Note that neither of these columns need to be primary keys. They can be any columns. In fact they can even be fields inside JSON columns (using the [ref](/api/objection/#ref) helper). In the case of ManyToManyRelation also the join table needs to be defined. This is done using the `through` object.
+The `from` and `to` properties of the `join` object define the database columns through which the models are associated. Note that neither of these columns need to be primary keys. They can be any columns. In fact they can even be fields inside JSON columns (using the [ref](/api/objection/#ref) helper). `Model.ref()` works too, like `join: { from: Person.ref('id'), to: Animal.ref('ownerId') }`: a ref without a table uses the table of its model class. In the case of ManyToManyRelation also the join table needs to be defined. This is done using the `through` object.
 
 The `modelClass` passed to the relation mappings is the class of the related model. It can be one of the following:
 
@@ -120,7 +120,7 @@ Composite id can be specified by giving an array of column names.
 
 Defaults to 'id'.
 
-You can return `null` in order to tell objection there is no primary key. This may be useful in models of join tables.
+You can return `null` in order to tell objection there is no primary key. This may be useful in models of join tables. Inserts then set no id on the models, and [withGraphJoined](/api/query-builder/eager-methods.html#withgraphjoined), [findById](/api/query-builder/find-methods.html#findbyid) and updates or deletes with joins on databases that filter them by ids need a primary key.
 
 ## `static` jsonSchema
 

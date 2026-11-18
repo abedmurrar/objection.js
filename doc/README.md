@@ -39,7 +39,7 @@ features:
     details: Pet.ref('age').gte(3), fn.count().filter(...), fn.case(), window functions and more, all typed.
     link: /fork/expressions
   - title: Safer queries
-    details: Escaped JSON field keys (an SQL injection in objection.js 3.1.5), orWhere() that can't match other owners' rows, and a for() that is no longer ignored.
+    details: Escaped JSON field keys (an SQL injection in objection.js 3.1.5), orWhere() that can't match other owners' rows, a for() that is no longer ignored, and patches with joins that only change the rows the joins match.
     link: /fork/breaking-changes
   - title: Modern
     details: Written in strict TypeScript. Node.js 22+, ES modules and CommonJS from one package, knex 3.3, no lodash and no bluebird.
@@ -66,7 +66,7 @@ What you get:
 - **[Strict TypeScript types](/fork/typescript)**
 - **[Tracing](/recipes/tracing.html) of every query through Node's `diagnostics_channel`**
 - **Optional [JSON schema](/guide/validation.html) validation**
-- **A way to [store complex documents](/guide/documents.html) as single rows**
+- **A way to [store complex documents](/guide/documents.html) as single rows**, with their JSON keys kept as written under [snakeCaseMappers](/recipes/snake-case-to-camel-case-conversion.html#json-keys-in-field-expressions)
 
 What you don't get:
 

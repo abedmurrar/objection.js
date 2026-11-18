@@ -833,6 +833,12 @@ See [knex documentation](https://knexjs.org/guide/query-builder.html#groupbyraw)
 
 See [knex documentation](https://knexjs.org/guide/query-builder.html#orderby)
 
+The array form takes [ref](/api/objection/#ref) and [raw](/api/objection/#raw) too, alone or as the `column` of an object:
+
+```js
+await Person.query().orderBy([ref('lastName'), { column: ref('age'), order: 'desc' }]);
+```
+
 ##### Return value
 
 | Type                                | Description                        |

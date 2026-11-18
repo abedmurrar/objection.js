@@ -176,8 +176,30 @@ class BaseModel extends Model {
 }
 ```
 
+## Updates and deletes with joins only change the rows the joins match
+
+knex leaves the joins out of updates on every database but MySQL. In objection.js 3.1.5 a patch with joins changed the rows that its where clauses matched without the joined tables on SQLite and postgres, and every row of the table when it had no where clause on a joined table:
+
+```js
+// Meant to deactivate the people that have pets. On SQLite and postgres this
+// ran `update persons set active = false`, which deactivated everyone.
+await Person.query().patch({ active: false }).joinRelated('pets');
+```
+
+Updates with joins on those databases, and deletes with joins on SQLite, where they didn't compile, now filter their rows by their ids in a subquery that has the joins and the where clauses. A model without an [idColumn](/api/model/static-properties.html#static-idcolumn) throws instead. On MySQL and MariaDB, which compile the joins, the columns that an update sets are qualified with its table, so a column of the same name in a joined table, like `name`, isn't ambiguous anymore.
+
+## `select()` applies to the fetch of `patchAndFetch()` and friends
+
+`patchAndFetchById()`, `patchAndFetch()`, `updateAndFetchById()` and `updateAndFetch()` fetched every column, whatever the query selected. The fetch selects what the query selects now, so `patchAndFetchById(1, { age: 31 }).select('id', 'name')` returns `{ id, name, age }`: the selected columns and the values of the patch. Leave out the `select()` to get every column.
+
 ## Bug fixes
 
 - `andWhereJsonNotSupersetOf()` no longer recurses forever.
 - `whereIn()`, `whereNotIn()` and `onIn()` with a raw column that has bindings, like `whereIn(fn.lower(ref('name')), names)`, got the wrong bindings: knex compiled the values before the column. See [Joins and model classes](./joins.md#raw-columns-in-wherein).
 - Subqueries in join callbacks threw `parentQuery.isUpdate is not a function` on MySQL. See [Joins and model classes](./joins.md#subqueries-in-join-callbacks).
+- A required property given as a query property, like `insert({ name: raw('...') })` or `val()`, failed validation.
+- `orderBy()` with refs in an array, like `orderBy([ref('name'), ref('age')])`, ordered by `undefined`.
+- `Model.ref()` in the `join` of a relation mapping threw "join.from must have format TableName.columnName".
+- An insert of a model with `idColumn = null` set the insert id as a property named `"null"` on MySQL, MariaDB and SQLite.
+- MySQL: a patch value that is a subquery of the updated table failed with "You can't specify target table ... for update in FROM clause".
+- `withGraphJoined()` modifiers that select an aggregate with an alias, like `count('* as n')`, failed, and raw selections that end with an alias and aliased subqueries were left out of the result.

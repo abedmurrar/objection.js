@@ -9,7 +9,7 @@ queryBuilder = queryBuilder.insert(modelsOrObjects);
 Creates an insert query.
 
 The inserted objects are validated against the model's [jsonSchema](/api/model/static-properties.html#static-jsonschema). If validation fails
-the Promise is rejected with a [ValidationError](/api/types/#class-validationerror).
+the Promise is rejected with a [ValidationError](/api/types/#class-validationerror). Values given as [raw](/api/objection/#raw), [val](/api/objection/#val), subqueries and other query properties aren't validated, but they do count as present for the `required` properties of the schema.
 
 NOTE: The return value of the insert query _only_ contains the properties given to the insert
 method plus the identifier. This is because we don't make an additional fetch query after
@@ -223,6 +223,18 @@ await Person.query().patch({
 
 Field expression keys work on postgres and MySQL, and throw on other databases. Only the given field changes, the rest of the JSON column is kept. If the column is `NULL`, the patch creates the object, or an array if the path starts with an index. See [JSON field expressions](/fork/mysql.md#json-field-expressions) and [Breaking changes](/fork/breaking-changes.md#patching-a-field-of-a-null-json-column-creates-the-object).
 
+A patch can have joins, which limit it to the rows that they match:
+
+```js
+// Deactivates the people that have a dog.
+await Person.query()
+  .patch({ active: false })
+  .joinRelated('pets')
+  .where('pets.species', 'dog');
+```
+
+MySQL and MariaDB compile the joins into the update, with the columns that it sets qualified by the table. On the other databases, whose updates can't have joins, the rows are filtered by their ids in a subquery that has the joins and the where clauses, so the model needs an [idColumn](/api/model/static-properties.html#static-idcolumn).
+
 ## patchAndFetchById()
 
 ```js
@@ -245,6 +257,14 @@ Just like [patch](/api/query-builder/mutate-methods.html#patch) for a single ite
 | [QueryBuilder](/api/query-builder/) | `this` query builder for chaining. |
 
 ##### Examples
+
+The fetch selects what the query selects, and the returned model also has the values of the patch:
+
+```js
+// select `id`, `name` from `persons` where `persons`.`id` = 134
+const person = await Person.query().patchAndFetchById(134, { age: 24 }).select('id', 'name');
+// { age: 24, id: 134, name: 'Jennifer' }
+```
 
 ```js
 const updatedPerson = await Person.query().patchAndFetchById(134, { age: 24 });
@@ -465,7 +485,14 @@ const numberOfDeletedRows = await Person.query()
 console.log('removed', numberOfDeletedRows, 'people');
 ```
 
-You can always use subqueries and all query building methods with `delete` queries, just like with every query in objection. With some databases, you cannot use joins with deletes (db restriction, not objection). You can replace joins with subqueries like this:
+You can always use subqueries and all query building methods with `delete` queries, just like with every query in objection, joins too:
+
+```js
+// This query deletes all people that have a pet named "Fluffy".
+await Person.query().delete().joinRelated('pets').where('pets.name', 'Fluffy');
+```
+
+SQLite can't compile a delete with joins, so there the rows are filtered by their ids in a subquery that has the joins and the where clauses, and the model needs an [idColumn](/api/model/static-properties.html#static-idcolumn). The same queries written with subqueries:
 
 ```js
 // This query deletes all people that have a pet named "Fluffy".

@@ -121,3 +121,20 @@ class Person extends Model {
 // Queries need to use the database casing.
 await Person.query().where('first_name', 'Jennifer');
 ```
+
+## JSON keys in field expressions
+
+A [field expression](/api/types/#type-fieldexpression) used as a property name, like `patch({ 'jsonData:someKey': 1 })`, is converted as a whole by `snakeCaseMappers`, so the patch writes the key `some_key` while `ref('json_data:someKey')` reads `someKey`. With `preserveJsonKeys: true` only the column part is converted, and the JSON keys stay as written:
+
+```js
+class Person extends Model {
+  static get columnNameMappers() {
+    return snakeCaseMappers({ preserveJsonKeys: true });
+  }
+}
+
+// Writes the key `someKey` of the `json_data` column.
+await Person.query().patch({ 'jsonData:someKey': 1 }).where('id', 1);
+```
+
+The option is off by default in 4.x, since turning it on changes where existing apps write, and will be on in 5.0.
