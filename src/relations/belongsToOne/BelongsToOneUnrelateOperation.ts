@@ -2,6 +2,7 @@ import { UnrelateOperation } from '../../queryBuilder/operations/UnrelateOperati
 import type { Relation, RelationQueryBuilder } from '../Relation';
 import type { RelationOwner } from '../RelationOwner';
 import type { Model } from '../../model/Model';
+import { unrelateKeyIndexes } from '../unrelateKeys';
 
 class BelongsToOneUnrelateOperation extends UnrelateOperation {
   declare relation: Relation;
@@ -11,10 +12,11 @@ class BelongsToOneUnrelateOperation extends UnrelateOperation {
     const { relation, owner } = this;
     const { ownerProp, ownerModelClass } = relation;
     const patch = {};
+    const keyIndexes = unrelateKeyIndexes(relation, ownerProp, ownerModelClass);
 
-    ownerProp.forEach((i) => {
+    for (const i of keyIndexes) {
       ownerProp.patch(patch, i, null);
-    });
+    }
 
     const ownerIdProp = ownerModelClass.getIdRelationProperty();
     const ownerRefs = ownerIdProp.refs(builder);
@@ -23,7 +25,9 @@ class BelongsToOneUnrelateOperation extends UnrelateOperation {
 
     const clearOwnerKeys = (owners: Model[]): void => {
       for (const owner of owners) {
-        ownerProp.forEach((i) => ownerProp.setProp(owner, i, null));
+        for (const i of keyIndexes) {
+          ownerProp.setProp(owner, i, null);
+        }
       }
     };
 

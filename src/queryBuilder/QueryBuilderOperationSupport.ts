@@ -51,7 +51,9 @@ const SelectSelector =
   /^(select|columns|column|distinct|count|countDistinct|min|max|sum|sumDistinct|avg|avgDistinct)$/;
 const OnSelector = /^(on|orOn|andOn)/;
 const OrderBySelector = /orderBy/;
-const JoinSelector = /(join|joinRaw|joinRelated)$/i;
+// The `joinRelated()` family are operations named `joinRelation`,
+// `leftJoinRelation`, and so on.
+const JoinSelector = /(join|joinRaw|joinRelation)$/i;
 const FromSelector = /^(from|fromRaw|into|table)$/;
 
 // What a walk of the operations found, for the version of the operations it

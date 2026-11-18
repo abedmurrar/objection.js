@@ -1,5 +1,6 @@
 import { after as afterImpl } from './after';
 import { afterReturn as afterReturnImpl } from './afterReturn';
+import { handleRejections as handleRejectionsImpl } from './handleRejections';
 import { isPromise as isPromiseImpl } from './isPromise';
 import { promiseMap } from './map';
 import { mapAfterAllReturn as mapAfterAllReturnImpl } from './mapAfterAllReturn';
@@ -11,7 +12,8 @@ import { mapAfterAllReturn as mapAfterAllReturnImpl } from './mapAfterAllReturn'
 const isPromise = isPromiseImpl;
 const after = afterImpl;
 const afterReturn = afterReturnImpl;
+const handleRejections = handleRejectionsImpl;
 const mapAfterAllReturn = mapAfterAllReturnImpl;
 const map = promiseMap;
 
-export { after, afterReturn, isPromise, map, mapAfterAllReturn };
+export { after, afterReturn, handleRejections, isPromise, map, mapAfterAllReturn };

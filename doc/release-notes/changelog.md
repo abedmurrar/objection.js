@@ -4,6 +4,29 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+### Bug fixes
+
+Found by new tests of combinations that no test covered: composite keys that share a column, a multi-tenant schema of every relation type, joins in relation writes, hooks, timestamps with microseconds, and the fork's newer features.
+
+- `cursorPage()`:
+  - A timestamp with microseconds, like the default precision of PostgreSQL timestamps or a MySQL `datetime(6)`, made the pages repeat without end. The drivers return timestamps as `Date`s, which have milliseconds, so the rows of the same millisecond compared greater than the cursor. The query now selects the sort columns once more as text, the cursor of a date keeps that text, and the next page compares with it at the column's precision. The text columns aren't part of the models.
+  - A sort column of a joined table, like `joinRelated('owner').orderBy('owner.name')`, was read from the model's own property of that name, and the pages repeated without end. It throws now, before the query: the values of the sort columns are read from the models.
+- `stream()` yielded nothing when a static `beforeFind()` hook cancelled the query with `cancelQuery(value)`. It yields the models of `value` with their `$afterFind()` hooks now, as awaiting the query gives them.
+- Relation writes with `joinRelated()` lost the join. `joinRelated()` and its variants are operations named `joinRelation`, `leftJoinRelation`, and so on, which the selector of the joins didn't match. The errors were "no such column" or "missing FROM-clause entry":
+  - a many-to-many `unrelate()` filtered by a `joinRelated()` table failed on every database;
+  - a many-to-many `patch()` or `delete()` failed on SQLite and PostgreSQL;
+  - a has-many `relate()` or `unrelate()` failed on SQLite and PostgreSQL.
+
+  On the databases other than MySQL, whose updates can't have joins, a has-many `relate()` or `unrelate()` with joins now filters the rows by their ids in a subquery.
+- MySQL:
+  - A `patch()` or `delete()` with a subquery that joins the same table under an alias, like `join('persons as p')`, `join({ p: 'persons' })` or `joinRelated()`, failed with "You can't specify target table ... for update in FROM clause". These subqueries are wrapped now, like those that join the table by its name.
+  - A many-to-many `unrelate()` or `patch()` of the join rows failed with "Operand should contain 4 column(s)" when both keys share a column, like a tenant id of both the owner and the related rows, and the filter read another table.
+  - A graph insert where `$beforeInsert()` set the id of some of the rows threw "batch insert on MySQL can't return ids when only some rows have an id". The rows of a table are split into one insert with ids and one without, and the split now runs after the `$beforeInsert()` hooks. Each hook still runs once.
+- SQLite: `whereInComposite()` with a subquery threw "sqlite doesn't support multi-column where in clauses", so `relatedQuery().for()` through a composite key that isn't the id failed. SQLite compares row values to a subquery since 3.15, and it's compiled like on the other databases now.
+- Tracing: the fetch query of `insertAndFetch().withGraphFetched()`, and other child queries of a query with a graph, were reported with `eager: true`. Only the queries that load the relations are now.
+- `unrelate()` of a has-many or belongs-to-one relation set every column of the key to null, also a column that is part of the id of the updated rows, like a `tenantId` that both the key and the id start with. That failed on a `NOT NULL` column, and in MySQL's non-strict mode changed the column to `0`, moving the row to another tenant. Only the columns of the key that aren't part of the id are set to null now. When the whole key is part of the id, `unrelate()` throws, since only deleting the rows can remove the relation.
+- When the `$beforeInsert()` or `$afterFind()` hook of one model rejected and the hook of a later model threw, the query rejected with the second error, and the first was an unhandled rejection, which ends the process by default. It's handled now.
+
 ## 4.7.1 (2026-11-18)
 
 ### Bug fixes

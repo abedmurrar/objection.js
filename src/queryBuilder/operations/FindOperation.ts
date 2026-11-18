@@ -1,6 +1,6 @@
 import { QueryBuilderOperation } from './QueryBuilderOperation';
 import { callStaticBeforeHook, callStaticAfterHook } from '../StaticHookArguments';
-import { isPromise, after, afterReturn } from '../../utils/promiseUtils';
+import { isPromise, after, afterReturn, handleRejections } from '../../utils/promiseUtils';
 import { isObject } from '../../utils/objectUtils';
 import type { Model, QueryBuilder } from './types';
 
@@ -47,16 +47,25 @@ function callAfterFindArray(ctx: unknown, results: unknown[], deep: boolean | un
   const start = deep ? 0 : firstWithAfterFindHook(results);
   let promises: unknown[] | null = null;
 
-  for (let i = start, l = results.length; i < l; ++i) {
-    const maybePromise = callAfterFindForOne(ctx, results[i], results[i], deep);
+  try {
+    for (let i = start, l = results.length; i < l; ++i) {
+      const maybePromise = callAfterFindForOne(ctx, results[i], results[i], deep);
 
-    if (isPromise(maybePromise)) {
-      if (promises === null) {
-        promises = [maybePromise];
-      } else {
-        promises.push(maybePromise);
+      if (isPromise(maybePromise)) {
+        if (promises === null) {
+          promises = [maybePromise];
+        } else {
+          promises.push(maybePromise);
+        }
       }
     }
+  } catch (err) {
+    // See `handleRejections()`.
+    if (promises !== null) {
+      handleRejections(promises);
+    }
+
+    throw err;
   }
 
   if (promises !== null) {
@@ -119,19 +128,25 @@ function callAfterFindForRelations(ctx: unknown, model: Model, results: unknown[
   const keys = Object.keys(model);
   let containsPromise = false;
 
-  for (let i = 0, l = keys.length; i < l; ++i) {
-    const key = keys[i];
-    const value = model[key];
+  try {
+    for (let i = 0, l = keys.length; i < l; ++i) {
+      const key = keys[i];
+      const value = model[key];
 
-    if (isRelation(value)) {
-      const maybePromise = callInstanceAfterFind(ctx, value, true);
+      if (isRelation(value)) {
+        const maybePromise = callInstanceAfterFind(ctx, value, true);
 
-      if (isPromise(maybePromise)) {
-        containsPromise = true;
+        if (isPromise(maybePromise)) {
+          containsPromise = true;
+        }
+
+        results.push(maybePromise);
       }
-
-      results.push(maybePromise);
     }
+  } catch (err) {
+    // See `handleRejections()`.
+    handleRejections(results);
+    throw err;
   }
 
   return containsPromise;

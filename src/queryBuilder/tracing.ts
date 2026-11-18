@@ -38,6 +38,8 @@ interface QueryTraceContext {
 interface RelationOperation {
   relation: { name: string; ownerModelClass: ModelClass };
   owner: unknown;
+  // Set on the find operations of the queries of `withGraphFetched()`.
+  eager?: boolean;
 }
 
 function isTracing(): boolean {
@@ -99,7 +101,6 @@ function createContext(
   operation: QueryTraceOperation | null,
   knexQuery: KnexLike,
 ): QueryTraceContext {
-  const parent = builder.parentQuery() as QueryBuilder | null;
   const relationOp = builder.findOperation(
     (op: Operation) => 'relation' in op && 'owner' in op,
   ) as unknown as RelationOperation | null;
@@ -112,7 +113,9 @@ function createContext(
       relationOp !== null
         ? { name: relationOp.relation.name, ownerModelClass: relationOp.relation.ownerModelClass }
         : null,
-    eager: parent !== null && parent.hasWithGraph(),
+    // Only the queries that load the relations. Other child queries of a query
+    // with a graph, like the fetch of `insertAndFetch()`, aren't eager.
+    eager: relationOp !== null && relationOp.eager === true,
     sql: sqlOf(knexQuery),
   };
 }

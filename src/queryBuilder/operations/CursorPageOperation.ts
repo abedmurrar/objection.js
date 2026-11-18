@@ -3,6 +3,7 @@ import { withWhereScope } from '../whereScopes';
 import { JoinEagerOperation } from './eager/JoinEagerOperation';
 import { isObject } from '../../utils/objectUtils';
 import { ValidationErrorType } from '../../model/ValidationError';
+import { isMySql, isMsSql } from '../../utils/knexUtils';
 import type { Model, OperationOptions, QueryBuilder } from './types';
 
 // The longest cursor that `cursorPage()` decodes. A cursor holds one value per
@@ -30,6 +31,9 @@ class CursorPageOperation extends QueryBuilderOperation {
   declare after: string | null;
   declare keys: CursorKey[];
   declare next: string | null;
+  // The values of the sort columns of the last row of the page as the
+  // database writes them as text, see `onBuild()`.
+  declare lastRowText: unknown[] | null;
 
   constructor(name: string | null, opt?: OperationOptions) {
     super(name, opt);
@@ -37,6 +41,7 @@ class CursorPageOperation extends QueryBuilderOperation {
     this.after = null;
     this.keys = [];
     this.next = null;
+    this.lastRowText = null;
   }
 
   onAdd(_: QueryBuilder, args: unknown[]): boolean {
@@ -78,6 +83,43 @@ class CursorPageOperation extends QueryBuilderOperation {
 
     // One row more than the page tells if there's a next page.
     builder.limit(this.limit + 1);
+
+    // The sort columns again, as text. The drivers return timestamps as
+    // `Date`s, which have milliseconds, and a column can have microseconds:
+    // a cursor of the rounded value would return the rows of the same
+    // millisecond on every page. `onRawResult()` takes the text of the last
+    // row, and removes the columns before the rows become models.
+    const knex = builder.knex();
+    const textType = isMySql(knex) ? 'char' : isMsSql(knex) ? 'nvarchar(max)' : 'text';
+
+    if (!builder.hasSelects()) {
+      builder.select(`${builder.tableRef()}.*`);
+    }
+
+    builder.select(
+      keys.map((key, i) => knex.raw(`cast(?? as ${textType}) as ${textColumn(i)}`, [key.column])),
+    );
+  }
+
+  onRawResult(_: QueryBuilder, rows: unknown): unknown {
+    this.lastRowText = null;
+
+    if (!Array.isArray(rows)) {
+      return rows;
+    }
+
+    if (rows.length > this.limit) {
+      const row = rows[this.limit - 1] as Record<string, unknown>;
+      this.lastRowText = this.keys.map((_, i) => row[textColumn(i)]);
+    }
+
+    for (const row of rows as Record<string, unknown>[]) {
+      for (let i = 0, l = this.keys.length; i < l; ++i) {
+        delete row[textColumn(i)];
+      }
+    }
+
+    return rows;
   }
 
   // Before the relations are loaded and the `afterFind()` hooks run, so that
@@ -87,7 +129,12 @@ class CursorPageOperation extends QueryBuilderOperation {
 
     if (Array.isArray(result) && result.length > this.limit) {
       result.length = this.limit;
-      this.next = encodeCursor(builder, this.keys, result[result.length - 1] as Model);
+      this.next = encodeCursor(
+        builder,
+        this.keys,
+        result[result.length - 1] as Model,
+        this.lastRowText,
+      );
     }
 
     return result;
@@ -103,6 +150,7 @@ class CursorPageOperation extends QueryBuilderOperation {
     clone.after = this.after;
     clone.keys = this.keys;
     clone.next = this.next;
+    clone.lastRowText = this.lastRowText;
     return clone;
   }
 }
@@ -147,16 +195,16 @@ function cursorKeys(builder: QueryBuilder): CursorKey[] {
     if (Array.isArray(args[0])) {
       for (const item of args[0]) {
         if (typeof item === 'string') {
-          keys.push(createKey(modelClass, item, undefined));
+          keys.push(createKey(builder, modelClass, item, undefined));
         } else if (isObject(item) && typeof (item as { column?: unknown }).column === 'string') {
           const { column, order } = item as { column: string; order?: unknown };
-          keys.push(createKey(modelClass, column, order));
+          keys.push(createKey(builder, modelClass, column, order));
         } else {
           throw orderByError();
         }
       }
     } else if (typeof args[0] === 'string') {
-      keys.push(createKey(modelClass, args[0], args[1]));
+      keys.push(createKey(builder, modelClass, args[0], args[1]));
     } else {
       throw orderByError();
     }
@@ -170,7 +218,7 @@ function cursorKeys(builder: QueryBuilder): CursorKey[] {
     if (!sorted) {
       const column = `${tableRef}.${idColumn}`;
       builder.orderBy(column, 'asc');
-      keys.push(createKey(modelClass, column, 'asc'));
+      keys.push(createKey(builder, modelClass, column, 'asc'));
     }
   }
 
@@ -178,6 +226,7 @@ function cursorKeys(builder: QueryBuilder): CursorKey[] {
 }
 
 function createKey(
+  builder: QueryBuilder,
   modelClass: ReturnType<QueryBuilder['resultModelClass']>,
   column: string,
   order: unknown,
@@ -188,6 +237,19 @@ function createKey(
 
   const dot = column.lastIndexOf('.');
   const columnName = dot === -1 ? column : column.slice(dot + 1);
+
+  // The value of a sort column is read from the models, which only have the
+  // columns of the query's table under their property names. A column of a
+  // joined table could be another one with the same name.
+  if (dot !== -1) {
+    const table = column.slice(0, dot);
+
+    if (table !== builder.tableRef() && table !== builder.tableName()) {
+      throw new Error(
+        `cursorPage(): it can only sort by the columns of ${builder.tableRef()}, not ${column}.`,
+      );
+    }
+  }
 
   return {
     column,
@@ -222,10 +284,24 @@ function whereAfter(qb: QueryBuilder, keys: CursorKey[], values: unknown[]): voi
   });
 }
 
+// The alias of the text of the `i`th sort column. Lowercase without
+// underscores, so that identifier mappers like `knexSnakeCaseMappers()`
+// keep it as it is.
+function textColumn(i: number): string {
+  return `objectioncursortext${i}`;
+}
+
 // A cursor is the values of the sort columns of the last row of a page, as
-// base64url-encoded JSON. Dates are kept as `{ "$date": iso string }`.
-function encodeCursor(builder: QueryBuilder, keys: CursorKey[], model: Model): string {
-  const values = keys.map((key) => {
+// base64url-encoded JSON. Dates are kept as `{ "$date": iso string, "$text":
+// the value as the database writes it }`: the text keeps the microseconds that
+// the `Date` loses, and is what the next page compares with.
+function encodeCursor(
+  builder: QueryBuilder,
+  keys: CursorKey[],
+  model: Model,
+  text: unknown[] | null,
+): string {
+  const values = keys.map((key, i) => {
     const value = (model as Record<string, unknown>)[key.property];
 
     if (value === undefined) {
@@ -241,7 +317,11 @@ function encodeCursor(builder: QueryBuilder, keys: CursorKey[], model: Model): s
     }
 
     if (value instanceof Date) {
-      return { $date: value.toISOString() };
+      const exact = text !== null ? text[i] : null;
+
+      return typeof exact === 'string' && isDateText(exact)
+        ? { $date: value.toISOString(), $text: exact }
+        : { $date: value.toISOString() };
     }
 
     if (typeof value === 'bigint') {
@@ -282,19 +362,34 @@ function decodeCursor(builder: QueryBuilder, cursor: string, keyCount: number): 
 
     if (isObject(value)) {
       const keys = Object.keys(value as object);
-      const date = (value as { $date?: unknown }).$date;
+      const { $date: date, $text: text } = value as { $date?: unknown; $text?: unknown };
+      const hasText = keys.length === 2 && keys.includes('$text');
 
-      if (keys.length === 1 && typeof date === 'string') {
+      if ((keys.length === 1 || hasText) && typeof date === 'string') {
         const parsed = new Date(date);
 
         if (!Number.isNaN(parsed.getTime())) {
-          return parsed;
+          if (!hasText) {
+            return parsed;
+          }
+
+          // Compared as the database's own text of the value, bound like
+          // every value of a cursor.
+          if (typeof text === 'string' && isDateText(text)) {
+            return text;
+          }
         }
       }
     }
 
     throw invalidCursor(builder);
   });
+}
+
+// A date or a timestamp as databases write them, like `2026-01-01
+// 12:00:00.123456+00`.
+function isDateText(value: string): boolean {
+  return value.length <= 40 && /^[0-9][0-9 :.T+Z-]*$/.test(value);
 }
 
 function isCursorScalar(value: unknown): boolean {

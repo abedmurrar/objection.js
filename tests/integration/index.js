@@ -143,6 +143,7 @@ describe('integration tests', () => {
       require('./transactions')(session);
       require('./queryContext')(session);
       require('./compositeKeys')(session);
+      require('./compositeKeysMatrix')(session);
       require('./crossDb')(session);
       require('./viewsAndAliases')(session);
       require('./schema')(session);

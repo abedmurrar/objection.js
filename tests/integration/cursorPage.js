@@ -217,6 +217,18 @@ module.exports = (session) => {
           Buffer.from('["g0",{"$date":"nope"},"k00"]').toString('base64url'),
         ],
         ['that is too long', 'a'.repeat(5000)],
+        [
+          'with a date text that is not a date',
+          Buffer.from(
+            `["g0",{"$date":"2026-01-01T00:00:00.000Z","$text":"1' or '1'='1"},"k00"]`,
+          ).toString('base64url'),
+        ],
+        [
+          'with a date text and another key',
+          Buffer.from(
+            '["g0",{"$date":"2026-01-01T00:00:00.000Z","$text":"2026-01-01","x":1},"k00"]',
+          ).toString('base64url'),
+        ],
       ];
 
       for (const [name, cursor] of cursors) {
