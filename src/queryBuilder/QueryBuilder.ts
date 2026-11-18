@@ -85,6 +85,27 @@ interface QueryOperationsSummary extends OperationsSummary {
   whereOperationCount: number;
 }
 
+// The fields that a `QueryBuilder` itself has, found from the first builder.
+let baseFields: Set<string> | null = null;
+
+// Copies the fields that a subclass of `QueryBuilder` sets, like a flag of a
+// custom method, to a clone: a query runs as a clone, which the subclass's
+// constructor has given the initial values. The values are copied, so a clone
+// shares the objects and arrays of the original.
+function copySubclassFields(from: QueryBuilder, to: QueryBuilder): void {
+  if (baseFields === null) {
+    baseFields = new Set(Object.keys(new QueryBuilder(from.modelClass())));
+  }
+
+  for (const key of Object.keys(from)) {
+    if (!baseFields.has(key)) {
+      (to as unknown as Record<string, unknown>)[key] = (
+        from as unknown as Record<string, unknown>
+      )[key];
+    }
+  }
+}
+
 // Whether the next builder created is a clone, see `clone()`.
 let skipNextContext = false;
 
@@ -522,6 +543,10 @@ class QueryBuilder extends QueryBuilderBase {
 
     builder._allowedGraphExpression = this._allowedGraphExpression;
     builder._findOperationOptions = this._findOperationOptions;
+
+    if (this.constructor !== QueryBuilder) {
+      copySubclassFields(this, builder);
+    }
 
     return builder;
   }
