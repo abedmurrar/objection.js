@@ -6,6 +6,17 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ### Bug fixes
 
+Found by new tests of a custom query builder through every query that objection creates.
+
+- Custom query builders:
+  - A field that a subclass of `QueryBuilder` set, like the flag of a `withDeleted()` method, was lost when the query ran, since a query runs as a clone, and `clone()` only copied objection's own fields. The fields of a subclass are now copied to its clones too, as they are: a clone shares the objects and arrays of the original.
+  - The `onBuild()` hooks of a static `relatedQuery()` used as a subquery saw the table without the alias of the relation in `tableRefFor()`, so a hook adding `` where(`${builder.tableRefFor(Pet)}.deletedAt`, ...) `` referred to a table that isn't in the subquery. The alias is set before the hooks run now.
+  - `upsertGraph()` threw "upsertGraph query should contain no other query builder calls" when an `onBuild()` hook, like one that leaves out soft-deleted rows, added a where clause to every query of a model. The calls are checked before the hooks run now.
+
+## 4.7.2 (2026-11-18)
+
+### Bug fixes
+
 Found by new tests of combinations that no test covered: composite keys that share a column, a multi-tenant schema of every relation type, joins in relation writes, hooks, timestamps with microseconds, and the fork's newer features.
 
 - `cursorPage()`:
@@ -25,10 +36,6 @@ Found by new tests of combinations that no test covered: composite keys that sha
 - SQLite: `whereInComposite()` with a subquery threw "sqlite doesn't support multi-column where in clauses", so `relatedQuery().for()` through a composite key that isn't the id failed. SQLite compares row values to a subquery since 3.15, and it's compiled like on the other databases now.
 - Tracing: the fetch query of `insertAndFetch().withGraphFetched()`, and other child queries of a query with a graph, were reported with `eager: true`. Only the queries that load the relations are now.
 - `unrelate()` of a has-many or belongs-to-one relation set every column of the key to null, also a column that is part of the id of the updated rows, like a `tenantId` that both the key and the id start with. That failed on a `NOT NULL` column, and in MySQL's non-strict mode changed the column to `0`, moving the row to another tenant. Only the columns of the key that aren't part of the id are set to null now. When the whole key is part of the id, `unrelate()` throws, since only deleting the rows can remove the relation.
-- Custom query builders:
-  - A field that a subclass of `QueryBuilder` set, like the flag of a `withDeleted()` method, was lost when the query ran, since a query runs as a clone, and `clone()` only copied objection's own fields. The fields of a subclass are now copied to its clones too, as they are: a clone shares the objects and arrays of the original.
-  - The `onBuild()` hooks of a static `relatedQuery()` used as a subquery saw the table without the alias of the relation in `tableRefFor()`, so a hook adding `` where(`${builder.tableRefFor(Pet)}.deletedAt`, ...) `` referred to a table that isn't in the subquery. The alias is set before the hooks run now.
-  - `upsertGraph()` threw "upsertGraph query should contain no other query builder calls" when an `onBuild()` hook, like one that leaves out soft-deleted rows, added a where clause to every query of a model. The calls are checked before the hooks run now.
 - When the `$beforeInsert()` or `$afterFind()` hook of one model rejected and the hook of a later model threw, the query rejected with the second error, and the first was an unhandled rejection, which ends the process by default. It's handled now.
 
 ## 4.7.1 (2026-11-18)
