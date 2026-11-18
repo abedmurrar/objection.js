@@ -41,6 +41,14 @@ class RelationFindOperation extends FindOperation {
     this.ownerKeyByRelated = new Map();
   }
 
+  // The alias of a static `relatedQuery()` subquery is set when the operation
+  // is added, before the `onBuild()` hooks of the query, so that they see it in
+  // `tableRefFor()`. A later `alias()` call replaces it.
+  onAdd(builder: RelationQueryBuilder, args: unknown[]): boolean {
+    this.maybeApplyAlias(builder);
+    return super.onAdd(builder, args);
+  }
+
   onBuild(builder: RelationQueryBuilder): void {
     this.maybeApplyAlias(builder);
     this.relation.findQuery(builder, this.owner);
