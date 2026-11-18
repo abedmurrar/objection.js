@@ -60,8 +60,8 @@ start =
 bracketStringRef =
   '['
       key:(
-       '"' stringWithoutDoubleQuotes '"' /
-       "'" stringWithoutSingleQuotes "'" /
+       '"' stringWithoutDoubleQuotes '"' &']' /
+       "'" stringWithoutSingleQuotes "'" &']' /
        stringWithoutSquareBrackets
       )
   ']'
@@ -85,11 +85,13 @@ stringWithoutSquareBrackets =
 stringWithoutColon =
   chars:([^:])+ { return chars.join(""); }
 
+// `*`: a quoted key can be empty, `[""]` or `['']`. The `&']'` above makes
+// quotes that aren't followed by the closing bracket part of the key.
 stringWithoutDoubleQuotes =
-  chars:([^"])+ { return chars.join(""); }
+  chars:([^"])* { return chars.join(""); }
 
 stringWithoutSingleQuotes =
-  chars:([^'])+ { return chars.join(""); }
+  chars:([^'])* { return chars.join(""); }
 
 stringWithoutSquareBracketsOrDots =
   chars:([^.\x5D\x5B])+ { return chars.join(""); }

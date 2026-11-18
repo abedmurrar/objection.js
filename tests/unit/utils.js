@@ -505,3 +505,61 @@ describe('utils', () => {
     });
   });
 });
+
+// From ditojs/objection 0fabf86e (#1089).
+describe('snakeCaseMappers and field expressions', () => {
+  const { snakeCaseMappers } = require('../../lib/utils/identifierMapping');
+
+  it('maps the JSON keys of field expressions by default, as before', () => {
+    const mappers = snakeCaseMappers();
+
+    expect(
+      mappers.format({
+        'jsonCol:[0][innerKey]': 1,
+        'jsonCol:someKey.otherKey': 2,
+        fooBar: 3,
+      }),
+    ).to.eql({
+      'json_col:[0][inner_key]': 1,
+      'json_col:some_key.other_key': 2,
+      foo_bar: 3,
+    });
+  });
+
+  it('only maps the column part of field expressions with preserveJsonKeys', () => {
+    const mappers = snakeCaseMappers({ preserveJsonKeys: true });
+
+    expect(
+      mappers.format({
+        'jsonCol:[0][innerKey]': 1,
+        'jsonCol:someKey.otherKey': 2,
+        'jsonCol:[a:bC]': 3,
+        'json_col:someKey': 4,
+        fooBar: 5,
+      }),
+    ).to.eql({
+      'json_col:[0][innerKey]': 1,
+      'json_col:someKey.otherKey': 2,
+      'json_col:[a:bC]': 3,
+      'json_col:someKey': 4,
+      foo_bar: 5,
+    });
+  });
+
+  it('combines preserveJsonKeys with the other options', () => {
+    const mappers = snakeCaseMappers({ preserveJsonKeys: true, upperCase: true });
+
+    expect(mappers.format({ 'jsonCol:someKey': 1, fooBar: 2 })).to.eql({
+      'JSON_COL:someKey': 1,
+      FOO_BAR: 2,
+    });
+  });
+
+  it("doesn't change parse", () => {
+    const mappers = snakeCaseMappers({ preserveJsonKeys: true });
+
+    expect(mappers.parse({ foo_bar: 1, 'rel:some_prop': 2 })).to.eql(
+      snakeCaseMappers().parse({ foo_bar: 1, 'rel:some_prop': 2 }),
+    );
+  });
+});

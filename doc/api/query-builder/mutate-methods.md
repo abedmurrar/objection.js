@@ -123,6 +123,8 @@ queryBuilder = queryBuilder.insertGraph(graph, options);
 
 See the [section about graph inserts](/guide/query-examples.html#graph-inserts).
 
+
+`insertGraph()` and [upsertGraph()](#upsertgraph) can't be combined with [onConflict()](#onconflict), [ignore()](#ignore) or [merge()](#merge), and throw if they are: the inserts of the graph are separate queries that these don't reach. Use `insert().onConflict()` for upserts of single rows.
 ##### Arguments
 
 | Argument | Type                                                                                                           | Description       |

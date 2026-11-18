@@ -8,10 +8,20 @@ interface ModifierAtPath {
   modifier: unknown;
 }
 
+// The `joinOperation` option of one `withGraphJoined()` call, with the
+// relations of that call.
+interface JoinOperationOfCall {
+  expression: RelationExpression;
+  joinOperation: string;
+}
+
 class EagerOperation extends QueryBuilderOperation {
   declare expression: RelationExpression;
   declare modifiersAtPath: ModifierAtPath[];
   declare graphOptions: GraphOptions;
+  // The `joinOperation` options of the `withGraphJoined()` calls. Unlike the
+  // other options, each one only applies to the relations of its call.
+  declare joinOperations: JoinOperationOfCall[];
 
   constructor(name: string | null, opt: OperationOptions) {
     super(name, opt);
@@ -19,6 +29,7 @@ class EagerOperation extends QueryBuilderOperation {
     this.expression = RelationExpression.create();
     this.modifiersAtPath = [];
     this.graphOptions = this.opt.defaultGraphOptions as GraphOptions;
+    this.joinOperations = [];
   }
 
   buildFinalExpression(): RelationExpression {
@@ -54,6 +65,7 @@ class EagerOperation extends QueryBuilderOperation {
     this.expression = eagerOp.expression.clone();
     this.modifiersAtPath = eagerOp.modifiersAtPath.slice();
     this.graphOptions = Object.assign({}, eagerOp.graphOptions);
+    this.joinOperations = eagerOp.joinOperations.slice();
   }
 
   clone(): this {
@@ -68,3 +80,4 @@ function getModifierName(index: number): string {
 }
 
 export { EagerOperation };
+export type { JoinOperationOfCall };

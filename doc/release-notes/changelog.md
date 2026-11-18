@@ -8,6 +8,21 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 - An `onBuild()` hook that removed operations, like one calling `clearSelect()` or `clearWhere()`, made the query skip building the operation after them. When that was the operation of `findById()`, its `where` was lost, so `query().select('id').onBuild((qb) => qb.clearSelect()).findById(2).patch({ ... })` updated every row of the table, and a `delete()` deleted every row. The walk over the operations continues at the right one now. Ported from [ditojs/objection](/fork/dito.md), with a different implementation [#2269](https://github.com/Vincit/objection.js/issues/2269).
 
+## 4.8.0 (2026-11-18)
+
+### What's new
+
+- `snakeCaseMappers({ preserveJsonKeys: true })` only converts the column part of a field expression used as a property name, and keeps its JSON path as written: `patch({ 'jsonData:someKey': 1 })` writes `someKey` into `json_data`, the key that `ref('json_data:someKey')` reads. Without the option the JSON keys are converted too, as before, so the patch wrote `some_key`. The default stays `false` in 4.x, since changing it moves where existing apps write, and will be `true` in 5.0. `knexSnakeCaseMappers()` takes its options as the new `KnexSnakeCaseMappersOptions` type, without this one. Ported from [ditojs/objection](/fork/dito.md), which added it after [#2625](https://github.com/Vincit/objection.js/pull/2625) by @cesumilo [#1089](https://github.com/Vincit/objection.js/issues/1089).
+
+### Bug fixes
+
+- `insertGraph()` and `upsertGraph()` silently ignored `onConflict()`, `ignore()` and `merge()`: the graph's inserts are separate queries that they don't reach, so a duplicate failed with a unique violation. They throw a clear error now, before any query runs [#2156](https://github.com/Vincit/objection.js/issues/2156).
+- `resultSize()` and the `total` of `page()` with `withGraphJoined()` counted the joined rows, one per related row, instead of the root models. They count the distinct root models now [#2329](https://github.com/Vincit/objection.js/issues/2329). The count query also leaves out the orders that a relation's `modify` adds, which made the database sort for nothing [#2747](https://github.com/Vincit/objection.js/issues/2747). Ported from [ditojs/objection](/fork/dito.md).
+- `withGraphJoined()` followed by `withGraphFetched()` switched the whole query to fetching, so a `where()` on a joined relation failed with an unknown column. The opposite order joined every relation. A query that uses both methods now joins all its relations, whichever comes first [#2269](https://github.com/Vincit/objection.js/issues/2269). Mixing the two algorithms in one query, as ditojs/objection does, may come later.
+- The `joinOperation` option of `withGraphJoined()` applied to every joined relation of the query, the one of the last call winning. So `withGraphJoined('pets', { joinOperation: 'innerJoin' }).withGraphJoined('movies')` left-joined the pets too, and returned people without pets. Each call's `joinOperation` applies to the relations of that call now. Ported from [ditojs/objection](/fork/dito.md) [#2125](https://github.com/Vincit/objection.js/issues/2125).
+- A field expression couldn't refer to an empty JSON key: `data:[""]` and `data:['']` referred to a key named `""` or `''`, so reads returned `null` and a patch added that key instead of changing the empty one. They refer to the empty key now, on PostgreSQL, MySQL and MariaDB. Quotes that aren't followed by the closing bracket are still part of the key. Ported from [ditojs/objection](/fork/dito.md), which took it from [#2680](https://github.com/Vincit/objection.js/pull/2680) by @kapouer.
+
+
 ## 4.7.3 (2026-11-18)
 
 ### Bug fixes

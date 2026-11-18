@@ -294,8 +294,16 @@ class QueryBuilder extends QueryBuilderBase {
     const eagerOp = ensureEagerOperation(this, algorithm);
     const parsedExp = parseRelationExpression(this.modelClass(), exp);
 
+    // The `joinOperation` option only applies to the relations of this call,
+    // see `RelationJoiner`. The other options are shared by all the calls.
+    const { joinOperation, ...graphOptions } = options as { joinOperation?: string };
+
     eagerOp.expression = eagerOp.expression.merge(parsedExp);
-    eagerOp.graphOptions = { ...eagerOp.graphOptions, ...options };
+    eagerOp.graphOptions = { ...eagerOp.graphOptions, ...graphOptions };
+
+    if (joinOperation) {
+      eagerOp.joinOperations.push({ expression: parsedExp, joinOperation });
+    }
 
     checkEager(this);
     return this;
@@ -621,12 +629,30 @@ class QueryBuilder extends QueryBuilderBase {
   async resultSize(): Promise<number> {
     const knex = this.knex();
     const builder = this.clone().clear(/orderBy|offset|limit/);
+    const joinEagerOp = builder.findOperation(JoinEagerOperation) as JoinEagerOperation | null;
+
+    if (joinEagerOp !== null) {
+      // `withGraphJoined()` needs the columns of the tables for its selects.
+      await joinEagerOp.onBefore3(builder);
+    }
 
     // knex's types don't accept this `from()` callback or `debug()` without an argument.
     const countQuery: KnexLike = (knex as KnexLike)
       .count('* as count')
       .from((knexBuilder: KnexLike) => {
-        builder.toKnexQuery(knexBuilder).as('temp');
+        // The orders that the query adds when it's built, like those of a
+        // relation's `modify`, are removed too.
+        knexBuilder = builder.toKnexQuery(knexBuilder).clearOrder();
+
+        if (joinEagerOp !== null) {
+          // The joins of `withGraphJoined()` give a row per joined child.
+          // Count the distinct root models instead (#2329).
+          const tableRef = builder.tableRef();
+          const idColumns = builder.modelClass().getIdColumnArray();
+          knexBuilder.clearSelect().distinct(idColumns.map((col) => `${tableRef}.${col}`));
+        }
+
+        knexBuilder.as('temp');
       });
 
     if (this.internalOptions().debug) {
@@ -1289,6 +1315,12 @@ function ensureEagerOperation(builder: QueryBuilder, algorithm: unknown = null):
     const EagerOperationClass = getOperationClassForEagerAlgorithm(builder, algorithm);
 
     if (eagerOp instanceof EagerOperationClass) {
+      return eagerOp;
+    } else if (eagerOp instanceof JoinEagerOperation) {
+      // A query with `withGraphJoined()` joins all its relations, also those
+      // of a later `withGraphFetched()`: its where clauses and orders can
+      // refer to the joined tables, which a fetch would leave out (#2269).
+      // A `withGraphJoined()` after `withGraphFetched()` already joins them.
       return eagerOp;
     } else {
       const newEagerOp = new EagerOperationClass('eager', {
