@@ -4,6 +4,8 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+## 4.7.3 (2026-11-18)
+
 ### Bug fixes
 
 Found by new tests of a custom query builder through every query that objection creates.
