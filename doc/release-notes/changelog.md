@@ -4,6 +4,8 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+## 4.7.2 (2026-11-18)
+
 ### Bug fixes
 
 Found by new tests of combinations that no test covered: composite keys that share a column, a multi-tenant schema of every relation type, joins in relation writes, hooks, timestamps with microseconds, and the fork's newer features.
