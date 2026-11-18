@@ -3,6 +3,8 @@ import { QueryBuilderOperation } from './QueryBuilderOperation';
 import { convertFieldExpressionsToRaw } from './UpdateOperation';
 import { InsertOperation } from './InsertOperation';
 import { DelegateOperation } from './DelegateOperation';
+import { isMySql } from '../../utils/knexUtils';
+import { after } from '../../utils/promiseUtils';
 import type { KnexBuilder, Model, OperationOptions, QueryBuilder } from './types';
 
 class MergeOperation extends QueryBuilderOperation {
@@ -26,6 +28,23 @@ class MergeOperation extends QueryBuilderOperation {
     }
 
     return true;
+  }
+
+  // On MySQL, finds out whether the update can report the id of an existing
+  // row. See `InsertOperation.prepareMySqlMerge()`. The insert operation comes
+  // before this one, so its `$beforeInsert()` hooks have run.
+  onBefore2(builder: QueryBuilder, result: unknown): unknown {
+    if (!isMySql(builder.knex())) {
+      return result;
+    }
+
+    const insertOp = findInsertOperation(builder);
+
+    if (insertOp === null) {
+      return result;
+    }
+
+    return after(insertOp.prepareMySqlMerge(builder), () => result);
   }
 
   onBuildKnex(knexBuilder: KnexBuilder, builder: QueryBuilder): KnexBuilder {

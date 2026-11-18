@@ -178,7 +178,7 @@ It's added when:
 - one model is inserted, and it has no id;
 - the id is one column, and that column is `AUTO_INCREMENT`.
 
-To find out whether the id column is `AUTO_INCREMENT`, objection reads it once per table with `show columns`. `LAST_INSERT_ID()` turns its argument into a number, so it would overwrite other ids, like a `uuid()` default.
+To find out whether the id column is `AUTO_INCREMENT`, objection reads it once per table with `show columns`, in the schema of `withSchema()` if the query has one. `LAST_INSERT_ID()` turns its argument into a number, so it would overwrite other ids, like a `uuid()` default.
 
 A multi-row upsert, or an upsert of a table without an `AUTO_INCREMENT` id, returns models without the id when the row existed. So does `ignore()`, whose `insert ignore` has no update. Find these rows by the columns of the unique key. `toKnexQuery()` shows the SQL without `LAST_INSERT_ID()`, because the column is only read when the query runs.
 

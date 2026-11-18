@@ -250,6 +250,74 @@ module.exports = (session) => {
           expect(queries.some((it) => /LAST_INSERT_ID/.test(it.sql))).to.equal(false);
         });
 
+        describe('withSchema()', () => {
+          const OTHER = 'objection_test_upsert_other';
+
+          before(async () => {
+            await knex.raw('drop database if exists ??', [OTHER]);
+            await knex.raw('create database ??', [OTHER]);
+            // The same table name as in the default database, with an id that
+            // isn't AUTO_INCREMENT, and a table only this database has.
+            await knex.schema.withSchema(OTHER).createTable('upsert_items', (table) => {
+              table.string('id', 36).primary().defaultTo(knex.raw('(uuid())'));
+              table.string('key', 16).notNullable().unique();
+              table.string('name');
+              table.integer('stock');
+            });
+            await knex.schema.withSchema(OTHER).createTable('upsert_other_items', (table) => {
+              table.increments('id').primary();
+              table.string('key', 16).notNullable().unique();
+              table.string('name');
+            });
+          });
+
+          after(async () => {
+            await knex.raw('drop database if exists ??', [OTHER]);
+          });
+
+          it("should read the columns of the schema's table", async () => {
+            // Reads, and caches, the table of the default database first.
+            await BoundItem.query().insert({ key: 'a', name: 'apple' }).onConflict('key').merge();
+
+            await knex.withSchema(OTHER).table('upsert_items').insert({ key: 'a', name: 'apple' });
+            const before = await knex.withSchema(OTHER).table('upsert_items').first();
+
+            const item = await BoundItem.query()
+              .withSchema(OTHER)
+              .insert({ key: 'a', name: 'apricot' })
+              .onConflict('key')
+              .merge();
+
+            const after = await knex.withSchema(OTHER).table('upsert_items').first();
+            // LAST_INSERT_ID() would have made the uuid a number.
+            expect(after.id).to.equal(before.id);
+            expect(after.name).to.equal('apricot');
+            expect(item.id).to.equal(undefined);
+          });
+
+          it('should give the id for a table only the schema has', async () => {
+            class OtherItem extends Model {
+              static get tableName() {
+                return 'upsert_other_items';
+              }
+            }
+
+            await knex
+              .withSchema(OTHER)
+              .table('upsert_other_items')
+              .insert({ key: 'a', name: 'x' });
+            const row = await knex.withSchema(OTHER).table('upsert_other_items').first();
+
+            const item = await OtherItem.query(knex)
+              .withSchema(OTHER)
+              .insert({ key: 'a', name: 'x' })
+              .onConflict('key')
+              .merge();
+
+            expect(item.id).to.equal(row.id);
+          });
+        });
+
         it('should map the id column with knexSnakeCaseMappers()', async () => {
           const mapped = require('knex')({
             ...session.knex.client.config,

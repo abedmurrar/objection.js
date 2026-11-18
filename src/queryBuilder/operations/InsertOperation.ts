@@ -54,18 +54,11 @@ class InsertOperation extends QueryBuilderOperation {
   onBefore2(builder: QueryBuilder, result: unknown): unknown {
     const maybePromise = callBeforeInsert(builder, this.models);
 
-    if (isMySql(builder.knex())) {
-      if (this.models.length > 1) {
-        return after(
-          after(maybePromise, () => this.prepareMySqlBatchInsert(builder)),
-          () => result,
-        );
-      } else if (builder.has('merge')) {
-        return after(
-          after(maybePromise, () => this.prepareMySqlMerge(builder)),
-          () => result,
-        );
-      }
+    if (this.models.length > 1 && isMySql(builder.knex())) {
+      return after(
+        after(maybePromise, () => this.prepareMySqlBatchInsert(builder)),
+        () => result,
+      );
     }
 
     return after(maybePromise, () => result);
@@ -118,17 +111,20 @@ class InsertOperation extends QueryBuilderOperation {
   // overwrite other ids, like a `uuid()` default. And only for a single model
   // without an id: the ids of a multi-row merge can't be told apart.
   // Reads the columns of each table once per knex instance, and returns
-  // synchronously after that.
+  // synchronously after that. Called by `MergeOperation.onBefore2()`, after the
+  // `$beforeInsert()` hooks, so that only upserts pay for it.
   prepareMySqlMerge(builder: QueryBuilder): void | Promise<void> {
     const idColumn = builder.modelClass().getIdColumn();
     this.mergeIdColumn = null;
 
-    if (typeof idColumn !== 'string' || this.models[0].$hasId()) {
+    if (this.models.length !== 1 || typeof idColumn !== 'string' || this.models[0].$hasId()) {
       return;
     }
 
     const knex = builder.knex();
-    const table = builder.tableName();
+    // The table in the schema of `withSchema()`, as `columnInfo()` reads it.
+    const schema = (builder.internalOptions() as { schema?: string }).schema;
+    const table = schema ? `${schema}.${builder.tableName()}` : builder.tableName();
     // The name of the column in the database, after the identifier mapping of
     // the knex config, like `knexSnakeCaseMappers()`, which `??` applies to the
     // table name.
