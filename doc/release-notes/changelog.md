@@ -4,6 +4,8 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+## 4.8.2 (2026-11-18)
+
 ### Bug fixes
 
 - A `patch()` or `update()` with joins, like `patch({ age: 99 }).joinRelated('pets')`, changed rows that the joins don't match on SQLite and PostgreSQL, and every row of the table when the query had no where clause on a joined table: knex leaves the joins out of updates on every database but MySQL. A `delete()` with joins failed on SQLite with a syntax error. Such writes filter their rows by their ids in a subquery that has the joins and the where clauses now. A model without an `idColumn` throws instead. See [Updates and deletes with joins only change the rows the joins match](/fork/breaking-changes.md#updates-and-deletes-with-joins-only-change-the-rows-the-joins-match).
