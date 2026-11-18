@@ -7,6 +7,7 @@ import { isObject, cloneDeep as cloneDeepValue, omit } from '../utils/objectUtil
 import type { JsonSchema, Model, ModelClass, ModelJson, ModelOptions } from './Model';
 import type { ValidatorArgs } from './Validator';
 import type { ValidationError } from './ValidationError';
+import { getQueryPropKeys } from './modelQueryProps';
 
 // The Ajv options, and the options of older Ajv versions that people may still
 // pass, like `v5` (which `Model.createValidator()` passes too).
@@ -23,6 +24,9 @@ interface AjvValidatorConfig {
 interface CompiledValidators {
   patchValidator: ValidateFunction | null;
   normalValidator: ValidateFunction | null;
+  // Validators of the schema without the `required` properties that are given
+  // as query properties, keyed by their names.
+  queryPropValidators: Map<string, ValidateFunction> | null;
 }
 
 interface ValidationErrorItem {
@@ -105,7 +109,12 @@ class AjvValidator extends Validator {
     }
 
     const modelClass = model.constructor as ModelClass;
-    const validator = this.getValidator(modelClass, ctx.jsonSchema, !!options.patch);
+    const validator = this.getValidator(
+      modelClass,
+      ctx.jsonSchema,
+      !!options.patch,
+      options.patch ? null : getMissingQueryPropKeys(model, json, ctx.jsonSchema),
+    );
 
     // We need to clone the input json if we are about to set default values.
     if (!options.mutable && !options.patch && setsDefaultValues(ctx.jsonSchema)) {
@@ -126,6 +135,7 @@ class AjvValidator extends Validator {
     modelClass: ModelClass,
     jsonSchema: JsonSchema,
     isPatchObject: boolean,
+    queryPropKeys: string[] | null = null,
   ): ValidateFunction {
     // Use the Ajv custom serializer if provided.
     const createCacheKey = this.ajvOptions.serialize || JSON.stringify;
@@ -152,6 +162,8 @@ class AjvValidator extends Validator {
 
           // Validator created for the unmodified schema.
           normalValidator: null,
+
+          queryPropValidators: null,
         };
 
         this.cache.set(cacheKey, validators);
@@ -168,6 +180,17 @@ class AjvValidator extends Validator {
       if (!validator) {
         validator = this.compilePatchValidator(jsonSchema);
         validators.patchValidator = validator;
+      }
+    } else if (queryPropKeys !== null) {
+      const key = JSON.stringify(queryPropKeys);
+      validators.queryPropValidators = validators.queryPropValidators || new Map();
+      validator = validators.queryPropValidators.get(key) || null;
+
+      if (!validator) {
+        validator = this.compileNormalValidator(
+          jsonSchemaWithoutRequiredKeys(jsonSchema, queryPropKeys),
+        );
+        validators.queryPropValidators.set(key, validator);
       }
     } else {
       validator = validators.normalValidator;
@@ -190,6 +213,39 @@ class AjvValidator extends Validator {
   compileNormalValidator(jsonSchema: JsonSchema): ValidateFunction {
     return this.ajv.compile(jsonSchema);
   }
+}
+
+// The keys of the query properties of `model`, like `raw()`, `val()` or a
+// subquery, that the schema requires and `json` doesn't have, sorted, or `null`
+// if there are none. Query properties are split from the json before it's
+// validated, but they do give the property a value (#2199).
+function getMissingQueryPropKeys(
+  model: Model,
+  json: ModelJson,
+  jsonSchema: JsonSchema,
+): string[] | null {
+  const queryPropKeys = getQueryPropKeys(model);
+
+  if (queryPropKeys === null) {
+    return null;
+  }
+
+  const required = (jsonSchema as { required?: unknown }).required;
+
+  if (!Array.isArray(required) || required.length === 0) {
+    return null;
+  }
+
+  const keys = queryPropKeys.filter((key) => required.includes(key) && !Object.hasOwn(json, key));
+  return keys.length > 0 ? keys.sort() : null;
+}
+
+function jsonSchemaWithoutRequiredKeys(jsonSchema: JsonSchema, keys: string[]): JsonSchema {
+  const required = (jsonSchema as { required: string[] }).required;
+  return {
+    ...(jsonSchema as object),
+    required: required.filter((key) => !keys.includes(key)),
+  } as JsonSchema;
 }
 
 function parseValidationError(

@@ -163,4 +163,11 @@ function isKnexRawConvertable(queryProp: object): boolean {
   return isFunction((queryProp as Partial<KnexRawConvertable>).toKnexRaw);
 }
 
-export { splitQueryProps, mergeQueryProps, isQueryProp };
+// The keys of the query properties that were split from `model`, or `null` if
+// there are none.
+function getQueryPropKeys(model: Model): string[] | null {
+  const queryProps = model[QUERY_PROPS_PROPERTY] as ModelJson | undefined;
+  return queryProps ? Object.keys(queryProps) : null;
+}
+
+export { splitQueryProps, mergeQueryProps, isQueryProp, getQueryPropKeys };

@@ -6,6 +6,8 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ### Bug fixes
 
+- `select()` didn't apply to the fetch of `patchAndFetchById()`, `updateAndFetchById()` and the other `*AndFetch` methods, which returned every column. The fetch selects what the query selects now. The model still has the values of the patch too [#1938](https://github.com/Vincit/objection.js/issues/1938).
+- A property that the schema requires failed validation when it was given as a query property, like `insert({ name: raw('...') })` or `val()`: query properties are taken out of the data before it's validated. They count as present now. Ported from [ditojs/objection](/fork/dito.md) [#2199](https://github.com/Vincit/objection.js/issues/2199).
 - Selections of `withGraphJoined()` modifiers that weren't recognized were missing from the result or broke the query:
   - An aggregate with an alias, like `count('* as n')`, counted as selecting all columns, so the main query selected columns that the joined subquery didn't have, and failed. Aggregates select their aliases from the joined subqueries now [#2219](https://github.com/Vincit/objection.js/issues/2219).
   - Raw SQL that ends with an alias, like `raw('RIGHT(token, 4) AS last4')`, and subqueries with `as()` were left out of the result. They're selected now, next to the other columns [#2365](https://github.com/Vincit/objection.js/issues/2365).
