@@ -8,6 +8,11 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 - `snakeCaseMappers({ preserveJsonKeys: true })` only converts the column part of a field expression used as a property name, and keeps its JSON path as written: `patch({ 'jsonData:someKey': 1 })` writes `someKey` into `json_data`, the key that `ref('json_data:someKey')` reads. Without the option the JSON keys are converted too, as before, so the patch wrote `some_key`. The default stays `false` in 4.x, since changing it moves where existing apps write, and will be `true` in 5.0. `knexSnakeCaseMappers()` takes its options as the new `KnexSnakeCaseMappersOptions` type, without this one. Ported from [ditojs/objection](/fork/dito.md), which added it after [#2625](https://github.com/Vincit/objection.js/pull/2625) by @cesumilo [#1089](https://github.com/Vincit/objection.js/issues/1089).
 
+### Bug fixes
+
+- A field expression couldn't refer to an empty JSON key: `data:[""]` and `data:['']` referred to a key named `""` or `''`, so reads returned `null` and a patch added that key instead of changing the empty one. They refer to the empty key now, on PostgreSQL, MySQL and MariaDB. Quotes that aren't followed by the closing bracket are still part of the key. Ported from [ditojs/objection](/fork/dito.md), which took it from [#2680](https://github.com/Vincit/objection.js/pull/2680) by @kapouer.
+
+
 ## 4.7.3 (2026-11-18)
 
 ### Bug fixes
