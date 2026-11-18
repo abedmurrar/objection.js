@@ -1,16 +1,32 @@
-import { flatten } from '../../../utils/objectUtils';
+import { flatten, isString, isPlainObject } from '../../../utils/objectUtils';
 import { Selection } from './Selection';
 import { ObjectionToKnexConvertingOperation } from '../ObjectionToKnexConvertingOperation';
 import type { KnexBuilder, OperationOptions, QueryBuilder } from '../types';
 
 const COUNT_REGEX = /count/i;
+const ALIAS_REGEX = /\s+as\s+/i;
+
+const AGGREGATE_METHODS = new Set([
+  'count',
+  'countDistinct',
+  'min',
+  'max',
+  'sum',
+  'sumDistinct',
+  'avg',
+  'avgDistinct',
+]);
 
 class SelectOperation extends ObjectionToKnexConvertingOperation {
   declare selections: Selection[];
+  // The columns that an aggregate selects: its aliases, which `withGraphJoined()`
+  // selects from the joined subqueries. `null` for other select operations.
+  declare aggregateSelections: Selection[] | null;
 
   constructor(name: string | null, opt?: OperationOptions) {
     super(name, opt);
     this.selections = [];
+    this.aggregateSelections = AGGREGATE_METHODS.has(name as string) ? [] : null;
   }
 
   onAdd(builder: QueryBuilder, args: unknown[]): boolean {
@@ -30,6 +46,12 @@ class SelectOperation extends ObjectionToKnexConvertingOperation {
       if (selectionInstance) {
         this.selections.push(selectionInstance);
       }
+    }
+
+    if (this.aggregateSelections !== null) {
+      this.aggregateSelections = getAggregateAliases(selections).map(
+        (alias) => new Selection(null, null, alias),
+      );
     }
 
     return ret;
@@ -58,7 +80,24 @@ class SelectOperation extends ObjectionToKnexConvertingOperation {
   clone(): this {
     const clone = super.clone();
     clone.selections = this.selections.slice();
+    clone.aggregateSelections = this.aggregateSelections && this.aggregateSelections.slice();
     return clone;
+  }
+}
+
+// The aliases of the columns that an aggregate selects, in knex's forms:
+// `count('col as alias')`, `count('col', { as: 'alias' })` and
+// `count({ alias: 'col' })`. Aggregates without an alias are left out, as the
+// name of their column differs between databases.
+function getAggregateAliases([column, options]: unknown[]): string[] {
+  if (isString(column) && ALIAS_REGEX.test(column)) {
+    return [column.split(ALIAS_REGEX)[1].trim()];
+  } else if (isPlainObject(options) && isString((options as { as?: unknown }).as)) {
+    return [(options as { as: string }).as];
+  } else if (isPlainObject(column)) {
+    return Object.keys(column as object);
+  } else {
+    return [];
   }
 }
 

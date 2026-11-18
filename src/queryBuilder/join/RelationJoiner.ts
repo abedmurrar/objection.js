@@ -1,5 +1,6 @@
 import { uniqBy } from '../../utils/objectUtils';
 import { Selection } from '../operations/select/Selection';
+import type { SelectOperation } from '../operations/select/SelectOperation';
 import { createModifier } from '../../utils/createModifier';
 import { map as mapPromise } from '../../utils/promiseUtils';
 import { ValidationErrorType } from '../../model/ValidationError';
@@ -158,6 +159,12 @@ class RelationJoiner {
     // for later use.
     userSelectQueries.set(tableNode, userSelectQuery);
 
+    if (selectsOnlyAliasesKeepingSelectAll(findJoinSelections(userSelectQuery))) {
+      // The main query selects all the columns of the joined subquery, so the
+      // subquery needs to select them too.
+      subqueryToJoin.select(`${subqueryToJoin.tableRef()}.*`);
+    }
+
     tableNode.relation!.join(builder, {
       joinOperation: this.options.joinOperation,
 
@@ -268,8 +275,9 @@ function ensureIdAndRelationPropsAreSelected({
     ),
   ];
 
+  const hasSelectionAs = createHasSelectionAs(builder);
   const selectStrings = uniqBy(cols)
-    .filter((col: string) => !builder.hasSelectionAs(col, col))
+    .filter((col: string) => !hasSelectionAs(col))
     .map((col: string) => `${tableRef}.${col}`);
 
   return builder.select(selectStrings);
@@ -286,8 +294,16 @@ function getSelectionsForNode({
 }): { selections: Selection[]; internalSelections: Selection[] } {
   // Every node has a query: `build()` and `_buildJoinsForNode()` add them.
   const userSelectQuery = userSelectQueries.get(tableNode)!;
-  const userSelections = userSelectQuery.findAllSelections();
+  // Only the joined subqueries select aggregates by their aliases. The root
+  // query keeps treating the columns passed to them as selected.
+  const isJoined = tableNode.parentNode !== null;
+  const userSelections = isJoined
+    ? findJoinSelections(userSelectQuery)
+    : userSelectQuery.findAllSelections();
   const userSelectedAllColumns = isSelectAllSelectionSet(userSelections);
+  const hasUserSelectionAs = isJoined
+    ? createHasSelectionAs(userSelectQuery)
+    : (column: string) => userSelectQuery.hasSelectionAs(column, column);
 
   let selections: Selection[] = [];
   let internalSelections: Selection[] = [];
@@ -309,7 +325,7 @@ function getSelectionsForNode({
 
     for (const idSelection of idSelections) {
       // The id selections have a column.
-      if (!userSelectQuery.hasSelectionAs(idSelection.column!, idSelection.column!)) {
+      if (!hasUserSelectionAs(idSelection.column!)) {
         selections.push(idSelection);
         internalSelections.push(idSelection);
       }
@@ -413,8 +429,52 @@ function isNotSelectAll(selection: Selection): boolean {
   return selection.column !== '*';
 }
 
+// The selections that don't keep all columns selected decide it: a modifier that
+// only selects aliased subqueries or raw SQL still selects all columns.
 function isSelectAllSelectionSet(selections: Selection[]): boolean {
+  selections = selections.filter((it) => !it.keepsSelectAll);
   return selections.length === 0 || selections.some(isSelectAll);
+}
+
+function selectsOnlyAliasesKeepingSelectAll(selections: Selection[]): boolean {
+  return selections.length > 0 && selections.every((it) => it.keepsSelectAll);
+}
+
+// Like `builder.findAllSelections()`, but aggregates select their aliases
+// instead of the columns they're passed (#2219). Aggregates without an alias
+// are left out, as the name of their column differs between databases.
+function findJoinSelections(builder: QueryBuilder): Selection[] {
+  let selections: Selection[] = [];
+
+  builder.forEachOperation(true, (op) => {
+    if (isSelectOperation(op)) {
+      selections = selections.concat(op.aggregateSelections || op.selections);
+    }
+  });
+
+  return selections;
+}
+
+// `(column) => builder.hasSelectionAs(column, column)`, but ignoring the columns
+// passed to aggregates, as they don't select them.
+function createHasSelectionAs(builder: QueryBuilder): (column: string) => boolean {
+  if (builder.has(isAggregateOperation)) {
+    const selectionQuery = builder.clone().clear(isAggregateOperation);
+    // Explicit, as a query with only aggregates doesn't select all columns.
+    return (column) => selectionQuery.hasSelectionAs(column, column, true);
+  } else {
+    return (column) => builder.hasSelectionAs(column, column);
+  }
+}
+
+// Only `SelectOperation`s have `aggregateSelections`. Checked without the
+// class, which this module can't import: the modules import each other.
+function isSelectOperation(op: unknown): op is SelectOperation {
+  return (op as Partial<SelectOperation>).aggregateSelections !== undefined;
+}
+
+function isAggregateOperation(op: unknown): boolean {
+  return isSelectOperation(op) && op.aggregateSelections !== null;
 }
 
 function checkAliasLength(modelClass: ModelClass, alias: string): void {

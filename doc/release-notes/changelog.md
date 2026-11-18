@@ -4,6 +4,14 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ## Unreleased
 
+### Bug fixes
+
+- Selections of `withGraphJoined()` modifiers that weren't recognized were missing from the result or broke the query:
+  - An aggregate with an alias, like `count('* as n')`, counted as selecting all columns, so the main query selected columns that the joined subquery didn't have, and failed. Aggregates select their aliases from the joined subqueries now [#2219](https://github.com/Vincit/objection.js/issues/2219).
+  - Raw SQL that ends with an alias, like `raw('RIGHT(token, 4) AS last4')`, and subqueries with `as()` were left out of the result. They're selected now, next to the other columns [#2365](https://github.com/Vincit/objection.js/issues/2365).
+
+  The docs of `withGraphJoined()` list what a modifier can select, and that a `groupBy` needs to include the id. Ported from [ditojs/objection](/fork/dito.md).
+
 ## 4.7.3 (2026-11-18)
 
 ### Bug fixes
