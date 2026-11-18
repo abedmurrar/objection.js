@@ -1298,6 +1298,12 @@ function ensureEagerOperation(builder: QueryBuilder, algorithm: unknown = null):
 
     if (eagerOp instanceof EagerOperationClass) {
       return eagerOp;
+    } else if (eagerOp instanceof JoinEagerOperation) {
+      // A query with `withGraphJoined()` joins all its relations, also those
+      // of a later `withGraphFetched()`: its where clauses and orders can
+      // refer to the joined tables, which a fetch would leave out (#2269).
+      // A `withGraphJoined()` after `withGraphFetched()` already joins them.
+      return eagerOp;
     } else {
       const newEagerOp = new EagerOperationClass('eager', {
         defaultGraphOptions,

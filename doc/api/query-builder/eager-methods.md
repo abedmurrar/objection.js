@@ -227,6 +227,8 @@ const people = await Person.query()
   .withGraphJoined('movies', { joinOperation: 'leftJoin' });
 ```
 
+A query that uses both `withGraphJoined()` and `withGraphFetched()` joins all its relations, whichever method comes first, so its `where()` and `orderBy()` can refer to the joined tables.
+
 In TypeScript, the relation expression is checked and the loaded relations are added to the result type, like with [withGraphFetched](/api/query-builder/eager-methods.html#withgraphfetched).
 
 **Limitations:**

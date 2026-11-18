@@ -1744,6 +1744,31 @@ module.exports = (session) => {
           });
       });
 
+      it('should join the relations whether withGraphJoined comes before or after withGraphFetched (#2269)', () => {
+        const summarize = (models) =>
+          models.map((model) => ({
+            id: model.id,
+            model1Relation1: model.model1Relation1.id,
+            model1Relation2: model.model1Relation2.map((it) => it.idCol).sort(),
+          }));
+
+        return Promise.all([
+          Model1.query()
+            .withGraphJoined('model1Relation1')
+            .where('model1Relation1.id', 2)
+            .withGraphFetched('model1Relation2'),
+          Model1.query()
+            .withGraphFetched('model1Relation2')
+            .withGraphJoined('model1Relation1')
+            .where('model1Relation1.id', 2),
+        ]).then(([joinedFirst, fetchedFirst]) => {
+          expect(summarize(joinedFirst)).to.eql([
+            { id: 1, model1Relation1: 2, model1Relation2: [1, 2] },
+          ]);
+          expect(summarize(fetchedFirst)).to.eql(summarize(joinedFirst));
+        });
+      });
+
       // From ditojs/objection 6fd5cb9e.
       it('should use the join type of each withGraphJoined call (#2125)', () => {
         const summarize = (models) =>
