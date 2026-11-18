@@ -1,21 +1,13 @@
 import { QueryBuilderOperation } from './QueryBuilderOperation';
 import { callStaticBeforeHook, callStaticAfterHook } from '../StaticHookArguments';
 import { afterReturn } from '../../utils/promiseUtils';
-import { isMySql, isSqlite } from '../../utils/knexUtils';
-import { filterJoinedWriteByIds } from './filterJoinedWriteByIds';
+import { isMySql } from '../../utils/knexUtils';
 import { deprecate } from '../../utils/deprecate';
 import type { KnexBuilder, QueryBuilder } from './types';
 
 class DeleteOperation extends QueryBuilderOperation {
   onBefore2(builder: QueryBuilder, result: unknown): unknown {
     return afterReturn(callStaticBeforeHook(builder, 'beforeDelete'), result);
-  }
-
-  onBuild(builder: QueryBuilder): void {
-    // knex compiles the joins of deletes on the other databases.
-    if (isSqlite(builder.unsafeKnex())) {
-      filterJoinedWriteByIds(builder);
-    }
   }
 
   onBuildKnex(knexBuilder: KnexBuilder, builder: QueryBuilder): KnexBuilder {

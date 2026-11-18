@@ -109,20 +109,33 @@ class AjvValidator extends Validator {
     }
 
     const modelClass = model.constructor as ModelClass;
-    const validator = this.getValidator(
-      modelClass,
-      ctx.jsonSchema,
-      !!options.patch,
-      options.patch ? null : getMissingQueryPropKeys(model, json, ctx.jsonSchema),
-    );
+    const isPatch = !!options.patch;
+    let validator = this.getValidator(modelClass, ctx.jsonSchema, isPatch);
 
     // We need to clone the input json if we are about to set default values.
-    if (!options.mutable && !options.patch && setsDefaultValues(ctx.jsonSchema)) {
+    if (!options.mutable && !isPatch && setsDefaultValues(ctx.jsonSchema)) {
       json = cloneDeep(json) as ModelJson;
     }
 
     validator.call(model, json);
-    const error = parseValidationError(validator.errors, modelClass, options, this.ajvOptions);
+    let errors = validator.errors;
+
+    if (errors && !isPatch) {
+      // Query properties, like `raw()`, are split from the json before it's
+      // validated, but they do give the property a value (#2199). The schema
+      // without those required keys only accepts more, so it's only needed when
+      // the validation fails, which keeps the validation of every other model
+      // as fast as before.
+      const queryPropKeys = getMissingQueryPropKeys(model, json, ctx.jsonSchema);
+
+      if (queryPropKeys !== null) {
+        validator = this.getValidator(modelClass, ctx.jsonSchema, false, queryPropKeys);
+        validator.call(model, json);
+        errors = validator.errors;
+      }
+    }
+
+    const error = parseValidationError(errors, modelClass, options, this.ajvOptions);
 
     if (error) {
       throw error;

@@ -1,7 +1,6 @@
 import { ref } from '../../queryBuilder/ReferenceBuilder';
 import { isEmpty } from '../../utils/objectUtils';
 import { isKnexRaw, isKnexQueryBuilder, isMySql } from '../../utils/knexUtils';
-import { filterJoinedWriteByIds } from './filterJoinedWriteByIds';
 import { toPgJsonPathLiteral, getJsonDialect } from '../../utils/postgresJsonPath';
 import { toMySqlJsonPath, toJsonSql } from '../../utils/mysqlJsonPath';
 import { QueryBuilderOperation } from './QueryBuilderOperation';
@@ -60,18 +59,11 @@ class UpdateOperation extends QueryBuilderOperation {
     }
   }
 
-  onBuild(builder: QueryBuilder): void {
-    // knex only compiles the joins of updates on MySQL.
-    if (!isMySql(builder.unsafeKnex())) {
-      filterJoinedWriteByIds(builder);
-    }
-  }
-
   onBuildKnex(knexBuilder: KnexBuilder, builder: QueryBuilder): KnexBuilder {
     const json = this.model.$toDatabaseJson(builder);
     const convertedJson = convertFieldExpressionsToRaw(builder, json);
 
-    if (isMySql(builder.unsafeKnex()) && builder.has(builder.constructor.JoinSelector)) {
+    if (builder.operationsSummary().hasJoinOperation && isMySql(builder.unsafeKnex())) {
       // A column of the same name in a joined table, like `name`, made the
       // column ambiguous.
       return knexBuilder.update(qualifyColumns(convertedJson, builder.tableRef()));

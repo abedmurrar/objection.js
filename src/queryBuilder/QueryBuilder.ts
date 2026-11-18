@@ -60,6 +60,7 @@ import type { HookName, PhaseHookName } from './operations/QueryBuilderOperation
 import type { OperationsSummary } from './QueryBuilderOperationSupport';
 import type { InstanceUpdateOperation } from './operations/InstanceUpdateOperation';
 import type { RelationOperationOptions } from '../relations/Relation';
+import { filterJoinedWrite } from './operations/filterJoinedWriteByIds';
 
 // A modifier: a function, the name of a modifier, an object of `where`
 // conditions or an array of those. `any[]`: the modifier gets the arguments
@@ -78,6 +79,8 @@ interface QueryOperationsSummary extends OperationsSummary {
   // The last operation that sets the table, see `buildKnexQuery()`.
   lastFromOperation: Operation | null;
   hasSelectOperation: boolean;
+  // Whether a join operation, like `join()` or `joinRelated()`, is there.
+  hasJoinOperation: boolean;
   // Whether a where operation has a where scope, see `whereScopes.ts`.
   hasScopedWhereOperation: boolean;
   // The number of where operations that aren't inside another where
@@ -441,6 +444,7 @@ class QueryBuilder extends QueryBuilderBase {
       eagerOperation: null,
       lastFromOperation: null,
       hasSelectOperation: false,
+      hasJoinOperation: false,
       hasScopedWhereOperation: false,
       whereOperationCount: 0,
     };
@@ -484,6 +488,10 @@ class QueryBuilder extends QueryBuilderBase {
 
     if ((kind & KIND_SELECT) !== 0) {
       summary.hasSelectOperation = true;
+    }
+
+    if ((kind & KIND_JOIN) !== 0) {
+      summary.hasJoinOperation = true;
     }
 
     if ((kind & KIND_WHERE) !== 0) {
@@ -1235,6 +1243,7 @@ const KIND_EAGER = 8;
 const KIND_FROM = 16;
 const KIND_SELECT = 32;
 const KIND_WHERE = 64;
+const KIND_JOIN = 128;
 const baseIs = QueryBuilderOperation.prototype.is;
 
 // The kinds of an operation that the summary of a query needs, worked out
@@ -1285,7 +1294,8 @@ function nameKind(op: Operation): number {
     kind =
       (QueryBuilderBase.FromSelector.test(name) ? KIND_FROM : 0) |
       (QueryBuilderBase.SelectSelector.test(name) ? KIND_SELECT : 0) |
-      (QueryBuilderBase.WhereSelector.test(name) ? KIND_WHERE : 0);
+      (QueryBuilderBase.WhereSelector.test(name) ? KIND_WHERE : 0) |
+      (QueryBuilderBase.JoinSelector.test(name) ? KIND_JOIN : 0);
 
     nameKinds.set(op.name, kind);
   }
@@ -1977,6 +1987,13 @@ function callOnBuildHooks(builder: QueryBuilder): QueryBuilder {
   callOnBuildFuncs(builder, builder.internalContext().onBuild);
 
   builder.executeOnBuild();
+
+  const summary = builder.operationsSummary();
+
+  if (summary.hasWriteOperation && summary.hasJoinOperation) {
+    filterJoinedWrite(builder);
+  }
+
   return builder;
 }
 

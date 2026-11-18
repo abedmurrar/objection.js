@@ -1,4 +1,5 @@
 import { withWhereScope } from '../whereScopes';
+import { isMySql, isSqlite } from '../../utils/knexUtils';
 import type { QueryBuilder } from './types';
 
 interface BuilderClass {
@@ -41,4 +42,16 @@ function filterJoinedWriteByIds(builder: QueryBuilder): void {
   withWhereScope(builder, () => builder.whereInComposite(idProp.refs(builder), subquery));
 }
 
-export { filterJoinedWriteByIds };
+// Runs after the `onBuild()` hooks of a write with joins. Those of the
+// many-to-many writes have moved their joins to a subquery already.
+function filterJoinedWrite(builder: QueryBuilder): void {
+  const knex = builder.unsafeKnex();
+
+  // knex only compiles the joins of updates on MySQL, and those of deletes on
+  // every database but SQLite.
+  if (builder.isUpdate() ? !isMySql(knex) : builder.isDelete() && isSqlite(knex)) {
+    filterJoinedWriteByIds(builder);
+  }
+}
+
+export { filterJoinedWrite, filterJoinedWriteByIds };
