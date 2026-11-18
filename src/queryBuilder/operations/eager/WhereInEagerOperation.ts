@@ -152,6 +152,7 @@ class WhereInEagerOperation extends EagerOperation {
     findOperation.alwaysReturnArray = true;
     findOperation.assignResultToOwner = true;
     findOperation.relationProperty = expr.node.$name!;
+    findOperation.eager = true;
     // The related models are assigned after the hooks of the query, so that
     // what `afterFind()` returns, e.g. filtered models, ends up in the graph.
     findOperation.assignAfterHooks = !!relation.relatedModelClass.useAfterFindInGraphs;

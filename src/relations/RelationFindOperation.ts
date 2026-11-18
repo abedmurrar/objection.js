@@ -21,6 +21,8 @@ class RelationFindOperation extends FindOperation {
   // `useAfterFindInGraphs`: the related models are assigned to the owners by
   // `assignResult()`, after the hooks of the query.
   declare assignAfterHooks: boolean;
+  // Set by `withGraphFetched()` for the queries of the relations it loads.
+  declare eager: boolean;
   // Shared with the clones that execute the query.
   declare ownerKeyByRelated: Map<RelationModel, string>;
 
@@ -35,6 +37,7 @@ class RelationFindOperation extends FindOperation {
     this.omitProps = [];
     this.alias = null;
     this.assignAfterHooks = false;
+    this.eager = false;
     this.ownerKeyByRelated = new Map();
   }
 
@@ -194,6 +197,7 @@ class RelationFindOperation extends FindOperation {
     clone.omitProps = this.omitProps.slice();
     clone.alias = this.alias;
     clone.assignAfterHooks = this.assignAfterHooks;
+    clone.eager = this.eager;
     clone.ownerKeyByRelated = this.ownerKeyByRelated;
 
     return clone;
