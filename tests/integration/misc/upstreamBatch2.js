@@ -1,5 +1,5 @@
 const expect = require('expect.js');
-const { Model, raw, val } = require('../../../');
+const { Model, raw, ref, val } = require('../../../');
 
 // Upstream objection.js issues that the fork had too, each in a describe.
 module.exports = (session) => {
@@ -57,6 +57,24 @@ module.exports = (session) => {
 
         expect(person).to.eql({ id: 1, name: 'Ann', age: 31 });
         expect(queries[queries.length - 1]).to.match(/^select ["`]id["`], ["`]name["`] from/);
+      });
+    });
+
+    describe('refs in an orderBy() array (#2252)', () => {
+      it('should order by the refs, also in { column } objects', async () => {
+        await knex('ub2_persons').insert([
+          { id: 2, name: 'Bob', age: 30 },
+          { id: 3, name: 'Ann', age: 20 },
+        ]);
+
+        const byRefs = await Person.query(knex).orderBy([ref('name'), ref('age')]);
+        const byObjects = await Person.query(knex).orderBy([
+          { column: ref('age'), order: 'desc' },
+          { column: ref('id') },
+        ]);
+
+        expect(byRefs.map((it) => it.id)).to.eql([3, 1, 2]);
+        expect(byObjects.map((it) => it.id)).to.eql([1, 2, 3]);
       });
     });
 

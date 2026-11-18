@@ -149,6 +149,12 @@ function convertArray(
           `undefined passed as an item in argument #${i} for '${opName}' operation. Call skipUndefined() method to ignore the undefined values.`,
         );
       }
+    } else if (opName === 'orderBy' && isObject(item)) {
+      // knex's `orderBy()` only reads `{ column, order, nulls }` objects from
+      // an array, so a ref, a raw or a query builder is put in one, and the
+      // properties of the object are converted (#2252).
+      const obj = isPlainObject(item) ? (item as Record<string, unknown>) : { column: item };
+      return convertPlainObject(obj, builder, i, opName, skipUndefined);
     } else if (hasToKnexRawMethod(item)) {
       return convertToKnexRaw(item, builder);
     } else if (isObjectionQueryBuilderBase(item)) {
