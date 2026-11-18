@@ -2,6 +2,7 @@ import { normalizeIds } from '../../utils/normalizeIds';
 import { RelateOperation } from '../../queryBuilder/operations/RelateOperation';
 import type { Relation, RelationQueryBuilder } from '../Relation';
 import type { RelationOwner } from '../RelationOwner';
+import { assertOwnerModelsHaveProps } from '../RelationOwner';
 
 class BelongsToOneRelateOperation extends RelateOperation {
   declare relation: Relation;
@@ -13,6 +14,13 @@ class BelongsToOneRelateOperation extends RelateOperation {
     this.ids = normalizeIds(args[0], this.relation.relatedProp, { arrayOutput: true });
 
     assertOneId(this.ids);
+    // The owner row is patched by its id.
+    assertOwnerModelsHaveProps(
+      this.owner,
+      this.relation,
+      'relate',
+      this.relation.ownerModelClass.getIdRelationProperty(),
+    );
     return true;
   }
 

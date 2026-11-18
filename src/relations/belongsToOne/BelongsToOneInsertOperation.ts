@@ -2,6 +2,7 @@ import { RelationInsertOperation } from '../RelationInsertOperation';
 import { BelongsToOneRelateOperation } from './BelongsToOneRelateOperation';
 import { InsertGraphOperation } from '../../queryBuilder/operations/InsertGraphOperation';
 import type { RelationQueryBuilder } from '../Relation';
+import { assertOwnerModelsHaveProps } from '../RelationOwner';
 
 class BelongsToOneInsertOperation extends RelationInsertOperation {
   onAdd(builder: RelationQueryBuilder, args: unknown[]): boolean {
@@ -10,6 +11,14 @@ class BelongsToOneInsertOperation extends RelationInsertOperation {
     if (this.models.length > 1) {
       throw this.relation.createError('can only insert one model to a BelongsToOneRelation');
     }
+
+    // The owner row is patched by its id after the related row is inserted.
+    assertOwnerModelsHaveProps(
+      this.owner,
+      this.relation,
+      'insert',
+      this.relation.ownerModelClass.getIdRelationProperty(),
+    );
 
     return retVal;
   }

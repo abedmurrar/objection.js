@@ -129,7 +129,8 @@ returning "id"
 
 -- MySQL
 insert into `persons` (`email`, `firstName`) values ('jennifer@example.com', 'Jennifer')
-on duplicate key update `email` = values(`email`), `firstName` = values(`firstName`)
+on duplicate key update `email` = values(`email`), `firstName` = values(`firstName`),
+`id` = LAST_INSERT_ID(`id`)
 
 -- SQLite
 insert into `persons` (`email`, `firstName`) values ('jennifer@example.com', 'Jennifer')
@@ -167,6 +168,19 @@ product.stock; // 8. Without returning('*') it would be 3.
 ```
 
 MySQL has no `returning()`. knex ignores it there with a warning, so fetch the row again with a query.
+
+#### The id of a MySQL upsert
+
+MySQL reports the id of the existing row after `on duplicate key update` only when the update changed the row, and `0` when it didn't. So objection adds `` `id` = LAST_INSERT_ID(`id`) `` to the update. It doesn't change the row, and it makes MySQL report the row's id in both cases. The returned model then has the id of the inserted or the existing row, like on postgres and SQLite.
+
+It's added when:
+
+- one model is inserted, and it has no id;
+- the id is one column, and that column is `AUTO_INCREMENT`.
+
+To find out whether the id column is `AUTO_INCREMENT`, objection reads it once per table with `show columns`, in the schema of `withSchema()` if the query has one. `LAST_INSERT_ID()` turns its argument into a number, so it would overwrite other ids, like a `uuid()` default.
+
+A multi-row upsert, or an upsert of a table without an `AUTO_INCREMENT` id, returns models without the id when the row existed. So does `ignore()`, whose `insert ignore` has no update. Find these rows by the columns of the unique key. `toKnexQuery()` shows the SQL without `LAST_INSERT_ID()`, because the column is only read when the query runs.
 
 ## Deletes with a limit
 

@@ -1,5 +1,6 @@
 import { RelationInsertOperation } from '../../RelationInsertOperation';
 import { ManyToManyRelateOperation } from '../relate/ManyToManyRelateOperation';
+import { assertOwnerModelsHaveProps } from '../../RelationOwner';
 import type { RelationModel, RelationQueryBuilder } from '../../Relation';
 import type { ManyToManyRelation } from '../ManyToManyRelation';
 
@@ -8,6 +9,9 @@ class ManyToManyInsertOperation extends RelationInsertOperation {
 
   onAdd(builder: RelationQueryBuilder, args: unknown[]): boolean {
     const retVal = super.onAdd(builder, args);
+    // Before the related rows are inserted, which would otherwise be left
+    // without join rows.
+    assertOwnerModelsHaveProps(this.owner, this.relation, 'insert');
 
     // Omit extra properties so that we don't try to insert
     // them to the related table. We don't actually remove them

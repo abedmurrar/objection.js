@@ -129,6 +129,7 @@ describe('integration tests', () => {
       require('./stream')(session);
       require('./cursorPage')(session);
       require('./insert')(session);
+      require('./onConflictIds')(session);
       require('./batchInsert')(session);
       require('./insertGraph')(session);
       require('./upsertGraph')(session);

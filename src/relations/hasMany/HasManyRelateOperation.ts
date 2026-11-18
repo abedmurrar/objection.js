@@ -2,7 +2,7 @@ import { withWhereScope } from '../../queryBuilder/whereScopes';
 import { normalizeIds } from '../../utils/normalizeIds';
 import { RelateOperation } from '../../queryBuilder/operations/RelateOperation';
 import type { Relation, RelationQueryBuilder } from '../Relation';
-import { assertSingleOwner } from '../RelationOwner';
+import { assertOwnerModelsHaveProps, assertSingleOwner } from '../RelationOwner';
 import type { RelationOwner } from '../RelationOwner';
 
 class HasManyRelateOperation extends RelateOperation {
@@ -17,6 +17,7 @@ class HasManyRelateOperation extends RelateOperation {
     });
 
     assertSingleOwner(this.owner, this.relation, 'relate', 'HasManyRelation', 'update');
+    assertOwnerModelsHaveProps(this.owner, this.relation, 'relate');
     return true;
   }
 

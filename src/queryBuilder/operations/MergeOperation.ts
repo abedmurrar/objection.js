@@ -1,6 +1,10 @@
 import { isFunction, isEmpty, isObject } from '../../utils/objectUtils';
 import { QueryBuilderOperation } from './QueryBuilderOperation';
 import { convertFieldExpressionsToRaw } from './UpdateOperation';
+import { InsertOperation } from './InsertOperation';
+import { DelegateOperation } from './DelegateOperation';
+import { isMySql } from '../../utils/knexUtils';
+import { after } from '../../utils/promiseUtils';
 import type { KnexBuilder, Model, OperationOptions, QueryBuilder } from './types';
 
 class MergeOperation extends QueryBuilderOperation {
@@ -26,16 +30,61 @@ class MergeOperation extends QueryBuilderOperation {
     return true;
   }
 
+  // On MySQL, finds out whether the update can report the id of an existing
+  // row. See `InsertOperation.prepareMySqlMerge()`. The insert operation comes
+  // before this one, so its `$beforeInsert()` hooks have run.
+  onBefore2(builder: QueryBuilder, result: unknown): unknown {
+    if (!isMySql(builder.knex())) {
+      return result;
+    }
+
+    const insertOp = findInsertOperation(builder);
+
+    if (insertOp === null) {
+      return result;
+    }
+
+    return after(insertOp.prepareMySqlMerge(builder), () => result);
+  }
+
   onBuildKnex(knexBuilder: KnexBuilder, builder: QueryBuilder): KnexBuilder {
     if (!isFunction(knexBuilder.merge)) {
       throw new Error('merge method can only be chained right after onConflict method');
     }
 
+    const insertOp = findInsertOperation(builder);
+    // An `AUTO_INCREMENT` id column on MySQL. See `prepareMySqlMerge()`.
+    const idColumn = insertOp !== null ? insertOp.mergeIdColumn : null;
+
     if (this.model) {
       const json = this.model.$toDatabaseJson(builder);
       const convertedJson = convertFieldExpressionsToRaw(builder, json);
 
-      return knexBuilder.merge(convertedJson);
+      return knexBuilder.merge(
+        idColumn !== null ? withLastInsertId(builder, convertedJson, idColumn) : convertedJson,
+      );
+    }
+
+    if (idColumn !== null) {
+      const updates = (this.args as unknown[])[0];
+      // The columns that knex updates with `merge([columns])`, or with `merge()`
+      // all the inserted ones, as `col = values(col)`.
+      const columns = Array.isArray(updates)
+        ? (updates as string[])
+        : updates === undefined
+          ? Object.keys(insertOp!.models[0].$toDatabaseJson(builder))
+          : null;
+
+      if (columns !== null) {
+        const knex = builder.knex();
+        const json: Record<string, unknown> = {};
+
+        for (const column of columns) {
+          json[column] = knex.raw('values(??)', [column]);
+        }
+
+        return knexBuilder.merge(withLastInsertId(builder, json, idColumn));
+      }
     }
 
     return knexBuilder.merge(...(this.args as unknown[]));
@@ -51,6 +100,32 @@ class MergeOperation extends QueryBuilderOperation {
     clone.args = this.args;
     return clone;
   }
+}
+
+// The insert operation, also when an operation like `insertAndFetch()`
+// delegates to it.
+function findInsertOperation(builder: QueryBuilder): InsertOperation | null {
+  let op = builder.findOperation(InsertOperation) as QueryBuilderOperation | null;
+
+  while (op instanceof DelegateOperation && !(op instanceof InsertOperation)) {
+    op = op.delegate;
+  }
+
+  return op instanceof InsertOperation ? op : null;
+}
+
+// `id = LAST_INSERT_ID(id)` after the updates, unless they set the id
+// themselves. Makes MySQL report the id of the existing row.
+function withLastInsertId(
+  builder: QueryBuilder,
+  json: Record<string, unknown>,
+  idColumn: string,
+): Record<string, unknown> {
+  if (Object.hasOwn(json, idColumn)) {
+    return json;
+  }
+
+  return { ...json, [idColumn]: builder.knex().raw('LAST_INSERT_ID(??)', [idColumn]) };
 }
 
 export { MergeOperation };
