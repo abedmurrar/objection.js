@@ -17,7 +17,7 @@ jobs:
 
     permissions:
       contents: write # create the GitHub release
-      id-token: write # npm provenance
+      id-token: write # npm trusted publishing and provenance
 
     steps:
       - uses: actions/checkout@v7
@@ -44,10 +44,10 @@ jobs:
           esac
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
+      # Trusted publishing: npm checks this workflow's OIDC token, so no npm
+      # token is stored. It needs npm 11.5.1 or later, which Node.js 24 has.
       - name: Publish to npm
         run: npm publish --provenance --access public --tag ${{ steps.version.outputs.dist-tag }}
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create the GitHub release
         run: |
