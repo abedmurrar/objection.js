@@ -29,6 +29,22 @@ Now you can do this:
 await Person.query().where('id', 1).myCustomMethod(1).where('foo', 'bar');
 ```
 
+A query runs as a clone of the builder, and so do `page()`, `resultSize()`, `stream()` and `cursorPage()`. The fields that a custom method sets on the builder are copied to the clones, so a flag like this one keeps its value when the query runs. The values are copied as they are: a clone shares the objects and arrays of the original.
+
+```js
+class MyQueryBuilder extends QueryBuilder {
+  constructor(...args) {
+    super(...args);
+    this.includeDeleted = false;
+  }
+
+  withDeleted() {
+    this.includeDeleted = true;
+    return this;
+  }
+}
+```
+
 If you want to set the custom query builder for all model classes you can just set the [QueryBuilder](/api/model/static-properties.html#static-querybuilder) property of the [Model](/api/model/) base class. A cleaner option would be to create your own Model subclass, set its [QueryBuilder](/api/query-builder/) property and inherit all your models from the custom Model class.
 
 ```js
