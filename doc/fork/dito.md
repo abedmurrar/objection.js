@@ -32,10 +32,11 @@ Each row links the original commits, which are by Jürg Lehni unless another aut
 | 4.8.0   | A field expression can refer to an empty JSON key with `[""]` or `['']`. | [cd57b0e0](https://github.com/ditojs/objection/commit/cd57b0e0) |
 | 4.8.0   | The `joinOperation` of `withGraphJoined()` applies to the relations of its own call. | [6fd5cb9e](https://github.com/ditojs/objection/commit/6fd5cb9e) |
 | 4.8.0   | `resultSize()` and `page()` with `withGraphJoined()` count the root models, and the count leaves out the orders of a relation's `modify`. | [093992a8](https://github.com/ditojs/objection/commit/093992a8) |
-| Unreleased | `withGraphJoined()` modifiers select aggregates by their aliases, and raw SQL ending with an alias and subqueries with `as()`. | [94fdc217](https://github.com/ditojs/objection/commit/94fdc217), [8851db95](https://github.com/ditojs/objection/commit/8851db95), [bd5775de](https://github.com/ditojs/objection/commit/bd5775de) |
-| Unreleased | A required property given as a query property, like `raw()`, passes validation. | [d69f783d](https://github.com/ditojs/objection/commit/d69f783d) |
-| Unreleased | `orderBy()` with refs in an array. | [7057a8eb](https://github.com/ditojs/objection/commit/7057a8eb) |
-| Unreleased | `Model.ref()` in the `join` of a relation mapping. | [3f44194a](https://github.com/ditojs/objection/commit/3f44194a) |
+| 4.8.1   | An `onBuild()` hook that removed operations made the query skip building the next one, so `findById().patch()` could update every row. This fork's code differs: the walk over the operations finds the current one again instead of copying the array on every change. | [caa05dc5](https://github.com/ditojs/objection/commit/caa05dc5) |
+| 4.8.2   | `withGraphJoined()` modifiers select aggregates by their aliases, and raw SQL ending with an alias and subqueries with `as()`. | [94fdc217](https://github.com/ditojs/objection/commit/94fdc217), [8851db95](https://github.com/ditojs/objection/commit/8851db95), [bd5775de](https://github.com/ditojs/objection/commit/bd5775de) |
+| 4.8.2   | A required property given as a query property, like `raw()`, passes validation. | [d69f783d](https://github.com/ditojs/objection/commit/d69f783d) |
+| 4.8.2   | `orderBy()` with refs in an array. | [7057a8eb](https://github.com/ditojs/objection/commit/7057a8eb) |
+| 4.8.2   | `Model.ref()` in the `join` of a relation mapping. | [3f44194a](https://github.com/ditojs/objection/commit/3f44194a) |
 | 4.1.4   | `resolve()` in a hook doesn't patch join rows, update instances or clear BelongsToOne owner keys. | [ebeba06a](https://github.com/ditojs/objection/commit/ebeba06a) |
 | 4.1.4   | `whereInComposite()` with an empty list of composite values. | [495ebb00](https://github.com/ditojs/objection/commit/495ebb00) |
 | 4.2.0   | `static useAfterFindInGraphs`: eager loading respects the static `afterFind()` hook of related model classes, opt-in in 4.x. | [70b2417d](https://github.com/ditojs/objection/commit/70b2417d), [c1433500](https://github.com/ditojs/objection/commit/c1433500) |

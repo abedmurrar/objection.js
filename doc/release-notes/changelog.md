@@ -20,6 +20,12 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
   The docs of `withGraphJoined()` list what a modifier can select, and that a `groupBy` needs to include the id. Ported from [ditojs/objection](/fork/dito.md).
 
+## 4.8.1 (2026-11-18)
+
+### Bug fixes
+
+- An `onBuild()` hook that removed operations, like one calling `clearSelect()` or `clearWhere()`, made the query skip building the operation after them. When that was the operation of `findById()`, its `where` was lost, so `query().select('id').onBuild((qb) => qb.clearSelect()).findById(2).patch({ ... })` updated every row of the table, and a `delete()` deleted every row. The walk over the operations continues at the right one now. Ported from [ditojs/objection](/fork/dito.md), with a different implementation [#2269](https://github.com/Vincit/objection.js/issues/2269).
+
 ## 4.8.0 (2026-11-18)
 
 ### What's new
@@ -43,7 +49,7 @@ Found by new tests of a custom query builder through every query that objection 
 
 - Custom query builders:
   - A field that a subclass of `QueryBuilder` set, like the flag of a `withDeleted()` method, was lost when the query ran, since a query runs as a clone, and `clone()` only copied objection's own fields. The fields of a subclass are now copied to its clones too, as they are: a clone shares the objects and arrays of the original.
-  - The `onBuild()` hooks of a static `relatedQuery()` used as a subquery saw the table without the alias of the relation in `tableRefFor()`, so a hook adding `` where(`${builder.tableRefFor(Pet)}.deletedAt`, ...) `` referred to a table that isn't in the subquery. The alias is set before the hooks run now.
+  - The alias of a static `relatedQuery()` used as a subquery is set when its find operation is added instead of when it's built. This entry first said that the subquery's `onBuild()` hooks saw the table name instead of the alias, which wasn't the case: the error came from a custom method called on the query before it was built. Such a call still sees the table name, since whether the query is a subquery, and gets the alias, depends on `for()`, which can still be called.
   - `upsertGraph()` threw "upsertGraph query should contain no other query builder calls" when an `onBuild()` hook, like one that leaves out soft-deleted rows, added a where clause to every query of a model. The calls are checked before the hooks run now.
 
 ## 4.7.2 (2026-11-18)

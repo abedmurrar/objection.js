@@ -402,6 +402,55 @@ describe('QueryBuilder', () => {
     });
   });
 
+  describe('operations that an onBuild() hook removes', () => {
+    // From ditojs/objection caa05dc5 (#2269).
+    it('should build the operations after the removed ones', () => {
+      expect(
+        TestModel.query()
+          .select('a')
+          .onBuild((builder) => builder.clearSelect().select('b'))
+          .findById(1)
+          .toKnexQuery()
+          .toString(),
+      ).to.equal('select "b" from "Model" where "Model"."id" = 1');
+    });
+
+    it('should keep the where clause of a patch and a delete', async () => {
+      await TestModel.query()
+        .select('id')
+        .onBuild((builder) => builder.clearSelect())
+        .findById(2)
+        .patch({ a: 1 });
+      await TestModel.query()
+        .where('a', 1)
+        .onBuild((builder) => builder.clearWhere().where('b', 2))
+        .delete();
+
+      expect(executedQueries).to.eql([
+        'update "Model" set "a" = 1 where "Model"."id" = 2',
+        'delete from "Model" where "b" = 2',
+      ]);
+    });
+
+    it('should run every onBuild() hook when one removes operations around it', () => {
+      const calls = [];
+      const sql = TestModel.query()
+        .where('a', 1)
+        .onBuild((builder) => {
+          calls.push('first');
+          // Removes the where before this hook and the one after it.
+          builder.clearWhere().where('c', 3);
+        })
+        .where('b', 2)
+        .onBuild(() => calls.push('second'))
+        .toKnexQuery()
+        .toString();
+
+      expect(calls).to.eql(['first', 'second']);
+      expect(sql).to.equal('select "Model".* from "Model" where "c" = 3');
+    });
+  });
+
   it('should have knex query builder methods', () => {
     // Doesn't test all the methods. Just enough to make sure the method calls are correctly
     // passed to the knex query builder.

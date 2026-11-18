@@ -111,6 +111,7 @@ type InternalQueryBuilderMembers =
   | 'everyOperation'
   | 'executeOnBuild'
   | 'executeOnBuildKnex'
+  | 'executeOnBuildOf'
   | 'findAllSelections'
   | 'findLastOperation'
   | 'findOperation'
