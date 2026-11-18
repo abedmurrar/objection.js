@@ -1295,3 +1295,12 @@ async () => {
 };
 
 Person.fromJson({ id: 1 }).$modelClass.query();
+
+// snakeCaseMappers() takes preserveJsonKeys; knexSnakeCaseMappers() doesn't.
+const preservingMappers: objection.ColumnNameMappers = objection.snakeCaseMappers({
+  preserveJsonKeys: true,
+  upperCase: false,
+});
+const knexMappers: objection.KnexMappers = objection.knexSnakeCaseMappers({ upperCase: false });
+void preservingMappers;
+void knexMappers;

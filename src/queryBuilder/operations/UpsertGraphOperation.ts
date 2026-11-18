@@ -1,6 +1,7 @@
 import { QueryBuilderOperation } from './QueryBuilderOperation';
 import { GraphUpsert } from '../graph/GraphUpsert';
 import { RelationFindOperation } from '../../relations/RelationFindOperation';
+import { assertNoConflictHandling } from './InsertGraphOperation';
 import type { Model, OperationOptions, QueryBuilder } from './types';
 
 class UpsertGraphOperation extends QueryBuilderOperation {
@@ -45,6 +46,8 @@ class UpsertGraphOperation extends QueryBuilderOperation {
   // Checks the calls of the user before the `onBuild()` hooks run, which may
   // add filters to every query of a model, like those of soft deletes.
   onBefore1(builder: QueryBuilder, result: unknown): unknown {
+    assertNoConflictHandling(builder, 'upsertGraph');
+
     if (hasOtherSqlModifyingQueryBuilderCalls(builder)) {
       throw new Error(
         'upsertGraph query should contain no other query builder calls like `findById`, `where` or `$relatedQuery` that would affect the SQL. They have no effect.',

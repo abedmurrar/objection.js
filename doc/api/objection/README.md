@@ -715,6 +715,7 @@ Function for adding snake_case to camelCase conversion to objection models. Bett
 | upperCase                         | boolean | `false` | Set to `true` if your columns are UPPER_SNAKE_CASED.                                                                                                    |
 | underscoreBeforeDigits            | boolean | `false` | When `true`, will place an underscore before digits (`foo1Bar2` becomes `foo_1_bar_2`). When `false`, `foo1Bar2` becomes `foo1_bar2`.                   |
 | underscoreBetweenUppercaseLetters | boolean | `false` | When `true`, will place underscores between consecutive uppercase letters (`fooBAR` becomes `foo_b_a_r`). When `false`, `fooBAR` will become `foo_bar`. |
+| preserveJsonKeys                  | boolean | `false` | When `true`, only the column part of a [field expression](/api/types/#type-fieldexpression) used as a property name, like in `patch({ 'jsonColumn:someKey': value })`, is converted, and the JSON path is kept as written: `json_column:someKey`. When `false`, the JSON keys are converted too (`json_column:some_key`), so the patch writes a key that `ref('json_column:someKey')` doesn't read. Keys of the objects stored in JSON columns are never converted. Will be `true` by default in 5.0. |
 
 ##### Examples
 
@@ -726,6 +727,19 @@ class Person extends Model {
     return snakeCaseMappers();
   }
 }
+```
+
+Keep the JSON keys of field expressions as written:
+
+```js
+class Person extends Model {
+  static get columnNameMappers() {
+    return snakeCaseMappers({ preserveJsonKeys: true });
+  }
+}
+
+// update persons set json_data = ... '{someKey}' ...
+await Person.query().patch({ 'jsonData:someKey': 1 }).where('id', 1);
 ```
 
 If your columns are UPPER_SNAKE_CASE
