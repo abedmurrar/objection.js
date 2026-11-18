@@ -1,6 +1,7 @@
 import { ref } from '../../queryBuilder/ReferenceBuilder';
 import { isEmpty } from '../../utils/objectUtils';
-import { isKnexRaw, isKnexQueryBuilder } from '../../utils/knexUtils';
+import { isKnexRaw, isKnexQueryBuilder, isMySql } from '../../utils/knexUtils';
+import { filterJoinedWriteByIds } from './filterJoinedWriteByIds';
 import { toPgJsonPathLiteral, getJsonDialect } from '../../utils/postgresJsonPath';
 import { toMySqlJsonPath, toJsonSql } from '../../utils/mysqlJsonPath';
 import { QueryBuilderOperation } from './QueryBuilderOperation';
@@ -59,9 +60,22 @@ class UpdateOperation extends QueryBuilderOperation {
     }
   }
 
+  onBuild(builder: QueryBuilder): void {
+    // knex only compiles the joins of updates on MySQL.
+    if (!isMySql(builder.unsafeKnex())) {
+      filterJoinedWriteByIds(builder);
+    }
+  }
+
   onBuildKnex(knexBuilder: KnexBuilder, builder: QueryBuilder): KnexBuilder {
     const json = this.model.$toDatabaseJson(builder);
     const convertedJson = convertFieldExpressionsToRaw(builder, json);
+
+    if (isMySql(builder.unsafeKnex()) && builder.has(builder.constructor.JoinSelector)) {
+      // A column of the same name in a joined table, like `name`, made the
+      // column ambiguous.
+      return knexBuilder.update(qualifyColumns(convertedJson, builder.tableRef()));
+    }
 
     return knexBuilder.update(convertedJson);
   }
@@ -98,6 +112,17 @@ class UpdateOperation extends QueryBuilderOperation {
     clone.hasNothingToUpdate = this.hasNothingToUpdate;
     return clone;
   }
+}
+
+// Qualifies the columns of an update with the table that it updates.
+function qualifyColumns(json: Record<string, unknown>, tableRef: string): Record<string, unknown> {
+  const qualified: Record<string, unknown> = {};
+
+  for (const column of Object.keys(json)) {
+    qualified[column.includes('.') ? column : `${tableRef}.${column}`] = json[column];
+  }
+
+  return qualified;
 }
 
 // An item of the `access` path of a parsed field expression.

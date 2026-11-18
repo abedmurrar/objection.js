@@ -170,6 +170,118 @@ module.exports = (session) => {
       });
     }
 
+    describe('updates and deletes with joins', () => {
+      class Pet extends Model {
+        static get tableName() {
+          return 'ub2_jpets';
+        }
+
+        static get relationMappings() {
+          return {
+            owner: {
+              relation: Model.BelongsToOneRelation,
+              modelClass: Owner,
+              join: { from: 'ub2_jpets.ownerId', to: 'ub2_persons.id' },
+            },
+          };
+        }
+      }
+
+      class Owner extends Model {
+        static get tableName() {
+          return 'ub2_persons';
+        }
+
+        static get relationMappings() {
+          return {
+            pets: {
+              relation: Model.HasManyRelation,
+              modelClass: Pet,
+              join: { from: 'ub2_persons.id', to: 'ub2_jpets.ownerId' },
+            },
+          };
+        }
+      }
+
+      before(async () => {
+        await knex.schema.dropTableIfExists('ub2_jpets');
+        await knex.schema.createTable('ub2_jpets', (table) => {
+          table.integer('id').primary();
+          table.integer('ownerId');
+          table.string('name');
+        });
+      });
+
+      after(() => knex.schema.dropTableIfExists('ub2_jpets'));
+
+      beforeEach(async () => {
+        await knex('ub2_jpets').delete();
+        await knex('ub2_persons').insert([
+          { id: 2, name: 'Bob', age: 40 },
+          { id: 3, name: 'Cid', age: 50 },
+        ]);
+        await knex('ub2_jpets').insert([
+          { id: 1, ownerId: 1, name: 'Fido' },
+          { id: 2, ownerId: 2, name: 'Rex' },
+        ]);
+      });
+
+      const ages = async () =>
+        (await knex('ub2_persons').orderBy('id')).map((it) => [it.id, it.age]);
+
+      it('patch() should only change the rows that the joins match', async () => {
+        // Without a where clause on the joined table, knex left the join out of
+        // the update on every database but MySQL, which changed every row.
+        const numUpdated = await Owner.query(knex).patch({ age: 99 }).joinRelated('pets');
+
+        expect(Number(numUpdated)).to.equal(2);
+        expect(await ages()).to.eql([
+          [1, 99],
+          [2, 99],
+          [3, 50],
+        ]);
+
+        await Owner.query(knex).patch({ age: 1 }).joinRelated('pets').where('pets.name', 'Rex');
+        expect(await ages()).to.eql([
+          [1, 99],
+          [2, 1],
+          [3, 50],
+        ]);
+      });
+
+      it('delete() should only delete the rows that the joins match', async () => {
+        const numDeleted = await Owner.query(knex)
+          .delete()
+          .joinRelated('pets')
+          .where('pets.name', 'Rex');
+
+        expect(Number(numDeleted)).to.equal(1);
+        expect((await ages()).map((it) => it[0])).to.eql([1, 3]);
+
+        await Owner.query(knex)
+          .delete()
+          .join('ub2_jpets', 'ub2_jpets.ownerId', 'ub2_persons.id')
+          .where('ub2_jpets.name', 'Fido');
+        expect((await ages()).map((it) => it[0])).to.eql([3]);
+      });
+
+      it('a relation patch() should keep the relation filter and the joins', async () => {
+        await Owner.relatedQuery('pets', knex)
+          .for(1)
+          .patch({ name: 'Max' })
+          .joinRelated('owner')
+          .where('owner.age', 30);
+        await Owner.relatedQuery('pets', knex)
+          .for(2)
+          .patch({ name: 'Max' })
+          .joinRelated('owner')
+          .where('owner.age', 30);
+
+        const names = (await knex('ub2_jpets').orderBy('id')).map((it) => it.name);
+        expect(names).to.eql(['Max', 'Rex']);
+      });
+    });
+
     describe('a required property given as a query property (#2199)', () => {
       it('should pass validation with raw() and val()', async () => {
         await Person.query(knex).insert({ id: 2, name: raw('?', ['Raw']) });

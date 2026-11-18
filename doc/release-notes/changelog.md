@@ -6,6 +6,8 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ### Bug fixes
 
+- A `patch()` or `update()` with joins, like `patch({ age: 99 }).joinRelated('pets')`, changed rows that the joins don't match on SQLite and PostgreSQL, and every row of the table when the query had no where clause on a joined table: knex leaves the joins out of updates on every database but MySQL. A `delete()` with joins failed on SQLite with a syntax error. Such writes filter their rows by their ids in a subquery that has the joins and the where clauses now. A model without an `idColumn` throws instead.
+- MySQL: a `patch()` or `update()` with joins failed with "Column 'name' in field list is ambiguous" when a joined table has a column of the same name as one that the update sets, like `name` or `updatedAt`. The columns are qualified with the updated table now.
 - MySQL: a `patch()` or `update()` whose value is a subquery of the updated table, like `patch({ age: Person.query().max('age') })`, failed with "You can't specify target table ... for update in FROM clause". It's wrapped now, like such subqueries in where clauses already were.
 - An insert of a model with `idColumn = null` on MySQL, MariaDB or SQLite set the insert id that the database returns as a property named `"null"`. Models without an id column get no id now [#2305](https://github.com/Vincit/objection.js/issues/2305).
 - `Model.ref()` in the `join` of a relation mapping, like `join: { from: Person.ref('id'), to: Pet.ref('ownerId') }`, threw "join.from must have format TableName.columnName", though the typings allow it. A ref without a table uses its model's table now. Ported from [ditojs/objection](/fork/dito.md) [#1873](https://github.com/Vincit/objection.js/issues/1873).
