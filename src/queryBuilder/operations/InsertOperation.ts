@@ -25,6 +25,10 @@ class InsertOperation extends QueryBuilderOperation {
   declare isArray: boolean;
   declare modelOptions: ModelOptions;
   declare autoIncrementIncrement: number | null;
+  // False when the caller has run the `$beforeInsert()` hooks of the models
+  // already. A MySQL graph insert does, to see the ids that the hooks set
+  // before it splits the rows into inserts, see `GraphInsertAction`.
+  declare callInstanceBeforeInsert: boolean;
   // The id column that `merge()` reads the id of an existing row from on MySQL.
   // See `prepareMySqlMerge()`.
   declare mergeIdColumn: string | null;
@@ -36,6 +40,7 @@ class InsertOperation extends QueryBuilderOperation {
     this.isArray = false;
     this.modelOptions = Object.assign({}, this.opt.modelOptions || {});
     this.autoIncrementIncrement = null;
+    this.callInstanceBeforeInsert = true;
     this.mergeIdColumn = null;
   }
 
@@ -52,7 +57,9 @@ class InsertOperation extends QueryBuilderOperation {
   // Returns synchronously when no hook returns a promise and no query is
   // needed, so that the query doesn't wait for promises it doesn't need.
   onBefore2(builder: QueryBuilder, result: unknown): unknown {
-    const maybePromise = callBeforeInsert(builder, this.models);
+    const maybePromise = this.callInstanceBeforeInsert
+      ? callBeforeInsert(builder, this.models)
+      : callStaticBeforeHook(builder, 'beforeInsert');
 
     if (this.models.length > 1 && isMySql(builder.knex())) {
       return after(
@@ -260,6 +267,7 @@ class InsertOperation extends QueryBuilderOperation {
     clone.models = this.models;
     clone.isArray = this.isArray;
     clone.autoIncrementIncrement = this.autoIncrementIncrement;
+    clone.callInstanceBeforeInsert = this.callInstanceBeforeInsert;
     clone.mergeIdColumn = this.mergeIdColumn;
 
     return clone;

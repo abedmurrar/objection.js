@@ -7,6 +7,7 @@ import type { GraphData, GraphEdge, GraphNode } from '../GraphData';
 import type { QueryBuilder } from '../../QueryBuilder';
 import type { ManyToManyRelation } from '../../../relations/manyToMany/ManyToManyRelation';
 import type { ModelClass } from '../../QueryBuilderOperationSupport';
+import { InsertOperation } from '../../operations/InsertOperation';
 
 // The edges each node depends on.
 type Dependencies = Map<GraphNode, GraphEdge[]>;
@@ -249,13 +250,33 @@ class GraphInsertAction extends GraphAction {
     }
 
     return this._runRelationBeforeInsertMethods(parentBuilder, nodes).then(async () => {
+      // The rows are split by whether they have an id, which the
+      // `$beforeInsert()` hooks can set. So on MySQL the hooks run before the
+      // split, and not again in the inserts.
+      const splits = nodes.length > 1 && isMySql(parentBuilder.unsafeKnex());
+
+      if (splits) {
+        const context = parentBuilder.context();
+        await promiseUtils.mapAfterAllReturn(
+          nodes,
+          (node: GraphNode) => node.obj.$beforeInsert(context),
+          null,
+        );
+      }
+
       for (const batch of splitBatch(parentBuilder, modelClass, nodes)) {
-        await modelClass
+        const query = modelClass
           .query()
           .insert(batch.map((node) => node.obj))
           .childQueryOf(parentBuilder)
-          .copyFrom(parentBuilder, GraphAction.ReturningAllSelector)
-          .execute();
+          .copyFrom(parentBuilder, GraphAction.ReturningAllSelector);
+
+        if (splits) {
+          (query.findOperation(InsertOperation) as InsertOperation).callInstanceBeforeInsert =
+            false;
+        }
+
+        await query.execute();
       }
     });
   }
