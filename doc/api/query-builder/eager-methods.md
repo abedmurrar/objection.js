@@ -218,7 +218,14 @@ There are two methods that can be used to load relations eagerly: [withGraphFetc
 
 As mentioned, this method uses [SQL joins](https://www.postgresql.org/docs/12/tutorial-join.html) to join all the relations defined in the `relationExpression` and then parses the result into a graph of model instances equal to the one you get from `withGraphFetched`. The main benefit of this is that you can filter the query based on the relations. See the examples.
 
-By default left join is used but you can define the join type using the [joinOperation](/api/types/#type-graphoptions) option.
+By default left join is used but you can define the join type using the [joinOperation](/api/types/#type-graphoptions) option. It applies to the relations of the call it's passed to, so one query can join some relations with `innerJoin` and others with `leftJoin`:
+
+```js
+// People who have pets, with their movies if they have any.
+const people = await Person.query()
+  .withGraphJoined('pets', { joinOperation: 'innerJoin' })
+  .withGraphJoined('movies', { joinOperation: 'leftJoin' });
+```
 
 In TypeScript, the relation expression is checked and the loaded relations are added to the result type, like with [withGraphFetched](/api/query-builder/eager-methods.html#withgraphfetched).
 

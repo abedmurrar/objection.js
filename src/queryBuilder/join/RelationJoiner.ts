@@ -4,6 +4,7 @@ import { createModifier } from '../../utils/createModifier';
 import { map as mapPromise } from '../../utils/promiseUtils';
 import { ValidationErrorType } from '../../model/ValidationError';
 import type { RelationExpression } from '../RelationExpression';
+import type { JoinOperationOfCall } from '../operations/eager/EagerOperation';
 import type { Relation } from '../../relations/Relation';
 import type { GraphOptions, Model, ModelClass, Modifiers, QueryBuilder } from '../operations/types';
 
@@ -42,6 +43,7 @@ class RelationJoiner {
   declare options: JoinOptions;
   declare tableTree: TableTree | null;
   declare internalSelections: Selection[] | null;
+  declare joinOperations: JoinOperationOfCall[];
 
   constructor({ modelClass }: { modelClass: ModelClass }) {
     this.rootModelClass = modelClass;
@@ -55,6 +57,7 @@ class RelationJoiner {
     this.options = defaultOptions();
     this.tableTree = null;
     this.internalSelections = null;
+    this.joinOperations = [];
   }
 
   setExpression(expression: RelationExpression): this {
@@ -76,6 +79,31 @@ class RelationJoiner {
   setOptions(options: Partial<JoinOptions> & GraphOptions): this {
     this.options = Object.assign(this.options, options);
     return this;
+  }
+
+  setJoinOperations(joinOperations: JoinOperationOfCall[]): this {
+    this.joinOperations = joinOperations;
+    return this;
+  }
+
+  // The `joinOperation` of the last `withGraphJoined()` call whose relations
+  // contain the relation of `tableNode`, or else the one of the options.
+  _getJoinOperation(tableNode: TableNode): string {
+    const path: string[] = [];
+
+    for (let node: TableNode | null = tableNode; node.parentNode; node = node.parentNode) {
+      path.unshift(node.relationProperty!);
+    }
+
+    for (let i = this.joinOperations.length - 1; i >= 0; --i) {
+      const { expression, joinOperation } = this.joinOperations[i];
+
+      if (containsPath(expression, path)) {
+        return joinOperation;
+      }
+    }
+
+    return this.options.joinOperation;
   }
 
   /**
@@ -159,7 +187,7 @@ class RelationJoiner {
     userSelectQueries.set(tableNode, userSelectQuery);
 
     tableNode.relation!.join(builder, {
-      joinOperation: this.options.joinOperation,
+      joinOperation: this._getJoinOperation(tableNode),
 
       ownerTable: tableNode.parentNode!.alias,
       relatedTableAlias: tableNode.alias,
@@ -424,6 +452,21 @@ function checkAliasLength(modelClass: ModelClass, alias: string): void {
       message: `identifier ${alias} is over ${ID_LENGTH_LIMIT} characters long and would be truncated by the database engine.`,
     });
   }
+}
+
+// Whether `expression` has the relations of `path`, like `['pets', 'toys']`.
+function containsPath(expression: RelationExpression, path: string[]): boolean {
+  let current: RelationExpression | null = expression;
+
+  for (const name of path) {
+    current = current.childExpression(name);
+
+    if (current === null) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 export { RelationJoiner, type FlatRow, type JoinModel, type JoinOptions, type JoinRelation };

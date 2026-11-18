@@ -30,6 +30,7 @@ Each row links the original commits, which are by Jürg Lehni unless another aut
 | 4.1.4   | `upsertGraph()` patches many-to-many rows by their ids. | [0d4d4c71](https://github.com/ditojs/objection/commit/0d4d4c71) |
 | 4.8.0   | `snakeCaseMappers({ preserveJsonKeys: true })` only converts the column part of field expressions. Off by default in 4.x; dito's 4.0 made it the default. | [0fabf86e](https://github.com/ditojs/objection/commit/0fabf86e) |
 | 4.8.0   | A field expression can refer to an empty JSON key with `[""]` or `['']`. | [cd57b0e0](https://github.com/ditojs/objection/commit/cd57b0e0) |
+| 4.8.0   | The `joinOperation` of `withGraphJoined()` applies to the relations of its own call. | [6fd5cb9e](https://github.com/ditojs/objection/commit/6fd5cb9e) |
 | 4.1.4   | `resolve()` in a hook doesn't patch join rows, update instances or clear BelongsToOne owner keys. | [ebeba06a](https://github.com/ditojs/objection/commit/ebeba06a) |
 | 4.1.4   | `whereInComposite()` with an empty list of composite values. | [495ebb00](https://github.com/ditojs/objection/commit/495ebb00) |
 | 4.2.0   | `static useAfterFindInGraphs`: eager loading respects the static `afterFind()` hook of related model classes, opt-in in 4.x. | [70b2417d](https://github.com/ditojs/objection/commit/70b2417d), [c1433500](https://github.com/ditojs/objection/commit/c1433500) |

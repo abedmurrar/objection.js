@@ -10,6 +10,7 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ### Bug fixes
 
+- The `joinOperation` option of `withGraphJoined()` applied to every joined relation of the query, the one of the last call winning. So `withGraphJoined('pets', { joinOperation: 'innerJoin' }).withGraphJoined('movies')` left-joined the pets too, and returned people without pets. Each call's `joinOperation` applies to the relations of that call now. Ported from [ditojs/objection](/fork/dito.md) [#2125](https://github.com/Vincit/objection.js/issues/2125).
 - A field expression couldn't refer to an empty JSON key: `data:[""]` and `data:['']` referred to a key named `""` or `''`, so reads returned `null` and a patch added that key instead of changing the empty one. They refer to the empty key now, on PostgreSQL, MySQL and MariaDB. Quotes that aren't followed by the closing bracket are still part of the key. Ported from [ditojs/objection](/fork/dito.md), which took it from [#2680](https://github.com/Vincit/objection.js/pull/2680) by @kapouer.
 
 

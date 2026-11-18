@@ -38,7 +38,8 @@ class JoinEagerOperation extends EagerOperation {
   configureJoiner(builder: QueryBuilder) {
     return this.joiner!.setExpression(this.buildFinalExpression())
       .setModifiers(this.buildFinalModifiers(builder))
-      .setOptions(this.graphOptions);
+      .setOptions(this.graphOptions)
+      .setJoinOperations(this.joinOperations);
   }
 
   onRawResult(builder: QueryBuilder, rows: unknown): unknown {

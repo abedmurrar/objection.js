@@ -294,8 +294,16 @@ class QueryBuilder extends QueryBuilderBase {
     const eagerOp = ensureEagerOperation(this, algorithm);
     const parsedExp = parseRelationExpression(this.modelClass(), exp);
 
+    // The `joinOperation` option only applies to the relations of this call,
+    // see `RelationJoiner`. The other options are shared by all the calls.
+    const { joinOperation, ...graphOptions } = options as { joinOperation?: string };
+
     eagerOp.expression = eagerOp.expression.merge(parsedExp);
-    eagerOp.graphOptions = { ...eagerOp.graphOptions, ...options };
+    eagerOp.graphOptions = { ...eagerOp.graphOptions, ...graphOptions };
+
+    if (joinOperation) {
+      eagerOp.joinOperations.push({ expression: parsedExp, joinOperation });
+    }
 
     checkEager(this);
     return this;
