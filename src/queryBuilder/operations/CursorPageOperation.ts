@@ -147,16 +147,16 @@ function cursorKeys(builder: QueryBuilder): CursorKey[] {
     if (Array.isArray(args[0])) {
       for (const item of args[0]) {
         if (typeof item === 'string') {
-          keys.push(createKey(modelClass, item, undefined));
+          keys.push(createKey(builder, modelClass, item, undefined));
         } else if (isObject(item) && typeof (item as { column?: unknown }).column === 'string') {
           const { column, order } = item as { column: string; order?: unknown };
-          keys.push(createKey(modelClass, column, order));
+          keys.push(createKey(builder, modelClass, column, order));
         } else {
           throw orderByError();
         }
       }
     } else if (typeof args[0] === 'string') {
-      keys.push(createKey(modelClass, args[0], args[1]));
+      keys.push(createKey(builder, modelClass, args[0], args[1]));
     } else {
       throw orderByError();
     }
@@ -170,7 +170,7 @@ function cursorKeys(builder: QueryBuilder): CursorKey[] {
     if (!sorted) {
       const column = `${tableRef}.${idColumn}`;
       builder.orderBy(column, 'asc');
-      keys.push(createKey(modelClass, column, 'asc'));
+      keys.push(createKey(builder, modelClass, column, 'asc'));
     }
   }
 
@@ -178,6 +178,7 @@ function cursorKeys(builder: QueryBuilder): CursorKey[] {
 }
 
 function createKey(
+  builder: QueryBuilder,
   modelClass: ReturnType<QueryBuilder['resultModelClass']>,
   column: string,
   order: unknown,
@@ -188,6 +189,19 @@ function createKey(
 
   const dot = column.lastIndexOf('.');
   const columnName = dot === -1 ? column : column.slice(dot + 1);
+
+  // The value of a sort column is read from the models, which only have the
+  // columns of the query's table under their property names. A column of a
+  // joined table could be another one with the same name.
+  if (dot !== -1) {
+    const table = column.slice(0, dot);
+
+    if (table !== builder.tableRef() && table !== builder.tableName()) {
+      throw new Error(
+        `cursorPage(): it can only sort by the columns of ${builder.tableRef()}, not ${column}.`,
+      );
+    }
+  }
 
   return {
     column,
