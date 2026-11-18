@@ -1,6 +1,7 @@
 import { ManyToManyModifyMixin, isSimpleFilterArg } from './ManyToManyModifyMixin';
 import type { ManyToManyModifyOperationClass } from './ManyToManyModifyMixin';
 import type { RelationQueryBuilder } from '../Relation';
+import type { ReferenceBuilder } from '../../queryBuilder/ReferenceBuilder';
 import type { ObjectionToKnexConvertingOperation } from '../../queryBuilder/operations/ObjectionToKnexConvertingOperation';
 
 // The join rows are filtered by a correlated subquery of the related table, as
@@ -65,7 +66,13 @@ const ManyToManyMySqlModifyMixin = <T extends ManyToManyModifyOperationClass>(Op
 
     async filterJoinRowsByIds(builder: RelationQueryBuilder): Promise<void> {
       const { joinTableOwnerProp, joinTableRelatedProp } = this.relation;
-      const idRefs = [...joinTableOwnerProp.refs(builder), ...joinTableRelatedProp!.refs(builder)];
+      // A column can be part of both keys, like a `tenant_id` of both the owner
+      // and the related rows. The rows of the select have each column once, so
+      // the list of columns needs it once too.
+      const idRefs = uniqueColumnRefs([
+        ...joinTableOwnerProp.refs(builder),
+        ...joinTableRelatedProp!.refs(builder),
+      ]);
 
       // The raw rows: no models, so that no hooks run for them.
       const rows: Record<string, unknown>[] = await builder
@@ -116,6 +123,23 @@ const ManyToManyMySqlModifyMixin = <T extends ManyToManyModifyOperationClass>(Op
     }
   };
 };
+
+// The references of `refs` without the ones to a column that an earlier one
+// refers to.
+function uniqueColumnRefs(refs: ReferenceBuilder[]): ReferenceBuilder[] {
+  const seen = new Set<string>();
+
+  return refs.filter((ref) => {
+    const key = `${ref.tableName}.${ref.column}`;
+
+    if (seen.has(key)) {
+      return false;
+    }
+
+    seen.add(key);
+    return true;
+  });
+}
 
 // The join tables known to have triggers that conflict with the subquery, for
 // each knex configuration (transactions share the configuration of their knex).
