@@ -10,6 +10,9 @@ class UpdateAndFetchOperation extends DelegateOperation {
   declare skipIdWhere: boolean;
   // Shared with the clones that each execution runs.
   declare state: { isMerged: boolean };
+  // A query with the selects of the query, for the fetch, or `null` if it has
+  // none. Set in each execution.
+  declare selects: QueryBuilder | null;
 
   constructor(name: string | null, opt: OperationOptions) {
     super(name, opt);
@@ -21,6 +24,7 @@ class UpdateAndFetchOperation extends DelegateOperation {
     this.id = null;
     this.skipIdWhere = false;
     this.state = { isMerged: false };
+    this.selects = null;
   }
 
   get model(): Model {
@@ -45,6 +49,18 @@ class UpdateAndFetchOperation extends DelegateOperation {
     return super.onBefore1(builder, result);
   }
 
+  // The fetch selects what the query selects (#1938). The selects are taken
+  // before the query is built, as the `onBuild()` hooks of the context that
+  // add selects run for the fetch too.
+  onBefore3(builder: QueryBuilder, result: unknown): unknown {
+    const selector = builder.constructor.SelectSelector;
+    this.selects = builder.has(selector)
+      ? builder.emptyInstance().copyFrom(builder, selector)
+      : null;
+
+    return super.onBefore3(builder, result);
+  }
+
   onBuild(builder: QueryBuilder): void {
     if (!this.skipIdWhere) {
       withWhereScope(builder, () => builder.findById(this.id));
@@ -60,13 +76,16 @@ class UpdateAndFetchOperation extends DelegateOperation {
       return undefined;
     }
 
-    // The fetch selects what the query selects (#1938). The model has the
-    // values of the patch too, merged with the fetched row.
+    // The model has the values of the patch too, merged with the fetched row.
+    const selects = this.selects;
     const fetched = await builder
       .emptyInstance()
       .childQueryOf(builder)
-      .copyFrom(builder, builder.constructor.SelectSelector)
       .modify((builder) => {
+        if (selects) {
+          builder.copyFrom(selects, builder.constructor.SelectSelector);
+        }
+
         if (!this.skipIdWhere) {
           builder.findById(this.id);
         }
