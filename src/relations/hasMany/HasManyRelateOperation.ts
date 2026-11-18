@@ -4,6 +4,7 @@ import { RelateOperation } from '../../queryBuilder/operations/RelateOperation';
 import type { Relation, RelationQueryBuilder } from '../Relation';
 import { assertOwnerModelsHaveProps, assertSingleOwner } from '../RelationOwner';
 import type { RelationOwner } from '../RelationOwner';
+import { copyRelatedFilters } from './copyRelatedFilters';
 
 class HasManyRelateOperation extends RelateOperation {
   declare relation: Relation;
@@ -30,13 +31,9 @@ class HasManyRelateOperation extends RelateOperation {
       relatedProp.patch(patch, i, ownerValues[0][i]);
     });
 
-    const query = this.relation.relatedModelClass
-      .query()
-      .childQueryOf(builder)
-      .patch(patch)
-      .copyFrom(builder, builder.constructor.JoinSelector)
-      .copyFrom(builder, builder.constructor.WhereSelector);
+    const query = this.relation.relatedModelClass.query().childQueryOf(builder).patch(patch);
 
+    copyRelatedFilters(builder, query, this.relation);
     withWhereScope(query, () => query.findByIds(this.ids));
     withWhereScope(query, () => query.modify(this.relation.modify));
 

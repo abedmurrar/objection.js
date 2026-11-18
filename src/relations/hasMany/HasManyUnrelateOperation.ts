@@ -2,6 +2,7 @@ import { withWhereScope } from '../../queryBuilder/whereScopes';
 import { UnrelateOperation } from '../../queryBuilder/operations/UnrelateOperation';
 import type { Relation, RelationQueryBuilder } from '../Relation';
 import type { RelationOwner } from '../RelationOwner';
+import { copyRelatedFilters } from './copyRelatedFilters';
 
 class HasManyUnrelateOperation extends UnrelateOperation {
   declare relation: Relation;
@@ -17,13 +18,9 @@ class HasManyUnrelateOperation extends UnrelateOperation {
       relatedProp.patch(patch, i, null);
     });
 
-    const query = this.relation.relatedModelClass
-      .query()
-      .childQueryOf(builder)
-      .patch(patch)
-      .copyFrom(builder, builder.constructor.JoinSelector)
-      .copyFrom(builder, builder.constructor.WhereSelector);
+    const query = this.relation.relatedModelClass.query().childQueryOf(builder).patch(patch);
 
+    copyRelatedFilters(builder, query, this.relation);
     withWhereScope(query, () => query.whereInComposite(relatedRefs, ownerValues));
     withWhereScope(query, () => query.modify(this.relation.modify));
 
