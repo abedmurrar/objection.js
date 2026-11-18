@@ -42,13 +42,19 @@ class UpsertGraphOperation extends QueryBuilderOperation {
     return true;
   }
 
-  onAfter1(builder: QueryBuilder): unknown {
+  // Checks the calls of the user before the `onBuild()` hooks run, which may
+  // add filters to every query of a model, like those of soft deletes.
+  onBefore1(builder: QueryBuilder, result: unknown): unknown {
     if (hasOtherSqlModifyingQueryBuilderCalls(builder)) {
       throw new Error(
         'upsertGraph query should contain no other query builder calls like `findById`, `where` or `$relatedQuery` that would affect the SQL. They have no effect.',
       );
     }
 
+    return result;
+  }
+
+  onAfter1(builder: QueryBuilder): unknown {
     return this.upsert!.run(builder);
   }
 
@@ -59,8 +65,9 @@ class UpsertGraphOperation extends QueryBuilderOperation {
   }
 }
 
+// `findById()` and `findByIds()` add their where clauses when the query is built.
 function hasOtherSqlModifyingQueryBuilderCalls(builder: QueryBuilder): boolean {
-  return builder.has(/where/) || builder.has(RelationFindOperation);
+  return builder.has(/where/) || builder.has(/^findByIds?$/) || builder.has(RelationFindOperation);
 }
 
 export { UpsertGraphOperation };
