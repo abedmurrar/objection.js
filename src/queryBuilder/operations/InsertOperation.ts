@@ -220,6 +220,10 @@ class InsertOperation extends QueryBuilderOperation {
           this.models[i].$setDatabaseJson(ret[i]);
         }
       }
+    } else if (builder.modelClass().getIdColumn() === null) {
+      // The insert ids that MySQL and SQLite return belong to no column of a
+      // model without an `idColumn`, which `$id()` would set as a property
+      // named "null" (#2305).
     } else if (ret.length === 1 && this.models.length > 1) {
       this.setMySqlBatchInsertIds(builder, ret[0]);
     } else {

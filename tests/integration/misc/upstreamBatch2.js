@@ -127,6 +127,35 @@ module.exports = (session) => {
       });
     });
 
+    describe('inserts of a model without an idColumn (#2305)', () => {
+      class Log extends Model {
+        static get tableName() {
+          return 'ub2_logs';
+        }
+
+        static get idColumn() {
+          return null;
+        }
+      }
+
+      before(async () => {
+        await knex.schema.dropTableIfExists('ub2_logs');
+        await knex.schema.createTable('ub2_logs', (table) => {
+          table.string('message');
+        });
+      });
+
+      after(() => knex.schema.dropTableIfExists('ub2_logs'));
+
+      it('should return the models without a "null" property', async () => {
+        const one = await Log.query(knex).insert({ message: 'a' });
+        const many = await Log.query(knex).insert([{ message: 'b' }, { message: 'c' }]);
+
+        expect({ ...one }).to.eql({ message: 'a' });
+        expect(many.map((it) => ({ ...it }))).to.eql([{ message: 'b' }, { message: 'c' }]);
+      });
+    });
+
     describe('a required property given as a query property (#2199)', () => {
       it('should pass validation with raw() and val()', async () => {
         await Person.query(knex).insert({ id: 2, name: raw('?', ['Raw']) });

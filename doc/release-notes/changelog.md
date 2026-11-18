@@ -6,6 +6,7 @@ Releases of `@abedmurrar/objection`, a fork of objection.js 3.1.5. The versions 
 
 ### Bug fixes
 
+- An insert of a model with `idColumn = null` on MySQL, MariaDB or SQLite set the insert id that the database returns as a property named `"null"`. Models without an id column get no id now [#2305](https://github.com/Vincit/objection.js/issues/2305).
 - `Model.ref()` in the `join` of a relation mapping, like `join: { from: Person.ref('id'), to: Pet.ref('ownerId') }`, threw "join.from must have format TableName.columnName", though the typings allow it. A ref without a table uses its model's table now. Ported from [ditojs/objection](/fork/dito.md) [#1873](https://github.com/Vincit/objection.js/issues/1873).
 - `orderBy()` with an array of refs, like `orderBy([ref('name'), ref('age')])`, or with refs in `{ column }` objects, ordered by `undefined`: knex only reads plain column names and `{ column, order }` objects from the array. The refs are put in such objects now. Ported from [ditojs/objection](/fork/dito.md) [#2252](https://github.com/Vincit/objection.js/issues/2252).
 - `select()` didn't apply to the fetch of `patchAndFetchById()`, `updateAndFetchById()` and the other `*AndFetch` methods, which returned every column. The fetch selects what the query selects now. The model still has the values of the patch too [#1938](https://github.com/Vincit/objection.js/issues/1938).
