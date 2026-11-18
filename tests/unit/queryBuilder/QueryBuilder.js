@@ -432,25 +432,22 @@ describe('QueryBuilder', () => {
       ]);
     });
 
-    it('should visit each operation once when operations move', () => {
-      const visits = [];
-      const query = TestModel.query().where('a', 1).where('b', 2).where('c', 3);
+    it('should run every onBuild() hook when one removes operations around it', () => {
+      const calls = [];
+      const sql = TestModel.query()
+        .where('a', 1)
+        .onBuild((builder) => {
+          calls.push('first');
+          // Removes the where before this hook and the one after it.
+          builder.clearWhere().where('c', 3);
+        })
+        .where('b', 2)
+        .onBuild(() => calls.push('second'))
+        .toKnexQuery()
+        .toString();
 
-      query.forEachOperation(/where/, (op) => {
-        visits.push(op.args[0]);
-
-        if (op.args[0] === 'b') {
-          // Removes the one before, adds one to the front and one to the end.
-          query.clear(/where/);
-          query.where('c', 3);
-          query.addOperationToFront(op.clone(), op.args);
-          query.where('d', 4);
-        }
-      });
-
-      // `a` and `b` were visited, `b`'s clone added to the front isn't, and
-      // the operations added after are, once each.
-      expect(visits).to.eql(['a', 'b', 'c', 'd']);
+      expect(calls).to.eql(['first', 'second']);
+      expect(sql).to.equal('select "Model".* from "Model" where "c" = 3');
     });
   });
 

@@ -713,7 +713,7 @@ class QueryBuilderOperationSupport {
       return;
     }
 
-    this.forEachOperation(true, (op) => {
+    visitOperationsWhileChanging(this._operations, (op) => {
       if ((op.hookMask() & HookBits.onBuild) !== 0) {
         this.callOperationMethod(op, 'onBuild', [this]);
       }
@@ -723,7 +723,7 @@ class QueryBuilderOperationSupport {
   executeOnBuildKnex(knexBuilder: KnexLike): KnexLike {
     const whereGrouping = this.needsWhereGrouping() ? createWhereGrouping(this) : null;
 
-    this.forEachOperation(true, (op) => {
+    visitOperationsWhileChanging(this._operations, (op) => {
       if (whereGrouping !== null && whereGrouping.isGrouped(op)) {
         knexBuilder = whereGrouping.build(op, knexBuilder);
       } else if ((op.hookMask() & HookBits.onBuildKnex) !== 0) {
@@ -816,13 +816,8 @@ function matchesSelector(
 // Visits the operations and their descendants depth first, each operation
 // before its children. Returns false if the callback stopped the walk by
 // returning false. The arrays are read as the walk goes, so operations that
-// the callback adds after the current one are visited too, as before.
-//
-// A callback, like an `onBuild()` hook calling `clearSelect()`, can also remove
-// operations before the current one or the current one itself. The walk then
-// continues after the current operation's new position, or at the operation
-// that took its place: going on by index would skip an operation, like the
-// one of `findById()`, whose where clause a patch then lost.
+// the callback adds are visited too, as before. Callbacks that may remove
+// operations use `visitOperationsWhileChanging()`.
 function visitOperations(
   operations: Operation[],
   kind: SelectorKind,
@@ -830,17 +825,9 @@ function visitOperations(
   callback: OperationCallback,
   match: boolean,
 ): boolean {
-  for (let i = 0; i < operations.length; ++i) {
-    const op = operations[i];
-
+  for (const op of operations) {
     if (matchesSelector(op, kind, operationSelector) === match && callback(op) === false) {
       return false;
-    }
-
-    // The current operation moved, or was removed: continue from its new
-    // index, or before the operation that took its place, without its children.
-    if (operations[i] !== op && operations[(i = indexAfterChange(operations, op, i))] !== op) {
-      continue;
     }
 
     if (
@@ -854,12 +841,37 @@ function visitOperations(
   return true;
 }
 
-// The index of `op` in `operations` after a callback changed them, or the
-// index before `i` if `op` was removed, so that the walk visits the operation
-// that took its place next.
-function indexAfterChange(operations: Operation[], op: Operation, i: number): number {
-  const index = operations.indexOf(op);
-  return index === -1 ? i - 1 : index;
+// Visits every operation like `visitOperations()`, for the walks that call
+// the hooks of the operations, which can run user code. An `onBuild()` hook
+// can remove operations, like one calling `clearSelect()`, also the one being
+// visited or the ones before it. Going on by index would then skip the next
+// operation, like the one of `findById()`, whose where clause a patch lost.
+// The walk continues after the current operation's new position, or at the
+// operation that took its place when it was removed.
+function visitOperationsWhileChanging(
+  operations: Operation[],
+  callback: (op: Operation) => void,
+): void {
+  for (let i = 0; i < operations.length; ++i) {
+    const op = operations[i];
+    callback(op);
+
+    if (operations[i] !== op) {
+      const index = operations.indexOf(op);
+
+      if (index === -1) {
+        // Removed, without its children: visit what took its place next.
+        --i;
+        continue;
+      }
+
+      i = index;
+    }
+
+    if (op.childOperations.length !== 0) {
+      visitOperationsWhileChanging(op.childOperations, callback);
+    }
+  }
 }
 
 function getTableName(modelClassOrTableName: TableSource): string {
