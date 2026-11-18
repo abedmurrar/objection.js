@@ -683,6 +683,324 @@ module.exports = (session) => {
       });
     });
 
+    // The rows of the tenants in `tenants` are those of `DATA`.
+    async function expectUntouched(tenants) {
+      const columns = {
+        cmOwners: ['tenantId', 'code', 'name'],
+        cmPets: ['tenantId', 'petNo', 'ownerCode', 'name'],
+        cmToys: ['tenantId', 'petNo', 'name'],
+        cmTags: ['tenantId', 'code', 'label'],
+        cmOwnerTags: ['tenantId', 'ownerCode', 'tagCode', 'note'],
+        cmFavorites: ['tenantId', 'ownerCode', 'tagCode'],
+      };
+
+      for (const [table, cols] of Object.entries(columns)) {
+        const actual = (await rows(table, cols)).filter((it) =>
+          tenants.includes(Number(it.split('/')[0])),
+        );
+        const want = DATA[table]
+          .filter((it) => tenants.includes(it.tenantId))
+          .map((it) => cols.map((col) => String(it[col])).join('/'))
+          .sort();
+
+        expect(actual).to.eql(want);
+      }
+    }
+
+    const ofTenant = async (table, columns, tenant) =>
+      (await rows(table, columns)).filter((it) => it.startsWith(`${tenant}/`));
+
+    describe('insertGraph()', () => {
+      it('should give every relation type both parts of its key', async () => {
+        await BoundOwner.query().insertGraph({
+          tenantId: 3,
+          code: 'a',
+          name: 'Cid',
+          pets: [
+            { petNo: 1, name: 'P1', toys: [{ name: 't1' }, { name: 't2' }] },
+            { petNo: 2, name: 'P2' },
+          ],
+          tags: [{ tenantId: 3, code: 'red', label: 'Rouge', note: 'm1' }],
+          favoriteTag: { tenantId: 3, code: 'blue', label: 'Bleu' },
+        });
+
+        expect(await ofTenant('cmOwners', ['tenantId', 'code', 'name'], 3)).to.eql(['3/a/Cid']);
+        expect(await ofTenant('cmPets', ['tenantId', 'petNo', 'ownerCode', 'name'], 3)).to.eql([
+          '3/1/a/P1',
+          '3/2/a/P2',
+        ]);
+        expect(await ofTenant('cmToys', ['tenantId', 'petNo', 'name'], 3)).to.eql([
+          '3/1/t1',
+          '3/1/t2',
+        ]);
+        expect(await ofTenant('cmTags', ['tenantId', 'code', 'label'], 3)).to.eql([
+          '3/blue/Bleu',
+          '3/red/Rouge',
+        ]);
+        expect(
+          await ofTenant('cmOwnerTags', ['tenantId', 'ownerCode', 'tagCode', 'note'], 3),
+        ).to.eql(['3/a/red/m1']);
+        expect(await ofTenant('cmFavorites', ['tenantId', 'ownerCode', 'tagCode'], 3)).to.eql([
+          '3/a/blue',
+        ]);
+        await expectUntouched([1, 2]);
+      });
+
+      it('should insert several owners with the same pet numbers', async () => {
+        await BoundOwner.query().insertGraph([
+          { tenantId: 3, code: 'a', name: 'Cid', pets: [{ petNo: 1, name: 'C1' }] },
+          {
+            tenantId: 4,
+            code: 'a',
+            name: 'Dan',
+            pets: [
+              { petNo: 1, name: 'D1' },
+              { petNo: 2, name: 'D2', toys: [{ name: 'dt' }] },
+            ],
+          },
+        ]);
+
+        const pets = (await rows('cmPets', ['tenantId', 'petNo', 'ownerCode', 'name'])).filter(
+          (it) => /^[34]\//.test(it),
+        );
+        const toys = (await rows('cmToys', ['tenantId', 'petNo', 'name'])).filter((it) =>
+          /^[34]\//.test(it),
+        );
+
+        expect(pets).to.eql(['3/1/a/C1', '4/1/a/D1', '4/2/a/D2']);
+        expect(toys).to.eql(['4/2/dt']);
+        await expectUntouched([1, 2]);
+      });
+
+      it('should share a new tag through #ref', async () => {
+        await BoundOwner.query().insertGraph(
+          [
+            {
+              tenantId: 3,
+              code: 'a',
+              name: 'Cid',
+              tags: [{ '#id': 'shared', tenantId: 3, code: 'green', label: 'Vert', note: 'x1' }],
+            },
+            { tenantId: 3, code: 'b', name: 'Cal', tags: [{ '#ref': 'shared' }] },
+          ],
+          { allowRefs: true },
+        );
+
+        expect(await ofTenant('cmTags', ['tenantId', 'code'], 3)).to.eql(['3/green']);
+        // `#ref` is the same model, and the extras of the join rows are its
+        // properties: both join rows get its note.
+        expect(
+          await ofTenant('cmOwnerTags', ['tenantId', 'ownerCode', 'tagCode', 'note'], 3),
+        ).to.eql(['3/a/green/x1', '3/b/green/x1']);
+        await expectUntouched([1, 2]);
+      });
+
+      it('should relate existing tags of the tenant with relate: true', async () => {
+        await BoundOwner.query().insertGraph(
+          { tenantId: 2, code: 'c', name: 'Cora', tags: [{ tenantId: 2, code: 'red', note: 'r' }] },
+          { relate: true },
+        );
+
+        expect(await rows('cmTags', ['tenantId', 'code'])).to.eql([
+          '1/blue',
+          '1/red',
+          '2/blue',
+          '2/red',
+        ]);
+        expect(
+          await ofTenant('cmOwnerTags', ['tenantId', 'ownerCode', 'tagCode', 'note'], 2),
+        ).to.eql(['2/a/blue/n4', '2/c/red/r']);
+        await expectUntouched([1]);
+      });
+
+      it('should insert the owner of a pet first and give the pet its key', async () => {
+        await BoundPet.query().insertGraph([
+          { tenantId: 3, petNo: 5, name: 'Solo', owner: { tenantId: 3, code: 'z', name: 'Zed' } },
+          // The pet's tenantId comes from its owner.
+          { petNo: 6, name: 'Solo2', owner: { tenantId: 3, code: 'y', name: 'Yan' } },
+        ]);
+
+        expect(await ofTenant('cmOwners', ['tenantId', 'code', 'name'], 3)).to.eql([
+          '3/y/Yan',
+          '3/z/Zed',
+        ]);
+        expect(await ofTenant('cmPets', ['tenantId', 'petNo', 'ownerCode', 'name'], 3)).to.eql([
+          '3/5/z/Solo',
+          '3/6/y/Solo2',
+        ]);
+        await expectUntouched([1, 2]);
+      });
+
+      it('should fetch the stored graph with insertGraphAndFetch()', async () => {
+        const owner = await BoundOwner.query().insertGraphAndFetch({
+          tenantId: 3,
+          code: 'a',
+          name: 'Cid',
+          pets: [{ petNo: 1, name: 'P1', toys: [{ name: 't1' }] }],
+          tags: [{ tenantId: 3, code: 'red', label: 'Rouge', note: 'n' }],
+        });
+
+        expect(owner.$id()).to.eql([3, 'a']);
+        expect(owner.pets.map((it) => [...it.$id(), it.ownerCode, it.name])).to.eql([
+          [3, 1, 'a', 'P1'],
+        ]);
+        expect(owner.pets[0].toys.map((it) => `${it.tenantId}/${it.petNo}/${it.name}`)).to.eql([
+          '3/1/t1',
+        ]);
+        expect(owner.tags.map((it) => `${it.tenantId}/${it.code}/${it.label}/${it.note}`)).to.eql([
+          '3/red/Rouge/n',
+        ]);
+      });
+
+      it('should roll back a graph that fails in a transaction', async () => {
+        let error = null;
+
+        try {
+          await Model.transaction(knex, (trx) =>
+            Owner.query(trx).insertGraph({
+              tenantId: 3,
+              code: 'a',
+              name: 'Cid',
+              tags: [{ tenantId: 3, code: 'red', label: 'Rouge' }],
+              // The same id twice.
+              pets: [
+                { petNo: 1, name: 'one' },
+                { petNo: 1, name: 'again' },
+              ],
+            }),
+          );
+        } catch (err) {
+          error = err;
+        }
+
+        expect(error).to.be.an(Error);
+        await expectUntouched([1, 2, 3]);
+      });
+    });
+
+    describe('more upsertGraph()', () => {
+      it('should update a has-one relation and change a has-one-through relation', async () => {
+        const graph = await BoundOwner.query()
+          .findById([1, 'a'])
+          .withGraphFetched('[firstPet, favoriteTag]');
+
+        expect(graph.firstPet.name).to.equal('Fido');
+        expect(graph.favoriteTag.code).to.equal('blue');
+
+        graph.firstPet.name = 'Fido 2';
+        graph.favoriteTag = { tenantId: 1, code: 'red' };
+
+        await BoundOwner.query().upsertGraph(graph, { relate: true, unrelate: true });
+
+        expect(await rows('cmFavorites', ['tenantId', 'ownerCode', 'tagCode'])).to.eql([
+          '1/a/red',
+          '2/a/red',
+        ]);
+        expect(await ofTenant('cmPets', ['tenantId', 'petNo', 'name'], 1)).to.eql([
+          '1/1/Fido 2',
+          '1/2/Rex',
+          '1/3/Tom',
+        ]);
+        expect(await rows('cmTags', ['tenantId', 'code'])).to.eql([
+          '1/blue',
+          '1/red',
+          '2/blue',
+          '2/red',
+        ]);
+        await expectUntouched([2]);
+      });
+
+      it('should update an extra column of a many-to-many relation', async () => {
+        const graph = await BoundOwner.query().findById([1, 'a']).withGraphFetched('tags');
+        graph.tags.find((it) => it.code === 'red').note = 'changed';
+
+        await BoundOwner.query().upsertGraph(graph);
+
+        expect(await rows('cmOwnerTags', ['tenantId', 'ownerCode', 'tagCode', 'note'])).to.eql([
+          '1/a/blue/n2',
+          '1/a/red/changed',
+          '1/b/red/n3',
+          '2/a/blue/n4',
+        ]);
+        expect(await rows('cmTags', ['tenantId', 'code', 'label'])).to.eql(
+          DATA.cmTags.map((it) => `${it.tenantId}/${it.code}/${it.label}`).sort(),
+        );
+      });
+
+      it('should move a pet between two owners of the tenant in one upsert', async () => {
+        await BoundOwner.query().upsertGraph(
+          [
+            { tenantId: 1, code: 'a', pets: [{ tenantId: 1, petNo: 1 }] },
+            {
+              tenantId: 1,
+              code: 'b',
+              pets: [
+                { tenantId: 1, petNo: 3 },
+                { tenantId: 1, petNo: 2 },
+              ],
+            },
+          ],
+          { relate: true, unrelate: true },
+        );
+
+        expect(await ofTenant('cmPets', ['tenantId', 'petNo', 'ownerCode', 'name'], 1)).to.eql([
+          '1/1/a/Fido',
+          '1/2/b/Rex',
+          '1/3/b/Tom',
+        ]);
+        await expectUntouched([2]);
+      });
+
+      it('should insert missing rows with given composite ids', async () => {
+        await BoundOwner.query().upsertGraph(
+          [
+            {
+              tenantId: 3,
+              code: 'n',
+              name: 'New',
+              pets: [{ tenantId: 3, petNo: 1, name: 'NP' }],
+            },
+          ],
+          { insertMissing: true },
+        );
+
+        expect(await ofTenant('cmOwners', ['tenantId', 'code', 'name'], 3)).to.eql(['3/n/New']);
+        expect(await ofTenant('cmPets', ['tenantId', 'petNo', 'ownerCode', 'name'], 3)).to.eql([
+          '3/1/n/NP',
+        ]);
+        await expectUntouched([1, 2]);
+      });
+
+      it('should update the whole row with update: true', async () => {
+        await BoundOwner.query().upsertGraph(
+          { tenantId: 2, code: 'a', name: 'Ada U' },
+          { update: true },
+        );
+
+        expect(await ofTenant('cmOwners', ['tenantId', 'code', 'name'], 2)).to.eql([
+          '2/a/Ada U',
+          '2/b/Ben',
+        ]);
+        await expectUntouched([1]);
+      });
+
+      it('should fetch the stored graph with upsertGraphAndFetch()', async () => {
+        const graph = await BoundOwner.query()
+          .findById([2, 'a'])
+          .withGraphFetched('[pets.toys, tags]');
+        graph.pets[0].name = 'Kitty';
+
+        const owner = await BoundOwner.query().upsertGraphAndFetch(graph);
+
+        expect(owner.$id()).to.eql([2, 'a']);
+        expect(owner.pets.map((it) => `${it.tenantId}/${it.petNo}/${it.name}`)).to.eql([
+          '2/1/Kitty',
+        ]);
+        expect(owner.pets[0].toys.map((it) => it.name)).to.eql(['mouse']);
+        expect(owner.tags.map((it) => `${it.label}:${it.note}`)).to.eql(['Blau:n4']);
+      });
+    });
+
     describe('upsertGraph()', () => {
       const fetchGraph = (t, code) =>
         BoundOwner.query()
