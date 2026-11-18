@@ -111,7 +111,6 @@ class InsertGraphOperation extends DelegateOperation {
   }
 }
 
-
 // The graph's inserts are separate queries, which `onConflict()`, `ignore()`
 // and `merge()` of the graph query don't reach, so they would be silently
 // ignored (#2156).
