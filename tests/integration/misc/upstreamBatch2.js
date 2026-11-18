@@ -78,6 +78,55 @@ module.exports = (session) => {
       });
     });
 
+    describe('Model.ref() in the join of a relation (#1873)', () => {
+      class Pet extends Model {
+        static get tableName() {
+          return 'ub2_pets';
+        }
+      }
+
+      class Owner extends Model {
+        static get tableName() {
+          return 'ub2_persons';
+        }
+
+        static get relationMappings() {
+          return {
+            pets: {
+              relation: Model.HasManyRelation,
+              modelClass: Pet,
+              join: { from: Owner.ref('id'), to: Pet.ref('ownerId') },
+            },
+          };
+        }
+      }
+
+      before(async () => {
+        await knex.schema.dropTableIfExists('ub2_pets');
+        await knex.schema.createTable('ub2_pets', (table) => {
+          table.increments('id').primary();
+          table.integer('ownerId');
+          table.string('name');
+        });
+      });
+
+      after(() => knex.schema.dropTableIfExists('ub2_pets'));
+
+      it('should load and insert through the relation', async () => {
+        // Without ids, so that PostgreSQL's sequence knows them.
+        await knex('ub2_pets').insert({ ownerId: 1, name: 'Fido' });
+        await knex('ub2_pets').insert({ ownerId: 9, name: 'Rex' });
+
+        const [owner] = await Owner.query(knex).withGraphFetched('pets').where('id', 1);
+        await owner.$relatedQuery('pets', knex).insert({ name: 'Kit' });
+
+        expect(owner.pets.map((it) => it.name)).to.eql(['Fido']);
+        expect(
+          (await knex('ub2_pets').where('ownerId', 1).orderBy('id')).map((it) => it.name),
+        ).to.eql(['Fido', 'Kit']);
+      });
+    });
+
     describe('a required property given as a query property (#2199)', () => {
       it('should pass validation with raw() and val()', async () => {
         await Person.query(knex).insert({ id: 2, name: raw('?', ['Raw']) });

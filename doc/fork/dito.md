@@ -31,6 +31,7 @@ Each row links the original commits, which are by Jürg Lehni unless another aut
 | Unreleased | `withGraphJoined()` modifiers select aggregates by their aliases, and raw SQL ending with an alias and subqueries with `as()`. | [94fdc217](https://github.com/ditojs/objection/commit/94fdc217), [8851db95](https://github.com/ditojs/objection/commit/8851db95), [bd5775de](https://github.com/ditojs/objection/commit/bd5775de) |
 | Unreleased | A required property given as a query property, like `raw()`, passes validation. | [d69f783d](https://github.com/ditojs/objection/commit/d69f783d) |
 | Unreleased | `orderBy()` with refs in an array. | [7057a8eb](https://github.com/ditojs/objection/commit/7057a8eb) |
+| Unreleased | `Model.ref()` in the `join` of a relation mapping. | [3f44194a](https://github.com/ditojs/objection/commit/3f44194a) |
 | 4.1.4   | `resolve()` in a hook doesn't patch join rows, update instances or clear BelongsToOne owner keys. | [ebeba06a](https://github.com/ditojs/objection/commit/ebeba06a) |
 | 4.1.4   | `whereInComposite()` with an empty list of composite values. | [495ebb00](https://github.com/ditojs/objection/commit/495ebb00) |
 | 4.2.0   | `static useAfterFindInGraphs`: eager loading respects the static `afterFind()` hook of related model classes, opt-in in 4.x. | [70b2417d](https://github.com/ditojs/objection/commit/70b2417d), [c1433500](https://github.com/ditojs/objection/commit/c1433500) |

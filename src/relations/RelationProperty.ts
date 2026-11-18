@@ -212,14 +212,18 @@ function createRefs(refs: unknown[]): ReferenceBuilder[] {
 
 function createPaths(refs: ReferenceBuilder[], modelClassResolver: ModelClassResolver): PropPath[] {
   return refs.map((ref) => {
-    if (!ref.tableName) {
+    // A reference made with `SomeModel.ref(column)` has no table name of its
+    // own: it's the one of its model class (#1873).
+    const tableName = ref.tableName || (ref.modelClass ? ref.modelClass.getTableName() : null);
+
+    if (!tableName) {
       throw new InvalidReferenceError();
     }
 
-    const modelClass = modelClassResolver(ref.tableName);
+    const modelClass = modelClassResolver(tableName);
 
     if (!modelClass) {
-      throw new ModelNotFoundError(ref.tableName);
+      throw new ModelNotFoundError(tableName);
     }
 
     const prop = modelClass.columnNameToPropertyName(ref.column);
